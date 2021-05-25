@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/sisu-network/dheart/server"
+	"github.com/sisu-network/tuktuk/server"
 )
 
 func main() {

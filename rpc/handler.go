@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/tuktuk/utils"
 )
 
 // handler handles JSON-RPC messages. There is one handler per connection. Note that

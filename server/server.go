@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sisu-network/dheart/rpc"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/tuktuk/rpc"
+	"github.com/sisu-network/tuktuk/utils"
 )
 
 type Server struct {

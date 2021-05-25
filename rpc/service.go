@@ -36,7 +36,7 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/tuktuk/utils"
 )
 
 var (

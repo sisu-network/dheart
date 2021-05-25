@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/tuktuk/utils"
 )
 
 var (

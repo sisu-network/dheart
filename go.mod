@@ -1,4 +1,4 @@
-module github.com/sisu-network/dheart
+module github.com/sisu-network/tuktuk
 
 go 1.16
 

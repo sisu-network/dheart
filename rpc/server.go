@@ -8,7 +8,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/tuktuk/utils"
 )
 
 const MetadataApi = "rpc"
