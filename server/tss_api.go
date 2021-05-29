@@ -19,7 +19,7 @@ func NewTssApi(tutuk *core.TutTuk) *TssApi {
 	}
 }
 
-func (api *TssApi) GetVersion() string {
+func (api *TssApi) Version() string {
 	return "1"
 }
 
@@ -38,4 +38,8 @@ func (api *TssApi) Setup(configs []common.ChainConfig) error {
 	api.isSetup = true
 
 	return nil
+}
+
+func (api *TssApi) Halt() {
+
 }
