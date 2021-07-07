@@ -5,8 +5,9 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/sisu-network/tuktuk/rpc"
 	"github.com/sisu-network/tuktuk/utils"
+
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type Server struct {
