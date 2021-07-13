@@ -8,34 +8,37 @@ import (
 	"github.com/sisu-network/tuktuk/utils"
 )
 
-type OnMemoryApi struct {
+// This is a mock API to use for single localhost node. It does not have TSS signing round and
+// generates a private key instead.
+type SingleNodeApi struct {
 	tutuk *core.TutTuk
 
 	keyMap map[string]interface{}
 	ethKey *ecdsa.PrivateKey
 }
 
-func NewOnMemoryApi(tuktuk *core.TutTuk) *OnMemoryApi {
-	return &OnMemoryApi{
+func NewSingleNodeApi(tuktuk *core.TutTuk) *SingleNodeApi {
+	return &SingleNodeApi{
 		tutuk:  tuktuk,
 		keyMap: make(map[string]interface{}),
 	}
 }
 
-func (api *OnMemoryApi) Version() string {
+func (api *SingleNodeApi) Version() string {
 	return "1"
 }
 
-func (api *OnMemoryApi) KeyGen(chain string) error {
+func (api *SingleNodeApi) KeyGen(chain string) error {
 	utils.LogInfo("chain = ", chain)
 	switch chain {
 	case "eth":
 		return api.keyGenEth(chain)
 	}
+
 	return nil
 }
 
-func (api *OnMemoryApi) keyGenEth(chain string) error {
+func (api *SingleNodeApi) keyGenEth(chain string) error {
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
 		return err
