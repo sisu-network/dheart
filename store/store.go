@@ -15,7 +15,7 @@ type Store struct {
 }
 
 func NewStore(path string, aesKey []byte) (*Store, error) {
-	db, err := leveldb.OpenFile("path/to/db", nil)
+	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		return nil, err
 	}
