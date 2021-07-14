@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/joho/godotenv"
+	"github.com/sisu-network/tuktuk/client"
 	"github.com/sisu-network/tuktuk/core"
 	"github.com/sisu-network/tuktuk/server"
 )
@@ -19,18 +20,27 @@ func initialize() {
 	}
 }
 
+func getSisuClient() *client.Client {
+	url := os.Getenv("SISU_SERVER_URL")
+	c := client.NewClient(url)
+	return c
+}
+
 func setupApiServer() {
+	c := getSisuClient()
+
 	tuktuk := core.NewTutTuk()
 
 	handler := rpc.NewServer()
 	if os.Getenv("USE_ON_MEMORY") == "" {
 		handler.RegisterName("tss", server.NewTssApi(tuktuk))
 	} else {
-		handler.RegisterName("tss", server.NewSingleNodeApi(tuktuk))
+		handler.RegisterName("tss", server.NewSingleNodeApi(tuktuk, c))
 	}
 
 	s := server.NewServer(handler, "localhost", 5678)
 
+	go c.TryDial()
 	go s.Run()
 }
 
