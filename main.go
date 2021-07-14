@@ -35,6 +35,9 @@ func setupApiServer() {
 	if os.Getenv("USE_ON_MEMORY") == "" {
 		handler.RegisterName("tss", server.NewTssApi(tuktuk))
 	} else {
+		api := server.NewSingleNodeApi(tuktuk, c)
+		api.Init()
+
 		handler.RegisterName("tss", server.NewSingleNodeApi(tuktuk, c))
 	}
 

@@ -2,9 +2,7 @@ package server
 
 import (
 	"crypto/ecdsa"
-	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"fmt"
 	"log"
 	"math/big"
@@ -15,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/sisu-network/tuktuk/client"
+	"github.com/sisu-network/tuktuk/common"
 	"github.com/sisu-network/tuktuk/core"
 	"github.com/sisu-network/tuktuk/store"
 	"github.com/sisu-network/tuktuk/utils"
@@ -36,33 +35,45 @@ type SingleNodeApi struct {
 }
 
 func NewSingleNodeApi(tuktuk *core.TutTuk, c *client.Client) *SingleNodeApi {
+	return &SingleNodeApi{
+		tutuk:   tuktuk,
+		keyMap:  make(map[string]interface{}),
+		ethKeys: make(map[string]*ecdsa.PrivateKey),
+		c:       c,
+	}
+}
+
+// Initializes private keys used for Tuktuk
+func (api *SingleNodeApi) Init() {
+	// Store
 	aesKey, err := base64.RawStdEncoding.DecodeString(encodedAESKey)
 	if err != nil {
 		panic(err)
 	}
 
 	path := os.Getenv("HOME_DIR")
-
 	store, err := store.NewStore(path+"/apidb", aesKey)
 	if err != nil {
 		panic(err)
 	}
+	api.store = store
 
-	return &SingleNodeApi{
-		tutuk:    tuktuk,
-		keyMap:   make(map[string]interface{}),
-		store:    store,
-		ethKeys:  make(map[string]*ecdsa.PrivateKey),
-		chainIds: initChainIds(),
-		c:        c,
+	// Initialized keygens
+	for _, chain := range common.SUPPORTED_CHAINS {
+		encPrivKey, err := api.store.GetEncrypted([]byte(api.getKeygenKey(chain)))
+		if err != nil {
+			continue
+		}
+
+		if utils.IsEcDSA(chain) {
+			privKey, err := utils.DecodeEcDSA(encPrivKey)
+			if err != nil {
+				panic(err)
+			}
+
+			api.ethKeys[chain] = privKey
+		}
 	}
-}
-
-func initChainIds() map[string]*big.Int {
-	chainIds := make(map[string]*big.Int)
-	chainIds["eth"] = big.NewInt(1)
-
-	return chainIds
 }
 
 func (api *SingleNodeApi) Version() string {
@@ -90,6 +101,10 @@ func (api *SingleNodeApi) KeyGen(chain string) error {
 	return err
 }
 
+func (api *SingleNodeApi) getKeygenKey(chain string) []byte {
+	return []byte(fmt.Sprintf("keygen_%s", chain))
+}
+
 func (api *SingleNodeApi) keyGenEth(chain string) error {
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -98,12 +113,11 @@ func (api *SingleNodeApi) keyGenEth(chain string) error {
 
 	api.ethKeys[chain] = privateKey
 
-	x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
-	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
+	pemEncoded := utils.EncodeEcDSA(privateKey)
 
 	utils.LogInfo("Saving encrypted key...")
 
-	return api.store.PutEncrypted([]byte(fmt.Sprintf("key_%s", chain)), []byte(pemEncoded))
+	return api.store.PutEncrypted(api.getKeygenKey(chain), pemEncoded)
 }
 
 func (api *SingleNodeApi) KeySign(chain string, serialized []byte) ([]byte, error) {

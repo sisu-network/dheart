@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
 
 type Store struct {
@@ -74,4 +75,8 @@ func (s *Store) GetEncrypted(key []byte) (value []byte, err error) {
 	data, err := gcm.Open(nil, nonce, ciphertext, nil)
 
 	return data, err
+}
+
+func (s *Store) Iterator() iterator.Iterator {
+	return s.db.NewIterator(nil, nil)
 }
