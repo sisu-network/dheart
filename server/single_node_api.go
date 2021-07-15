@@ -52,6 +52,13 @@ func (api *SingleNodeApi) Init() {
 	}
 
 	path := os.Getenv("HOME_DIR")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		err := os.Mkdir(path, os.ModePerm)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	store, err := store.NewStore(path+"/apidb", aesKey)
 	if err != nil {
 		panic(err)
