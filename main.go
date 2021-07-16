@@ -38,7 +38,7 @@ func setupApiServer() {
 		api := server.NewSingleNodeApi(tuktuk, c)
 		api.Init()
 
-		handler.RegisterName("tss", server.NewSingleNodeApi(tuktuk, c))
+		handler.RegisterName("tss", api)
 	}
 
 	s := server.NewServer(handler, "localhost", 5678)

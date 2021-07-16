@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/sisu-network/tuktuk/types"
 	"github.com/sisu-network/tuktuk/utils"
 )
 
@@ -55,8 +56,13 @@ func (c *Client) KeygenResult(chain string) error {
 	}
 
 	utils.LogDebug("Sending keygen result to sisu server")
+	keygenResult := types.KeygenResult{
+		Chain:   chain,
+		Success: true,
+	}
+
 	var result interface{}
-	err := c.client.CallContext(context.Background(), &result, "tss_keygenResult", chain)
+	err := c.client.CallContext(context.Background(), &result, "tss_keygenResult", keygenResult)
 	if err != nil {
 		utils.LogError("Cannot post keygen resutl, err = ", err)
 		return err

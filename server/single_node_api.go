@@ -67,13 +67,13 @@ func (api *SingleNodeApi) Init() {
 
 	// Initialized keygens
 	for _, chain := range common.SUPPORTED_CHAINS {
-		encPrivKey, err := api.store.GetEncrypted([]byte(api.getKeygenKey(chain)))
+		bz, err := api.store.GetEncrypted([]byte(api.getKeygenKey(chain)))
 		if err != nil {
 			continue
 		}
 
 		if utils.IsEcDSA(chain) {
-			privKey, err := utils.DecodeEcDSA(encPrivKey)
+			privKey, err := crypto.ToECDSA(bz)
 			if err != nil {
 				panic(err)
 			}
@@ -95,10 +95,13 @@ func (api *SingleNodeApi) KeyGen(chain string) error {
 		err = api.keyGenEth(chain)
 	}
 
+	utils.LogInfo("err = ", err)
+
 	if err == nil {
 		// Add some delay to mock TSS gen delay before sending back to Sisu server
 		go func() {
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * 3)
+			utils.LogInfo("Sending keygen to Sisu")
 			api.c.KeygenResult(chain)
 		}()
 	} else {
@@ -112,6 +115,7 @@ func (api *SingleNodeApi) getKeygenKey(chain string) []byte {
 	return []byte(fmt.Sprintf("keygen_%s", chain))
 }
 
+// Key generation for ETH based chains
 func (api *SingleNodeApi) keyGenEth(chain string) error {
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -120,13 +124,11 @@ func (api *SingleNodeApi) keyGenEth(chain string) error {
 
 	api.ethKeys[chain] = privateKey
 
-	pemEncoded := utils.EncodeEcDSA(privateKey)
-
-	utils.LogInfo("Saving encrypted key...")
-
-	return api.store.PutEncrypted(api.getKeygenKey(chain), pemEncoded)
+	encoded := crypto.FromECDSA(privateKey)
+	return api.store.PutEncrypted(api.getKeygenKey(chain), encoded)
 }
 
+// Signing any transaction
 func (api *SingleNodeApi) KeySign(chain string, serialized []byte) ([]byte, error) {
 	var err error
 	var data []byte
