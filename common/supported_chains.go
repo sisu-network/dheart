@@ -19,3 +19,14 @@ var (
 func init() {
 	SUPPORTED_CHAINS_ID_MAP["eth"] = big.NewInt(1)
 }
+
+func IsEthBasedChain(chain string) bool {
+	switch chain {
+	case CHAIN_ETH:
+		return true
+	case CHAIN_ETH_MAINNET:
+		return true
+	}
+
+	return false
+}
