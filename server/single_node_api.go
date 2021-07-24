@@ -96,13 +96,17 @@ func (api *SingleNodeApi) KeyGen(chain string) error {
 	}
 
 	utils.LogInfo("err = ", err)
+	pubKey := api.ethKeys[chain].Public()
+	publicKeyECDSA, _ := pubKey.(*ecdsa.PublicKey)
+	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
 
 	if err == nil {
 		// Add some delay to mock TSS gen delay before sending back to Sisu server
 		go func() {
 			time.Sleep(time.Second * 3)
 			utils.LogInfo("Sending keygen to Sisu")
-			api.c.KeygenResult(chain)
+
+			api.c.BroadcastKeygenResult(chain, publicKeyBytes)
 		}()
 	} else {
 		utils.LogError(err)

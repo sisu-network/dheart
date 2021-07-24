@@ -1,7 +1,7 @@
 package types
 
 type KeygenResult struct {
-	Chain   string
-	Success bool
-	Hash    string
+	Chain       string
+	Success     bool
+	PubKeyBytes []byte
 }

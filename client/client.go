@@ -48,7 +48,7 @@ func (c *Client) TryDial() {
 	utils.LogInfo("Sisu server is connected")
 }
 
-func (c *Client) KeygenResult(chain string) error {
+func (c *Client) BroadcastKeygenResult(chain string, pubKey []byte) error {
 	utils.LogDebug("c.connected = ", c.connected)
 
 	if !c.connected {
@@ -57,8 +57,9 @@ func (c *Client) KeygenResult(chain string) error {
 
 	utils.LogDebug("Sending keygen result to sisu server")
 	keygenResult := types.KeygenResult{
-		Chain:   chain,
-		Success: true,
+		Chain:       chain,
+		Success:     true,
+		PubKeyBytes: pubKey,
 	}
 
 	var result interface{}
