@@ -83,6 +83,10 @@ func (api *SingleNodeApi) Init() {
 	}
 }
 
+// Empty function for checking health only.
+func (api *SingleNodeApi) CheckHealth() {
+}
+
 func (api *SingleNodeApi) Version() string {
 	return "1"
 }
@@ -98,7 +102,7 @@ func (api *SingleNodeApi) KeyGen(chain string) error {
 	utils.LogInfo("err = ", err)
 	pubKey := api.ethKeys[chain].Public()
 	publicKeyECDSA, _ := pubKey.(*ecdsa.PublicKey)
-	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
+	publicKeyBytes := crypto.CompressPubkey(publicKeyECDSA)
 
 	if err == nil {
 		// Add some delay to mock TSS gen delay before sending back to Sisu server

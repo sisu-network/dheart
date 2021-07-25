@@ -36,16 +36,27 @@ func (c *Client) TryDial() {
 
 	for {
 		utils.LogInfo("Dialing...", c.url)
-		var err error
-		c.client, err = rpc.DialContext(context.Background(), c.url)
-		if err == nil {
+		c.client, _ = rpc.DialContext(context.Background(), c.url)
+		if err := c.CheckHealth(); err == nil {
 			c.connected = true
 			break
 		}
+
 		time.Sleep(RETRY_TIME)
 	}
 
 	utils.LogInfo("Sisu server is connected")
+}
+
+func (c *Client) CheckHealth() error {
+	var result interface{}
+	err := c.client.CallContext(context.Background(), &result, "tss_checkHealth")
+	if err != nil {
+		utils.LogError("Cannot check tuktuk health, err = ", err)
+		return err
+	}
+
+	return nil
 }
 
 func (c *Client) BroadcastKeygenResult(chain string, pubKey []byte) error {
