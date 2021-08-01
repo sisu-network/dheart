@@ -4,14 +4,12 @@ import (
 	"crypto/ecdsa"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"math/big"
 	"os"
 	"time"
 
 	eTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/sisu-network/tuktuk/client"
 	"github.com/sisu-network/tuktuk/common"
 	"github.com/sisu-network/tuktuk/core"
@@ -146,18 +144,24 @@ func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, e
 
 	privateKey := api.ethKeys[chain]
 
-	var tx *eTypes.Transaction
-	err := rlp.DecodeBytes(serialized, tx)
+	fmt.Println("len(serialized) = ", len(serialized))
+
+	tx := &eTypes.Transaction{}
+	err := tx.UnmarshalBinary(serialized)
 	if err != nil {
+		utils.LogError("Cannot unmarshall ETH tx.")
 		return nil, err
 	}
 
+	fmt.Println("Signing this TX.....")
 	signedTx, err := eTypes.SignTx(tx, eTypes.NewEIP155Signer(api.chainIds[chain]), privateKey)
 	if err != nil {
-		log.Fatal(err)
+		utils.LogError("cannot sign eth tx. err = ", err)
 	}
 
-	serializedSigned, err := rlp.EncodeToBytes(signedTx)
+	fmt.Println("Signing completed")
+
+	serializedSigned, err := signedTx.MarshalBinary()
 
 	return serializedSigned, err
 }
