@@ -8,6 +8,9 @@ type KeysignRequest struct {
 }
 
 type KeysignResult struct {
+	Success   bool
+	ErrMesage string
+
 	OutChain       string
 	OutHash        string
 	OutBlockHeight int64

@@ -186,6 +186,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 			utils.LogInfo("Sending keygen to Sisu")
 
 			api.c.BroadcastKeySignResult(&types.KeysignResult{
+				Success:        true,
 				OutChain:       req.OutChain,
 				OutBlockHeight: req.OutBlockHeight,
 				OutHash:        req.OutHash,
@@ -193,7 +194,14 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 			})
 		}()
 	} else {
-		utils.LogError(err)
+		api.c.BroadcastKeySignResult(&types.KeysignResult{
+			Success:        false,
+			ErrMesage:      err.Error(),
+			OutChain:       req.OutChain,
+			OutBlockHeight: req.OutBlockHeight,
+			OutHash:        req.OutHash,
+			Signature:      signature,
+		})
 	}
 
 	return err
