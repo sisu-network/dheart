@@ -73,9 +73,22 @@ func (c *Client) BroadcastKeygenResult(chain string, pubKey []byte) error {
 		PubKeyBytes: pubKey,
 	}
 
-	var result interface{}
-	err := c.client.CallContext(context.Background(), &result, "tss_keygenResult", keygenResult)
+	var r interface{}
+	err := c.client.CallContext(context.Background(), &r, "tss_keygenResult", keygenResult)
 	if err != nil {
+		// TODO: Retry on failure.
+		utils.LogError("Cannot post keygen resutl, err = ", err)
+		return err
+	}
+
+	return nil
+}
+
+func (c *Client) BroadcastKeySignResult(result *types.KeysignResult) error {
+	var r interface{}
+	err := c.client.CallContext(context.Background(), &r, "tss_keySignResult", result)
+	if err != nil {
+		// TODO: Retry on failure.
 		utils.LogError("Cannot post keygen resutl, err = ", err)
 		return err
 	}

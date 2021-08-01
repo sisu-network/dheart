@@ -9,13 +9,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core/types"
+	eTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/sisu-network/tuktuk/client"
 	"github.com/sisu-network/tuktuk/common"
 	"github.com/sisu-network/tuktuk/core"
 	"github.com/sisu-network/tuktuk/store"
+	"github.com/sisu-network/tuktuk/types"
 	"github.com/sisu-network/tuktuk/utils"
 )
 
@@ -97,6 +98,8 @@ func (api *SingleNodeApi) KeyGen(chain string) error {
 	switch chain {
 	case "eth":
 		err = api.keyGenEth(chain)
+	default:
+		return fmt.Errorf("Unknown chain: %s", chain)
 	}
 
 	utils.LogInfo("err = ", err)
@@ -136,20 +139,6 @@ func (api *SingleNodeApi) keyGenEth(chain string) error {
 	return api.store.PutEncrypted(api.getKeygenKey(chain), encoded)
 }
 
-// Signing any transaction
-func (api *SingleNodeApi) KeySign(chain string, serialized []byte) ([]byte, error) {
-	var err error
-	var data []byte
-
-	utils.LogDebug("Signing transaction....")
-	switch chain {
-	case "eth":
-		data, err = api.keySignEth(chain, serialized)
-	}
-
-	return data, err
-}
-
 func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, error) {
 	if api.ethKeys[chain] == nil {
 		return nil, fmt.Errorf("There is no private key for this chain")
@@ -157,13 +146,13 @@ func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, e
 
 	privateKey := api.ethKeys[chain]
 
-	var tx *types.Transaction
+	var tx *eTypes.Transaction
 	err := rlp.DecodeBytes(serialized, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(api.chainIds[chain]), privateKey)
+	signedTx, err := eTypes.SignTx(tx, eTypes.NewEIP155Signer(api.chainIds[chain]), privateKey)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -171,4 +160,37 @@ func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, e
 	serializedSigned, err := rlp.EncodeToBytes(signedTx)
 
 	return serializedSigned, err
+}
+
+// Signing any transaction
+func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
+	var err error
+	var signature []byte
+
+	utils.LogDebug("Signing transaction....")
+	switch req.Chain {
+	case "eth":
+		signature, err = api.keySignEth(req.Chain, req.OutBytes)
+	default:
+		return fmt.Errorf("Unknown chain: %s", req.Chain)
+	}
+
+	if err == nil {
+		// Add some delay to mock TSS gen delay before sending back to Sisu server
+		go func() {
+			time.Sleep(time.Second * 3)
+			utils.LogInfo("Sending keygen to Sisu")
+
+			api.c.BroadcastKeySignResult(&types.KeysignResult{
+				Chain:         req.Chain,
+				InBlockHeight: req.InBlockHeight,
+				OutTxHash:     req.OutTxHash,
+				Signature:     signature,
+			})
+		}()
+	} else {
+		utils.LogError(err)
+	}
+
+	return err
 }
