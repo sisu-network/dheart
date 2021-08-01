@@ -168,11 +168,11 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 	var signature []byte
 
 	utils.LogDebug("Signing transaction....")
-	switch req.Chain {
+	switch req.OutChain {
 	case "eth":
-		signature, err = api.keySignEth(req.Chain, req.OutBytes)
+		signature, err = api.keySignEth(req.OutChain, req.OutBytes)
 	default:
-		return fmt.Errorf("Unknown chain: %s", req.Chain)
+		return fmt.Errorf("Unknown chain: %s", req.OutChain)
 	}
 
 	if err == nil {
@@ -182,10 +182,10 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 			utils.LogInfo("Sending keygen to Sisu")
 
 			api.c.BroadcastKeySignResult(&types.KeysignResult{
-				Chain:         req.Chain,
-				InBlockHeight: req.InBlockHeight,
-				OutTxHash:     req.OutTxHash,
-				Signature:     signature,
+				OutChain:       req.OutChain,
+				OutBlockHeight: req.OutBlockHeight,
+				OutHash:        req.OutHash,
+				Signature:      signature,
 			})
 		}()
 	} else {
