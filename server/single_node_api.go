@@ -126,6 +126,7 @@ func (api *SingleNodeApi) getKeygenKey(chain string) []byte {
 
 // Key generation for ETH based chains
 func (api *SingleNodeApi) keyGenEth(chain string) error {
+	utils.LogInfo("Keygen for chain", chain)
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
 		return err
@@ -143,9 +144,6 @@ func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, e
 	}
 
 	privateKey := api.ethKeys[chain]
-
-	fmt.Println("len(serialized) = ", len(serialized))
-
 	tx := &eTypes.Transaction{}
 	err := tx.UnmarshalBinary(serialized)
 	if err != nil {
@@ -153,13 +151,12 @@ func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, e
 		return nil, err
 	}
 
-	fmt.Println("Signing this TX.....")
 	signedTx, err := eTypes.SignTx(tx, eTypes.NewEIP155Signer(api.chainIds[chain]), privateKey)
 	if err != nil {
 		utils.LogError("cannot sign eth tx. err = ", err)
 	}
 
-	fmt.Println("Signing completed")
+	utils.LogInfo("Signing completed")
 
 	serializedSigned, err := signedTx.MarshalBinary()
 
@@ -194,6 +191,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 			})
 		}()
 	} else {
+		utils.LogError("Cannot do key gen. Err =", err)
 		api.c.BroadcastKeySignResult(&types.KeysignResult{
 			Success:        false,
 			ErrMesage:      err.Error(),
