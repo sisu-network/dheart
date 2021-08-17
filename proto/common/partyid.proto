@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+option go_package = "github.com/sisu-network/dheart/types/common";
+
+package common;
+
+message PartyId {
+  string id = 1;
+  string moniker = 2;
+  bytes key = 3;
+}

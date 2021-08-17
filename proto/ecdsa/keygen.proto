@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+option go_package = "github.com/sisu-network/dheart/types/ecdsa";
+
+package ecdsa;
+
+import "proto/common/partyid.proto";
+
+message Presign {
+  repeated common.PartyId partyIds = 1;
+}
