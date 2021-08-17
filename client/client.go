@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/sisu-network/tuktuk/types"
-	"github.com/sisu-network/tuktuk/utils"
+	"github.com/sisu-network/dheart/types"
+	"github.com/sisu-network/dheart/utils"
 )
 
 const (
@@ -52,7 +52,7 @@ func (c *Client) CheckHealth() error {
 	var result interface{}
 	err := c.client.CallContext(context.Background(), &result, "tss_checkHealth")
 	if err != nil {
-		utils.LogError("Cannot check tuktuk health, err = ", err)
+		utils.LogError("Cannot check dheart health, err = ", err)
 		return err
 	}
 

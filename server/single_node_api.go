@@ -10,12 +10,12 @@ import (
 
 	eTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/sisu-network/tuktuk/client"
-	"github.com/sisu-network/tuktuk/common"
-	"github.com/sisu-network/tuktuk/core"
-	"github.com/sisu-network/tuktuk/store"
-	"github.com/sisu-network/tuktuk/types"
-	"github.com/sisu-network/tuktuk/utils"
+	"github.com/sisu-network/dheart/client"
+	"github.com/sisu-network/dheart/common"
+	"github.com/sisu-network/dheart/core"
+	"github.com/sisu-network/dheart/store"
+	"github.com/sisu-network/dheart/types"
+	"github.com/sisu-network/dheart/utils"
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 // This is a mock API to use for single localhost node. It does not have TSS signing round and
 // generates a private key instead.
 type SingleNodeApi struct {
-	tutuk    *core.TutTuk
+	dheart   *core.Dheart
 	keyMap   map[string]interface{}
 	store    *store.Store
 	ethKeys  map[string]*ecdsa.PrivateKey
@@ -33,16 +33,16 @@ type SingleNodeApi struct {
 	c        *client.Client
 }
 
-func NewSingleNodeApi(tuktuk *core.TutTuk, c *client.Client) *SingleNodeApi {
+func NewSingleNodeApi(dheart *core.Dheart, c *client.Client) *SingleNodeApi {
 	return &SingleNodeApi{
-		tutuk:   tuktuk,
+		dheart:  dheart,
 		keyMap:  make(map[string]interface{}),
 		ethKeys: make(map[string]*ecdsa.PrivateKey),
 		c:       c,
 	}
 }
 
-// Initializes private keys used for Tuktuk
+// Initializes private keys used for dheart
 func (api *SingleNodeApi) Init() {
 	// Store
 	aesKey, err := base64.RawStdEncoding.DecodeString(encodedAESKey)

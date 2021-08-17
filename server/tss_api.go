@@ -4,18 +4,18 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	common "github.com/sisu-network/tuktuk/common"
-	"github.com/sisu-network/tuktuk/core"
+	common "github.com/sisu-network/dheart/common"
+	"github.com/sisu-network/dheart/core"
 )
 
 type TssApi struct {
 	isSetup bool
-	tutuk   *core.TutTuk
+	dheart  *core.Dheart
 }
 
-func NewTssApi(tutuk *core.TutTuk) *TssApi {
+func NewTssApi(dheart *core.Dheart) *TssApi {
 	return &TssApi{
-		tutuk: tutuk,
+		dheart: dheart,
 	}
 }
 

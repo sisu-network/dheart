@@ -5,7 +5,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/sisu-network/tuktuk/utils"
+	"github.com/sisu-network/dheart/utils"
 
 	"github.com/ethereum/go-ethereum/rpc"
 )

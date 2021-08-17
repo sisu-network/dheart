@@ -8,9 +8,9 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/joho/godotenv"
-	"github.com/sisu-network/tuktuk/client"
-	"github.com/sisu-network/tuktuk/core"
-	"github.com/sisu-network/tuktuk/server"
+	"github.com/sisu-network/dheart/client"
+	"github.com/sisu-network/dheart/core"
+	"github.com/sisu-network/dheart/server"
 )
 
 func initialize() {
@@ -29,13 +29,13 @@ func getSisuClient() *client.Client {
 func setupApiServer() {
 	c := getSisuClient()
 
-	tuktuk := core.NewTutTuk()
+	dheart := core.NewTutTuk()
 
 	handler := rpc.NewServer()
 	if os.Getenv("USE_ON_MEMORY") == "" {
-		handler.RegisterName("tss", server.NewTssApi(tuktuk))
+		handler.RegisterName("tss", server.NewTssApi(dheart))
 	} else {
-		api := server.NewSingleNodeApi(tuktuk, c)
+		api := server.NewSingleNodeApi(dheart, c)
 		api.Init()
 
 		handler.RegisterName("tss", api)

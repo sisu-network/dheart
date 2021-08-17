@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"github.com/sisu-network/tuktuk/common"
+	"github.com/sisu-network/dheart/common"
 )
 
 func IsEcDSA(chain string) bool {

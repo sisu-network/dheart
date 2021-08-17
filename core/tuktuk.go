@@ -1,22 +1,22 @@
 package core
 
 import (
-	chaineth "github.com/sisu-network/tuktuk/chain/eth"
-	common "github.com/sisu-network/tuktuk/common"
+	chaineth "github.com/sisu-network/dheart/chain/eth"
+	common "github.com/sisu-network/dheart/common"
 )
 
 const (
 	CHAIN_ETH = "eth"
 )
 
-type TutTuk struct {
+type Dheart struct {
 }
 
-func NewTutTuk() *TutTuk {
-	return &TutTuk{}
+func NewTutTuk() *Dheart {
+	return &Dheart{}
 }
 
-func (t *TutTuk) Setup(configs []common.ChainConfig) {
+func (t *Dheart) Setup(configs []common.ChainConfig) {
 	for _, config := range configs {
 		switch config.ChainSymbol {
 		case CHAIN_ETH:
