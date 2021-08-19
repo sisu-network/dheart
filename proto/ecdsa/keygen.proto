@@ -4,8 +4,8 @@ option go_package = "github.com/sisu-network/dheart/types/ecdsa";
 
 package ecdsa;
 
-import "proto/common/partyid.proto";
-
 message Presign {
-  repeated common.PartyId partyIds = 1;
+  int64 number = 1;
+  string hash = 2;
+  repeated string partyIds = 3;
 }
