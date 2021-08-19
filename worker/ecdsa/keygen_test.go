@@ -12,9 +12,12 @@ import (
 	"time"
 
 	"github.com/sisu-network/dheart/types/common"
+	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
+
+	wTypes "github.com/sisu-network/dheart/worker/types"
 )
 
 const (
@@ -23,9 +26,9 @@ const (
 )
 
 //--- Miscellaneous helpers functions -- /
-func processMsgWithPanicOnFail(w *KeygenWorker, tssMsg *common.TssMessage) {
-	go func(w *KeygenWorker, tssMsg *common.TssMessage) {
-		err := w.processNewMessage(tssMsg)
+func processMsgWithPanicOnFail(w worker.Worker, tssMsg *common.TssMessage) {
+	go func(w worker.Worker, tssMsg *common.TssMessage) {
+		err := w.ProcessNewMessage(tssMsg)
 		if err != nil {
 			panic(err)
 		}
@@ -60,15 +63,26 @@ func TestKeygenEndToEnd(t *testing.T) {
 	}
 
 	// Generates n workers
-	workers := make([]*KeygenWorker, n)
+	workers := make([]worker.Worker, n)
 	for i := 0; i < n; i++ {
 		preparams := loadPreparams(i)
-		workers[i] = NewKeygenWorker(pIDs, pIDs[i], preparams, threshold, NewTestDispatcher(outCh), errCh, NewTestKeygenCallback(cb))
+
+		workers[i] = NewKeygenWorker(
+			wTypes.ECDSA_KEYGEN,
+			1,
+			pIDs,
+			pIDs[i],
+			preparams,
+			threshold,
+			NewTestDispatcher(outCh),
+			errCh,
+			NewTestKeygenCallback(cb),
+		)
 	}
 
 	// Run all workers
 	for i := 0; i < len(workers); i++ {
-		go func(w *KeygenWorker) {
+		go func(w worker.Worker) {
 			if err := w.Start(); err != nil {
 				panic(err)
 			}
@@ -90,7 +104,7 @@ keygen:
 			isBroadcast := tssMsg.IsBroadcast()
 			if isBroadcast {
 				for _, w := range workers {
-					if w.myPid.Id == tssMsg.From {
+					if w.GetId() == tssMsg.From {
 						continue
 					}
 
@@ -102,7 +116,7 @@ keygen:
 				}
 
 				for _, w := range workers {
-					if w.myPid.Id == tssMsg.To {
+					if w.GetId() == tssMsg.To {
 						processMsgWithPanicOnFail(w, tssMsg)
 						break
 					}

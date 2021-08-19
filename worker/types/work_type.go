@@ -1,0 +1,13 @@
+package types
+
+type WorkType int32
+
+const (
+	ECDSA_KEYGEN = iota
+	ECDSA_PRESIGN
+	ECDSA_SIGNING
+
+	EDDSA_KEYGEN
+	EDDSA_PRESIGN
+	EDDSA_SIGNING
+)
