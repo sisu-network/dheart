@@ -11,6 +11,7 @@ import (
 	"github.com/sisu-network/dheart/client"
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/server"
+	"github.com/sisu-network/dheart/worker/ecdsa"
 )
 
 func initialize() {
@@ -54,4 +55,6 @@ func main() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
+
+	ecdsa.NewKeygenWorker(nil, nil, nil, 0, nil)
 }

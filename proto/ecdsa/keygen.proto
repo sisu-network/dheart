@@ -4,7 +4,7 @@ option go_package = "github.com/sisu-network/dheart/types/ecdsa";
 
 package ecdsa;
 
-message Presign {
+message Keygen {
   int64 number = 1;
   string hash = 2;
   repeated string partyIds = 3;

@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option go_package = "github.com/sisu-network/dheart/types/common";
+
+package common;
+
+message TssMessage {
+  string from = 1;
+  string to = 2;
+
+  repeated UpdateMessage updateMessages = 3;
+}
+
+message UpdateMessage {
+  bytes data = 1;
+  bytes serializedMessageRouting = 2;
+  string round = 3;
+}
