@@ -2,67 +2,48 @@ package ecdsa
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io/ioutil"
-	"math/big"
-	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	testPreparamsFixtureDirFormat  = "%s/../../data/_ecdsa_preparams_fixtures"
-	testPreparamsFixtureFileFormat = "preparams_data_%d.json"
-)
-
 //--- Miscellaneous helpers functions -- /
-func processMsgWithPanicOnFail(w worker.Worker, tssMsg *common.TssMessage) {
-	go func(w worker.Worker, tssMsg *common.TssMessage) {
-		err := w.ProcessNewMessage(tssMsg)
-		if err != nil {
-			panic(err)
-		}
-	}(w, tssMsg)
-}
 
 func TestKeygenEndToEnd(t *testing.T) {
-	n := 10
-	threshold := 6
+	totalParticipants := 15
+	threshold := 1
 
-	partyIDs := make(tss.UnSortedPartyIDs, n)
-	for i := 0; i < n; i++ {
-		pMoniker := fmt.Sprintf("%d", i+1)
-		partyIDs[i] = tss.NewPartyID(pMoniker, pMoniker, big.NewInt(int64(i*i)+1))
-		partyIDs[i].Index = i + 1
-	}
-	pIDs := tss.SortPartyIDs(partyIDs)
-
+	pIDs := generatePartyIds(totalParticipants)
 	errCh := make(chan error)
 	outCh := make(chan *common.TssMessage)
 
 	done := make(chan bool)
+	workers := make([]worker.Worker, totalParticipants)
 	finishedWorkerCount := 0
 
-	finalOutput := make([]*keygen.LocalPartySaveData, 0)
-	cb := func(data *keygen.LocalPartySaveData) {
-		finalOutput = append(finalOutput, data)
+	finalOutput := make([]*keygen.LocalPartySaveData, len(pIDs))
+	cb := func(workerId string, data *keygen.LocalPartySaveData) {
+		for i, worker := range workers {
+			if worker.GetId() == workerId {
+				finalOutput[i] = data
+				break
+			}
+		}
+
 		finishedWorkerCount += 1
-		if finishedWorkerCount == n {
+
+		if finishedWorkerCount == totalParticipants {
 			done <- true
 		}
 	}
 
 	// Generates n workers
-	workers := make([]worker.Worker, n)
-	for i := 0; i < n; i++ {
+	for i := 0; i < totalParticipants; i++ {
 		preparams := loadPreparams(i)
 
 		workers[i] = NewKeygenWorker(
@@ -77,57 +58,21 @@ func TestKeygenEndToEnd(t *testing.T) {
 		)
 	}
 
+	// Start all workers
+	startAllWorkers(workers)
+
 	// Run all workers
-	for i := 0; i < len(workers); i++ {
-		go func(w worker.Worker) {
-			if err := w.Start(); err != nil {
-				panic(err)
-			}
-		}(workers[i])
-	}
+	runAllWorkers(workers, outCh, errCh, done)
 
-	// Do keygen
-keygen:
-	for {
-		select {
-		case err := <-errCh:
-			panic(err)
-		case <-done:
-			break keygen
-		case <-time.After(time.Second * 30):
-			panic(errors.New("Test timeout"))
-
-		case tssMsg := <-outCh:
-			isBroadcast := tssMsg.IsBroadcast()
-			if isBroadcast {
-				for _, w := range workers {
-					if w.GetId() == tssMsg.From {
-						continue
-					}
-
-					processMsgWithPanicOnFail(w, tssMsg)
-				}
-			} else {
-				if tssMsg.From == tssMsg.To {
-					panic("A worker cannot send a message to itself")
-				}
-
-				for _, w := range workers {
-					if w.GetId() == tssMsg.To {
-						processMsgWithPanicOnFail(w, tssMsg)
-						break
-					}
-				}
-			}
-		}
-	}
-
-	assert.Equal(t, len(finalOutput), n)
+	assert.Equal(t, len(finalOutput), totalParticipants)
 	for _, output := range finalOutput {
 		// Check that everyone has the same output
 		assert.Equal(t, output.ECDSAPub.X(), finalOutput[0].ECDSAPub.X())
 		assert.Equal(t, output.ECDSAPub.Y(), finalOutput[0].ECDSAPub.Y())
 	}
+
+	// Save final outputs
+	saveKeysignOutput(finalOutput)
 }
 
 func generateTestPreparams(n int) {
@@ -146,20 +91,12 @@ func generateTestPreparams(n int) {
 }
 
 func saveTestPreparams(index int, bz []byte) error {
-	fileName := getTestPreparamsFileName(index)
+	fileName := getTestSavedFileName(testPreparamsFixtureDirFormat, testPreparamsFixtureFileFormat, index)
 	return ioutil.WriteFile(fileName, bz, 0644)
 }
 
-func getTestPreparamsFileName(index int) string {
-	_, callerFileName, _, _ := runtime.Caller(0)
-	srcDirName := filepath.Dir(callerFileName)
-	fixtureDirName := fmt.Sprintf(testPreparamsFixtureDirFormat, srcDirName)
-
-	return fmt.Sprintf("%s/"+testPreparamsFixtureFileFormat, fixtureDirName, index)
-}
-
 func loadPreparams(index int) *keygen.LocalPreParams {
-	fileName := getTestPreparamsFileName(index)
+	fileName := getTestSavedFileName(testPreparamsFixtureDirFormat, testPreparamsFixtureFileFormat, index)
 	bz, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		panic(err)
@@ -172,4 +109,21 @@ func loadPreparams(index int) *keygen.LocalPreParams {
 	}
 
 	return preparams
+}
+
+func saveKeysignOutput(outputs []*keygen.LocalPartySaveData) error {
+	for i, output := range outputs {
+		fileName := getTestSavedFileName(testKeygenSavedDataFixtureDirFormat, testKeygenSavedDataFixtureFileFormat, i)
+
+		bz, err := json.Marshal(output)
+		if err != nil {
+			panic(err)
+		}
+
+		if err := ioutil.WriteFile(fileName, bz, 0644); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

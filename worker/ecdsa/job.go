@@ -13,8 +13,14 @@ import (
 
 type JobCallback interface {
 	onError(job *Job, err error)
-	onMessage(job *Job, msg tss.Message)
-	onKeygenFinished(job *Job, data *keygen.LocalPartySaveData)
+
+	OnJobMessage(job *Job, msg tss.Message)
+
+	// Called when this keygen job finishes.
+	OnJobKeygenFinished(job *Job, data *keygen.LocalPartySaveData)
+
+	// Called when this presign job finishes.
+	OnJobPresignFinished(job *Job, data *presign.LocalPresignData)
 }
 
 type Job struct {
@@ -80,6 +86,7 @@ func (job *Job) startListening() {
 	errCh := job.errCh
 	outCh := job.outCh
 
+	// TODO: Add timeout and missing messages.
 	for {
 		select {
 		case err := <-errCh:
@@ -87,10 +94,14 @@ func (job *Job) startListening() {
 			return
 
 		case msg := <-outCh:
-			job.callback.onMessage(job, msg)
+			job.callback.OnJobMessage(job, msg)
 
 		case data := <-job.endKeygenCh:
-			job.callback.onKeygenFinished(job, &data)
+			job.callback.OnJobKeygenFinished(job, &data)
+			return
+
+		case data := <-job.endPresignCh:
+			job.callback.OnJobPresignFinished(job, &data)
 			return
 		}
 	}

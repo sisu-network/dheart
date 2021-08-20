@@ -9,6 +9,7 @@ import (
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/interfaces"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
+	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 
 	"github.com/sisu-network/dheart/types/common"
@@ -19,7 +20,9 @@ import (
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
 // channel to avoid creating too many channels.
 type WorkerCallback interface {
-	onKeygenFinished(data *keygen.LocalPartySaveData)
+	OnWorkKeygenFinished(workerId string, data *keygen.LocalPartySaveData)
+
+	OnWorkPresignFinished(workerId string, data *presign.LocalPresignData)
 }
 
 // Implements DefaultWorker interface
@@ -34,10 +37,9 @@ type DefaultWorker struct {
 	jobs           []*Job
 	localPreparams *keygen.LocalPreParams
 	dispatcher     interfaces.MessageDispatcher
-	savedData      *keygen.LocalPartySaveData
 
-	saveData *keygen.LocalPartySaveData
-	errCh    chan error
+	keygenOutput *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
+	errCh        chan error
 
 	callback WorkerCallback
 }
@@ -74,7 +76,7 @@ func NewPresignWorker(
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
 	params *tss.Parameters,
-	savedData *keygen.LocalPartySaveData,
+	keygenOutput *keygen.LocalPartySaveData,
 	dispatcher interfaces.MessageDispatcher,
 	errCh chan error,
 	callback WorkerCallback,
@@ -82,16 +84,17 @@ func NewPresignWorker(
 	p2pCtx := tss.NewPeerContext(pIDs)
 
 	return &DefaultWorker{
-		jobType:    wTypes.ECDSA_PRESIGN,
-		batchSize:  batchSize,
-		myPid:      myPid,
-		pIDs:       pIDs,
-		p2pCtx:     p2pCtx,
-		threshold:  len(pIDs) - 1,
-		dispatcher: dispatcher,
-		errCh:      errCh,
-		callback:   callback,
-		jobs:       make([]*Job, batchSize),
+		jobType:      wTypes.ECDSA_PRESIGN,
+		batchSize:    batchSize,
+		myPid:        myPid,
+		pIDs:         pIDs,
+		p2pCtx:       p2pCtx,
+		threshold:    len(pIDs) - 1,
+		dispatcher:   dispatcher,
+		keygenOutput: keygenOutput,
+		errCh:        errCh,
+		callback:     callback,
+		jobs:         make([]*Job, batchSize),
 	}
 }
 
@@ -105,6 +108,8 @@ func (w *DefaultWorker) Start() error {
 			w.jobs[i] = NewKeygenJob(w.pIDs, w.myPid, params, w.localPreparams, w)
 
 		case wTypes.ECDSA_PRESIGN:
+			w.jobs[i] = NewPresignJob(w.pIDs, w.myPid, params, w.keygenOutput, w)
+
 		case wTypes.ECDSA_SIGNING:
 		}
 
@@ -120,7 +125,7 @@ func (w *DefaultWorker) onError(job *Job, err error) {
 }
 
 // Called when there is a new message from tss-lib
-func (w *DefaultWorker) onMessage(job *Job, msg tss.Message) {
+func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 	dest := msg.GetTo()
 	to := ""
 	if dest != nil {
@@ -181,12 +186,14 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 	return nil
 }
 
-// Implements onKeygenFinished of JobCallback. This function is called from a job after key
+// Implements OnJobKeygenFinished of JobCallback. This function is called from a job after key
 // generation finishes.
-func (w *DefaultWorker) onKeygenFinished(job *Job, data *keygen.LocalPartySaveData) {
-	w.saveData = data
+func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySaveData) {
+	w.callback.OnWorkKeygenFinished(w.GetId(), data)
+}
 
-	w.callback.onKeygenFinished(data)
+func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresignData) {
+	w.callback.OnWorkPresignFinished(w.GetId(), data)
 }
 
 // Implements GetId() of Worker interface.
