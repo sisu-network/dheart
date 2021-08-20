@@ -2,8 +2,10 @@ package ecdsa
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
+	"runtime"
 	"testing"
 
 	"github.com/sisu-network/dheart/types/common"
@@ -13,6 +15,15 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestPresignBigTest(t *testing.T) {
+	fmt.Printf("START: ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
+	for i := 0; i < 3; i++ {
+		TestPresignEndToEnd(t)
+	}
+
+	fmt.Printf("END: ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
+}
 
 func TestPresignEndToEnd(t *testing.T) {
 	n := 3
