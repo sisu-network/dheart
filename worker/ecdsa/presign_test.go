@@ -16,7 +16,7 @@ import (
 
 func TestPresignEndToEnd(t *testing.T) {
 	n := 3
-	batchSize := 2
+	batchSize := 4
 
 	pIDs := generatePartyIds(n)
 

@@ -108,8 +108,6 @@ func startAllWorkers(workers []worker.Worker) {
 	}
 
 	wg.Wait()
-
-	fmt.Println("All jobs started")
 }
 
 func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh chan error, done chan bool) {
@@ -123,7 +121,6 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh
 			panic(errors.New("Test timeout"))
 
 		case tssMsg := <-outCh:
-			fmt.Println("There is a message")
 			isBroadcast := tssMsg.IsBroadcast()
 			if isBroadcast {
 				for _, w := range workers {

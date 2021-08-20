@@ -43,12 +43,14 @@ type DefaultWorker struct {
 	dispatcher     interfaces.MessageDispatcher
 
 	presignInput *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
+
 	// A map between of rounds and
 	// key: one of the 2 values
 	//      - round if a message is broadcast
 	//      - round-partyId if a message is unicast
 	// value: list of task that completes this message signing.
-	jobOutput *sync.Map
+	jobOutput     map[string][]tss.Message
+	jobOutputLock *sync.RWMutex
 
 	// List of final presign output. This array has length of batchSize.
 	keygenOutputs  []*keygen.LocalPartySaveData
@@ -106,16 +108,17 @@ func baseWorker(batchSize int,
 	p2pCtx := tss.NewPeerContext(pIDs)
 
 	return &DefaultWorker{
-		batchSize:  batchSize,
-		myPid:      myPid,
-		pIDs:       pIDs,
-		p2pCtx:     p2pCtx,
-		dispatcher: dispatcher,
-		errCh:      errCh,
-		callback:   callback,
-		jobs:       make([]*Job, batchSize),
-		jobOutput:  &sync.Map{},
-		outputLock: &sync.RWMutex{},
+		batchSize:     batchSize,
+		myPid:         myPid,
+		pIDs:          pIDs,
+		p2pCtx:        p2pCtx,
+		dispatcher:    dispatcher,
+		errCh:         errCh,
+		callback:      callback,
+		jobs:          make([]*Job, batchSize),
+		jobOutput:     make(map[string][]tss.Message),
+		jobOutputLock: &sync.RWMutex{},
+		outputLock:    &sync.RWMutex{},
 	}
 }
 
@@ -159,15 +162,18 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 		msgKey = msgKey + "-" + msg.GetTo()[0].Id
 	}
 
-	value, ok := w.jobOutput.Load(msgKey)
-	if !ok {
-		value = make([]tss.Message, w.batchSize)
+	// Update the list of finished jobs for msgKey
+	w.jobOutputLock.Lock()
+	list := w.jobOutput[msgKey]
+	if list == nil {
+		list = make([]tss.Message, w.batchSize)
 	}
-	list := value.([]tss.Message)
 	list[job.index] = msg
-	w.jobOutput.Store(msgKey, list)
-
+	w.jobOutput[msgKey] = list
+	// Count how many job that have completed.
 	count := w.getCompletedJobCount(list)
+	w.jobOutputLock.Unlock()
+
 	if count == w.batchSize {
 		// We have completed all job for current round. Send the list to the dispatcher.
 		dest := msg.GetTo()
@@ -184,13 +190,10 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 
 		if dest == nil {
 			// broadcast
-			w.dispatcher.BroadcastMessage(w.pIDs, tssMsg)
+			go w.dispatcher.BroadcastMessage(w.pIDs, tssMsg)
 		} else {
-			w.dispatcher.UnicastMessage(dest[0], tssMsg)
+			go w.dispatcher.UnicastMessage(dest[0], tssMsg)
 		}
-
-		// Delete the list from the output map.
-		w.jobOutput.Delete(msgKey)
 	}
 }
 
@@ -268,7 +271,7 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 	w.outputLock.RUnlock()
 
 	if count == w.batchSize {
-		fmt.Println(w.GetId(), "Done!!!")
+		utils.LogVerbose(w.GetId(), "Done!")
 
 		copy := w.presignOutputs
 		w.callback.OnWorkPresignFinished(w.GetId(), copy)
