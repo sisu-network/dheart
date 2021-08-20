@@ -72,7 +72,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	}
 
 	// Save final outputs
-	saveKeysignOutput(finalOutput)
+	// saveKeysignOutput(finalOutput)
 }
 
 func generateTestPreparams(n int) {

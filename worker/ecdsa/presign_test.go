@@ -51,7 +51,7 @@ func TestPresignEndToEnd(t *testing.T) {
 			pIDs,
 			pIDs[i],
 			params,
-			savedData[i],
+			savedData,
 			NewTestDispatcher(outCh),
 			errCh,
 			NewTestPresignCallback(cb),

@@ -37,7 +37,7 @@ type Job struct {
 	callback JobCallback
 }
 
-func NewKeygenJob(pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Parameters, localPreparams *keygen.LocalPreParams, callback JobCallback) *Job {
+func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Parameters, localPreparams *keygen.LocalPreParams, callback JobCallback) *Job {
 	errCh := make(chan *tss.Error, len(pIDs))
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan keygen.LocalPartySaveData, len(pIDs))
@@ -45,6 +45,7 @@ func NewKeygenJob(pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Param
 	party := keygen.NewLocalParty(params, outCh, endCh, *localPreparams).(*keygen.LocalParty)
 
 	return &Job{
+		index:       index,
 		jobType:     wTypes.ECDSA_KEYGEN,
 		party:       party,
 		errCh:       errCh,
@@ -54,7 +55,7 @@ func NewKeygenJob(pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Param
 	}
 }
 
-func NewPresignJob(pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Parameters, savedData *keygen.LocalPartySaveData, callback JobCallback) *Job {
+func NewPresignJob(index int, pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Parameters, savedData *keygen.LocalPartySaveData, callback JobCallback) *Job {
 	errCh := make(chan *tss.Error, len(pIDs))
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan presign.LocalPresignData, len(pIDs))
@@ -62,6 +63,7 @@ func NewPresignJob(pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Para
 	party := presign.NewLocalParty(pIDs, params, *savedData, outCh, endCh)
 
 	return &Job{
+		index:        index,
 		jobType:      wTypes.ECDSA_PRESIGN,
 		party:        party,
 		errCh:        errCh,
