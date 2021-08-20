@@ -2,7 +2,6 @@ package ecdsa
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"testing"
@@ -17,6 +16,7 @@ import (
 
 func TestPresignEndToEnd(t *testing.T) {
 	n := 3
+	batchSize := 4
 
 	pIDs := generatePartyIds(n)
 
@@ -39,7 +39,7 @@ func TestPresignEndToEnd(t *testing.T) {
 
 		finishedWorkerCount += 1
 
-		if finishedWorkerCount == n {
+		if finishedWorkerCount == n*batchSize {
 			done <- true
 		}
 	}
@@ -47,11 +47,11 @@ func TestPresignEndToEnd(t *testing.T) {
 	for i := 0; i < n; i++ {
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), n-1)
 		worker := NewPresignWorker(
-			1,
+			batchSize,
 			pIDs,
 			pIDs[i],
 			params,
-			savedData,
+			savedData[i],
 			NewTestDispatcher(outCh),
 			errCh,
 			NewTestPresignCallback(cb),
@@ -60,10 +60,7 @@ func TestPresignEndToEnd(t *testing.T) {
 		workers[i] = worker
 	}
 
-	fmt.Println("Worker size = ", len(workers))
-
 	// Start all workers
-	fmt.Println("Starting all workers...")
 	startAllWorkers(workers)
 
 	// Run all workers

@@ -92,6 +92,7 @@ func (job *Job) startListening() {
 	for {
 		select {
 		case err := <-errCh:
+			utils.LogError("Error on job index", job.index)
 			job.onError(err)
 			return
 

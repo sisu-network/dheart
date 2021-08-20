@@ -40,7 +40,7 @@ type DefaultWorker struct {
 	localPreparams *keygen.LocalPreParams
 	dispatcher     interfaces.MessageDispatcher
 
-	keygenOutputs []*keygen.LocalPartySaveData // output from keygen. This field is used for presign.
+	keygenOutput *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
 	// A map between of rounds and
 	// key: one of the 2 values
 	//      - round if a message is broadcast
@@ -85,7 +85,7 @@ func NewPresignWorker(
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
 	params *tss.Parameters,
-	keygenOutputs []*keygen.LocalPartySaveData,
+	keygenOutput *keygen.LocalPartySaveData,
 	dispatcher interfaces.MessageDispatcher,
 	errCh chan error,
 	callback WorkerCallback,
@@ -93,18 +93,18 @@ func NewPresignWorker(
 	p2pCtx := tss.NewPeerContext(pIDs)
 
 	return &DefaultWorker{
-		jobType:       wTypes.ECDSA_PRESIGN,
-		batchSize:     batchSize,
-		myPid:         myPid,
-		pIDs:          pIDs,
-		p2pCtx:        p2pCtx,
-		threshold:     len(pIDs) - 1,
-		dispatcher:    dispatcher,
-		keygenOutputs: keygenOutputs,
-		errCh:         errCh,
-		callback:      callback,
-		jobs:          make([]*Job, batchSize),
-		jobOutput:     &sync.Map{},
+		jobType:      wTypes.ECDSA_PRESIGN,
+		batchSize:    batchSize,
+		myPid:        myPid,
+		pIDs:         pIDs,
+		p2pCtx:       p2pCtx,
+		threshold:    len(pIDs) - 1,
+		dispatcher:   dispatcher,
+		keygenOutput: keygenOutput,
+		errCh:        errCh,
+		callback:     callback,
+		jobs:         make([]*Job, batchSize),
+		jobOutput:    &sync.Map{},
 	}
 }
 
@@ -118,7 +118,7 @@ func (w *DefaultWorker) Start() error {
 			w.jobs[i] = NewKeygenJob(i, w.pIDs, w.myPid, params, w.localPreparams, w)
 
 		case wTypes.ECDSA_PRESIGN:
-			w.jobs[i] = NewPresignJob(i, w.pIDs, w.myPid, params, w.keygenOutputs[i], w)
+			w.jobs[i] = NewPresignJob(i, w.pIDs, w.myPid, params, w.keygenOutput, w)
 
 		case wTypes.ECDSA_SIGNING:
 
@@ -158,8 +158,6 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 
 	count := w.getCompletedJobCount(list)
 	if count == w.batchSize {
-		fmt.Println("All jobs finished for round ", msgKey)
-
 		// We have completed all job for current round. Send the list to the dispatcher.
 		dest := msg.GetTo()
 		to := ""
@@ -181,7 +179,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 		}
 
 		// Delete the list from the output map.
-		// w.jobOutput.Delete(msgKey)
+		w.jobOutput.Delete(msgKey)
 	}
 }
 
@@ -212,7 +210,7 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 		}
 
 		// TODO: Check message size here.
-		updateMessage := tssMsg.UpdateMessages[0]
+		updateMessage := tssMsg.UpdateMessages[i]
 		msg, err := tss.ParseWireMessage(updateMessage.Data, from, tssMsg.IsBroadcast())
 		if err != nil {
 			utils.LogError(err)
