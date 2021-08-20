@@ -47,11 +47,11 @@ func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.Ts
 //---/
 
 type TestWorkerCallback struct {
-	keygenCallback  func(workerId string, data *keygen.LocalPartySaveData)
+	keygenCallback  func(workerId string, data []*keygen.LocalPartySaveData)
 	presignCallback func(workerId string, data []*presign.LocalPresignData)
 }
 
-func NewTestKeygenCallback(keygenCallback func(workerId string, data *keygen.LocalPartySaveData)) *TestWorkerCallback {
+func NewTestKeygenCallback(keygenCallback func(workerId string, data []*keygen.LocalPartySaveData)) *TestWorkerCallback {
 	return &TestWorkerCallback{
 		keygenCallback: keygenCallback,
 	}
@@ -63,7 +63,7 @@ func NewTestPresignCallback(presignCallback func(workerId string, data []*presig
 	}
 }
 
-func (cb *TestWorkerCallback) OnWorkKeygenFinished(workerId string, data *keygen.LocalPartySaveData) {
+func (cb *TestWorkerCallback) OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData) {
 	cb.keygenCallback(workerId, data)
 }
 

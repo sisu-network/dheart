@@ -17,6 +17,7 @@ import (
 func TestKeygenEndToEnd(t *testing.T) {
 	totalParticipants := 15
 	threshold := 1
+	batchSize := 1
 
 	pIDs := generatePartyIds(totalParticipants)
 	errCh := make(chan error)
@@ -26,8 +27,8 @@ func TestKeygenEndToEnd(t *testing.T) {
 	workers := make([]worker.Worker, totalParticipants)
 	finishedWorkerCount := 0
 
-	finalOutput := make([]*keygen.LocalPartySaveData, len(pIDs))
-	cb := func(workerId string, data *keygen.LocalPartySaveData) {
+	finalOutput := make([][]*keygen.LocalPartySaveData, len(pIDs)) // n * batchSize
+	cb := func(workerId string, data []*keygen.LocalPartySaveData) {
 		for i, worker := range workers {
 			if worker.GetId() == workerId {
 				finalOutput[i] = data
@@ -47,7 +48,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 		preparams := loadPreparams(i)
 
 		workers[i] = NewKeygenWorker(
-			1,
+			batchSize,
 			pIDs,
 			pIDs[i],
 			preparams,
@@ -64,11 +65,17 @@ func TestKeygenEndToEnd(t *testing.T) {
 	// Run all workers
 	runAllWorkers(workers, outCh, errCh, done)
 
-	assert.Equal(t, len(finalOutput), totalParticipants)
-	for _, output := range finalOutput {
+	// All outputs should have the same batch size.
+	for i := 0; i < totalParticipants; i++ {
+		assert.Equal(t, len(finalOutput[i]), batchSize)
+	}
+
+	for j := 0; j < batchSize; j++ {
 		// Check that everyone has the same output
-		assert.Equal(t, output.ECDSAPub.X(), finalOutput[0].ECDSAPub.X())
-		assert.Equal(t, output.ECDSAPub.Y(), finalOutput[0].ECDSAPub.Y())
+		for i := 0; i < totalParticipants; i++ {
+			assert.Equal(t, finalOutput[i][j].ECDSAPub.X(), finalOutput[0][j].ECDSAPub.X())
+			assert.Equal(t, finalOutput[i][j].ECDSAPub.Y(), finalOutput[0][j].ECDSAPub.Y())
+		}
 	}
 
 	// Save final outputs

@@ -22,7 +22,7 @@ import (
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
 // channel to avoid creating too many channels.
 type WorkerCallback interface {
-	OnWorkKeygenFinished(workerId string, data *keygen.LocalPartySaveData)
+	OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData)
 
 	OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData)
 }
@@ -252,7 +252,24 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 // Implements OnJobKeygenFinished of JobCallback. This function is called from a job after key
 // generation finishes.
 func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySaveData) {
-	w.callback.OnWorkKeygenFinished(w.GetId(), data)
+	w.outputLock.Lock()
+	w.keygenOutputs[job.index] = data
+	w.outputLock.Unlock()
+
+	// Count the number of finished job.
+	w.outputLock.RLock()
+	count := 0
+	for _, item := range w.keygenOutputs {
+		if item != nil {
+			count++
+		}
+	}
+	w.outputLock.RUnlock()
+
+	if count == w.batchSize {
+		utils.LogVerbose(w.GetId(), "Done!")
+		w.callback.OnWorkKeygenFinished(w.GetId(), w.keygenOutputs)
+	}
 }
 
 func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresignData) {
@@ -272,9 +289,7 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 
 	if count == w.batchSize {
 		utils.LogVerbose(w.GetId(), "Done!")
-
-		copy := w.presignOutputs
-		w.callback.OnWorkPresignFinished(w.GetId(), copy)
+		w.callback.OnWorkPresignFinished(w.GetId(), w.presignOutputs)
 	}
 }
 
