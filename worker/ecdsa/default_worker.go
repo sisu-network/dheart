@@ -24,7 +24,7 @@ import (
 type WorkerCallback interface {
 	OnWorkKeygenFinished(workerId string, data *keygen.LocalPartySaveData)
 
-	OnWorkPresignFinished(workerId string, data *presign.LocalPresignData)
+	OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData)
 }
 
 // Implements DefaultWorker interface
@@ -34,22 +34,26 @@ type DefaultWorker struct {
 	pIDs      tss.SortedPartyIDs
 	p2pCtx    *tss.PeerContext
 	jobType   wTypes.WorkType
+	callback  WorkerCallback
+	errCh     chan error
 
 	threshold      int
 	jobs           []*Job
 	localPreparams *keygen.LocalPreParams
 	dispatcher     interfaces.MessageDispatcher
 
-	keygenOutput *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
+	presignInput *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
 	// A map between of rounds and
 	// key: one of the 2 values
 	//      - round if a message is broadcast
 	//      - round-partyId if a message is unicast
 	// value: list of task that completes this message signing.
 	jobOutput *sync.Map
-	errCh     chan error
 
-	callback WorkerCallback
+	// List of final presign output. This array has length of batchSize.
+	keygenOutputs  []*keygen.LocalPartySaveData
+	presignOutputs []*presign.LocalPresignData
+	outputLock     *sync.RWMutex
 }
 
 func NewKeygenWorker(
@@ -62,22 +66,14 @@ func NewKeygenWorker(
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	p2pCtx := tss.NewPeerContext(pIDs)
+	worker := baseWorker(batchSize, pIDs, myPid, nil, dispatcher, errCh, callback)
 
-	return &DefaultWorker{
-		jobType:        wTypes.ECDSA_KEYGEN,
-		batchSize:      batchSize,
-		myPid:          myPid,
-		pIDs:           pIDs,
-		p2pCtx:         p2pCtx,
-		threshold:      threshold,
-		localPreparams: localPreparams,
-		dispatcher:     dispatcher,
-		errCh:          errCh,
-		callback:       callback,
-		jobs:           make([]*Job, batchSize),
-		jobOutput:      &sync.Map{},
-	}
+	worker.jobType = wTypes.ECDSA_KEYGEN
+	worker.localPreparams = localPreparams
+	worker.threshold = threshold
+	worker.keygenOutputs = make([]*keygen.LocalPartySaveData, batchSize)
+
+	return worker
 }
 
 func NewPresignWorker(
@@ -90,21 +86,36 @@ func NewPresignWorker(
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
+	worker := baseWorker(batchSize, pIDs, myPid, params, dispatcher, errCh, callback)
+
+	worker.jobType = wTypes.ECDSA_PRESIGN
+	worker.presignInput = keygenOutput
+	worker.presignOutputs = make([]*presign.LocalPresignData, batchSize)
+
+	return worker
+}
+
+func baseWorker(batchSize int,
+	pIDs tss.SortedPartyIDs,
+	myPid *tss.PartyID,
+	params *tss.Parameters,
+	dispatcher interfaces.MessageDispatcher,
+	errCh chan error,
+	callback WorkerCallback,
+) *DefaultWorker {
 	p2pCtx := tss.NewPeerContext(pIDs)
 
 	return &DefaultWorker{
-		jobType:      wTypes.ECDSA_PRESIGN,
-		batchSize:    batchSize,
-		myPid:        myPid,
-		pIDs:         pIDs,
-		p2pCtx:       p2pCtx,
-		threshold:    len(pIDs) - 1,
-		dispatcher:   dispatcher,
-		keygenOutput: keygenOutput,
-		errCh:        errCh,
-		callback:     callback,
-		jobs:         make([]*Job, batchSize),
-		jobOutput:    &sync.Map{},
+		batchSize:  batchSize,
+		myPid:      myPid,
+		pIDs:       pIDs,
+		p2pCtx:     p2pCtx,
+		dispatcher: dispatcher,
+		errCh:      errCh,
+		callback:   callback,
+		jobs:       make([]*Job, batchSize),
+		jobOutput:  &sync.Map{},
+		outputLock: &sync.RWMutex{},
 	}
 }
 
@@ -118,7 +129,7 @@ func (w *DefaultWorker) Start() error {
 			w.jobs[i] = NewKeygenJob(i, w.pIDs, w.myPid, params, w.localPreparams, w)
 
 		case wTypes.ECDSA_PRESIGN:
-			w.jobs[i] = NewPresignJob(i, w.pIDs, w.myPid, params, w.keygenOutput, w)
+			w.jobs[i] = NewPresignJob(i, w.pIDs, w.myPid, params, w.presignInput, w)
 
 		case wTypes.ECDSA_SIGNING:
 
@@ -242,7 +253,26 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 }
 
 func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresignData) {
-	w.callback.OnWorkPresignFinished(w.GetId(), data)
+	w.outputLock.Lock()
+	w.presignOutputs[job.index] = data
+	w.outputLock.Unlock()
+
+	// Count the number of finished job.
+	w.outputLock.RLock()
+	count := 0
+	for _, item := range w.presignOutputs {
+		if item != nil {
+			count++
+		}
+	}
+	w.outputLock.RUnlock()
+
+	if count == w.batchSize {
+		fmt.Println(w.GetId(), "Done!!!")
+
+		copy := w.presignOutputs
+		w.callback.OnWorkPresignFinished(w.GetId(), copy)
+	}
 }
 
 // Implements GetId() of Worker interface.

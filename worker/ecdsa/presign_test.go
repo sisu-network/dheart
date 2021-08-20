@@ -16,7 +16,7 @@ import (
 
 func TestPresignEndToEnd(t *testing.T) {
 	n := 3
-	batchSize := 4
+	batchSize := 2
 
 	pIDs := generatePartyIds(n)
 
@@ -28,8 +28,8 @@ func TestPresignEndToEnd(t *testing.T) {
 	done := make(chan bool)
 	finishedWorkerCount := 0
 
-	presignOutputs := make([]*presign.LocalPresignData, len(pIDs))
-	cb := func(workerId string, data *presign.LocalPresignData) {
+	presignOutputs := make([][]*presign.LocalPresignData, len(pIDs)) // n * batchSize
+	cb := func(workerId string, data []*presign.LocalPresignData) {
 		for i, worker := range workers {
 			if worker.GetId() == workerId {
 				presignOutputs[i] = data
@@ -39,7 +39,7 @@ func TestPresignEndToEnd(t *testing.T) {
 
 		finishedWorkerCount += 1
 
-		if finishedWorkerCount == n*batchSize {
+		if finishedWorkerCount == n {
 			done <- true
 		}
 	}
@@ -66,19 +66,21 @@ func TestPresignEndToEnd(t *testing.T) {
 	// Run all workers
 	runAllWorkers(workers, outCh, errCh, done)
 
-	verifyPubKey(t, presignOutputs)
+	verifyPubKey(t, n, batchSize, presignOutputs)
 }
 
-func verifyPubKey(t *testing.T, presignOutputs []*presign.LocalPresignData) {
-	w := big.NewInt(0)
-	for _, output := range presignOutputs {
-		w.Add(w, output.W)
-	}
-	w.Mod(w, tss.EC().Params().N)
+func verifyPubKey(t *testing.T, n, batchSize int, presignOutputs [][]*presign.LocalPresignData) {
+	for j := 0; j < batchSize; j++ {
+		w := big.NewInt(0)
+		for i := 0; i < n; i++ {
+			w.Add(w, presignOutputs[i][j].W)
+		}
+		w.Mod(w, tss.EC().Params().N)
 
-	px, py := tss.EC().ScalarBaseMult(w.Bytes())
-	assert.Equal(t, px, presignOutputs[0].ECDSAPub.X())
-	assert.Equal(t, py, presignOutputs[0].ECDSAPub.Y())
+		px, py := tss.EC().ScalarBaseMult(w.Bytes())
+		assert.Equal(t, px, presignOutputs[0][j].ECDSAPub.X())
+		assert.Equal(t, py, presignOutputs[0][j].ECDSAPub.Y())
+	}
 }
 
 func loadKeygenSavedData(n int) []*keygen.LocalPartySaveData {

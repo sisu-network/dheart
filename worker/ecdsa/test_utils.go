@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/sisu-network/dheart/types/common"
@@ -47,7 +48,7 @@ func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.Ts
 
 type TestWorkerCallback struct {
 	keygenCallback  func(workerId string, data *keygen.LocalPartySaveData)
-	presignCallback func(workerId string, data *presign.LocalPresignData)
+	presignCallback func(workerId string, data []*presign.LocalPresignData)
 }
 
 func NewTestKeygenCallback(keygenCallback func(workerId string, data *keygen.LocalPartySaveData)) *TestWorkerCallback {
@@ -56,7 +57,7 @@ func NewTestKeygenCallback(keygenCallback func(workerId string, data *keygen.Loc
 	}
 }
 
-func NewTestPresignCallback(presignCallback func(workerId string, data *presign.LocalPresignData)) *TestWorkerCallback {
+func NewTestPresignCallback(presignCallback func(workerId string, data []*presign.LocalPresignData)) *TestWorkerCallback {
 	return &TestWorkerCallback{
 		presignCallback: presignCallback,
 	}
@@ -66,7 +67,7 @@ func (cb *TestWorkerCallback) OnWorkKeygenFinished(workerId string, data *keygen
 	cb.keygenCallback(workerId, data)
 }
 
-func (cb *TestWorkerCallback) OnWorkPresignFinished(workerId string, data *presign.LocalPresignData) {
+func (cb *TestWorkerCallback) OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData) {
 	cb.presignCallback(workerId, data)
 }
 
@@ -94,14 +95,21 @@ func generatePartyIds(n int) tss.SortedPartyIDs {
 //---/
 
 func startAllWorkers(workers []worker.Worker) {
-	// Run all workers
+	// Start all workers
+	wg := sync.WaitGroup{}
+	wg.Add(len(workers))
 	for i := 0; i < len(workers); i++ {
 		go func(w worker.Worker) {
 			if err := w.Start(); err != nil {
 				panic(err)
 			}
+			wg.Done()
 		}(workers[i])
 	}
+
+	wg.Wait()
+
+	fmt.Println("All jobs started")
 }
 
 func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh chan error, done chan bool) {
@@ -115,6 +123,7 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh
 			panic(errors.New("Test timeout"))
 
 		case tssMsg := <-outCh:
+			fmt.Println("There is a message")
 			isBroadcast := tssMsg.IsBroadcast()
 			if isBroadcast {
 				for _, w := range workers {
