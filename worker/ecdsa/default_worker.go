@@ -16,7 +16,9 @@ import (
 	wTypes "github.com/sisu-network/dheart/worker/types"
 )
 
-type KeygenWorkerCallback interface {
+// A callback for the caller to receive updates from this worker. We use callback instead of Go
+// channel to avoid creating too many channels.
+type WorkerCallback interface {
 	onKeygenFinished(data *keygen.LocalPartySaveData)
 }
 
@@ -32,15 +34,15 @@ type DefaultWorker struct {
 	jobs           []*Job
 	localPreparams *keygen.LocalPreParams
 	dispatcher     interfaces.MessageDispatcher
+	savedData      *keygen.LocalPartySaveData
 
 	saveData *keygen.LocalPartySaveData
 	errCh    chan error
 
-	callback KeygenWorkerCallback
+	callback WorkerCallback
 }
 
 func NewKeygenWorker(
-	jobType wTypes.WorkType,
 	batchSize int,
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
@@ -48,12 +50,12 @@ func NewKeygenWorker(
 	threshold int,
 	dispatcher interfaces.MessageDispatcher,
 	errCh chan error,
-	callback KeygenWorkerCallback,
+	callback WorkerCallback,
 ) worker.Worker {
 	p2pCtx := tss.NewPeerContext(pIDs)
 
 	return &DefaultWorker{
-		jobType:        jobType,
+		jobType:        wTypes.ECDSA_KEYGEN,
 		batchSize:      batchSize,
 		myPid:          myPid,
 		pIDs:           pIDs,
@@ -67,15 +69,45 @@ func NewKeygenWorker(
 	}
 }
 
+func NewPresignWorker(
+	batchSize int,
+	pIDs tss.SortedPartyIDs,
+	myPid *tss.PartyID,
+	params *tss.Parameters,
+	savedData *keygen.LocalPartySaveData,
+	dispatcher interfaces.MessageDispatcher,
+	errCh chan error,
+	callback WorkerCallback,
+) worker.Worker {
+	p2pCtx := tss.NewPeerContext(pIDs)
+
+	return &DefaultWorker{
+		jobType:    wTypes.ECDSA_PRESIGN,
+		batchSize:  batchSize,
+		myPid:      myPid,
+		pIDs:       pIDs,
+		p2pCtx:     p2pCtx,
+		threshold:  len(pIDs) - 1,
+		dispatcher: dispatcher,
+		errCh:      errCh,
+		callback:   callback,
+		jobs:       make([]*Job, batchSize),
+	}
+}
+
 func (w *DefaultWorker) Start() error {
 	params := tss.NewParameters(w.p2pCtx, w.myPid, len(w.pIDs), w.threshold)
 
 	// Creates all jobs
 	for i := range w.jobs {
 		switch w.jobType {
+		case wTypes.ECDSA_KEYGEN:
+			w.jobs[i] = NewKeygenJob(w.pIDs, w.myPid, params, w.localPreparams, w)
+
+		case wTypes.ECDSA_PRESIGN:
+		case wTypes.ECDSA_SIGNING:
 		}
 
-		w.jobs[i] = NewKeygenJob(w.pIDs, w.myPid, params, w.localPreparams, w)
 		w.jobs[i].Start()
 	}
 
@@ -108,6 +140,7 @@ func (w *DefaultWorker) onMessage(job *Job, msg tss.Message) {
 	}
 }
 
+// Process incoming update message.
 func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
 	if w.batchSize != len(tssMsg.UpdateMessages) {
 		return errors.New("Batch size does not match")
@@ -148,12 +181,15 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 	return nil
 }
 
+// Implements onKeygenFinished of JobCallback. This function is called from a job after key
+// generation finishes.
 func (w *DefaultWorker) onKeygenFinished(job *Job, data *keygen.LocalPartySaveData) {
 	w.saveData = data
 
 	w.callback.onKeygenFinished(data)
 }
 
+// Implements GetId() of Worker interface.
 func (w *DefaultWorker) GetId() string {
 	return w.myPid.Id
 }

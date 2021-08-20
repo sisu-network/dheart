@@ -29,15 +29,15 @@ func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.Ts
 //---/
 
 type TestKeygenCallback struct {
-	internalCb func(data *keygen.LocalPartySaveData)
+	keygenCallback func(data *keygen.LocalPartySaveData)
 }
 
 func NewTestKeygenCallback(internalCb func(data *keygen.LocalPartySaveData)) *TestKeygenCallback {
 	return &TestKeygenCallback{
-		internalCb: internalCb,
+		keygenCallback: internalCb,
 	}
 }
 
 func (cb *TestKeygenCallback) onKeygenFinished(data *keygen.LocalPartySaveData) {
-	cb.internalCb(data)
+	cb.keygenCallback(data)
 }

@@ -48,12 +48,12 @@ func NewKeygenJob(pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Param
 	}
 }
 
-func NewPresignJob(pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Parameters, savedData keygen.LocalPartySaveData, callback JobCallback) *Job {
+func NewPresignJob(pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Parameters, savedData *keygen.LocalPartySaveData, callback JobCallback) *Job {
 	errCh := make(chan *tss.Error, len(pIDs))
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan presign.LocalPresignData, len(pIDs))
 
-	party := presign.NewLocalParty(pIDs, params, savedData, outCh, endCh)
+	party := presign.NewLocalParty(pIDs, params, *savedData, outCh, endCh)
 
 	return &Job{
 		jobType:      wTypes.ECDSA_PRESIGN,

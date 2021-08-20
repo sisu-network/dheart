@@ -16,8 +16,6 @@ import (
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
-
-	wTypes "github.com/sisu-network/dheart/worker/types"
 )
 
 const (
@@ -36,8 +34,8 @@ func processMsgWithPanicOnFail(w worker.Worker, tssMsg *common.TssMessage) {
 }
 
 func TestKeygenEndToEnd(t *testing.T) {
+	n := 10
 	threshold := 6
-	n := threshold + 1
 
 	partyIDs := make(tss.UnSortedPartyIDs, n)
 	for i := 0; i < n; i++ {
@@ -68,7 +66,6 @@ func TestKeygenEndToEnd(t *testing.T) {
 		preparams := loadPreparams(i)
 
 		workers[i] = NewKeygenWorker(
-			wTypes.ECDSA_KEYGEN,
 			1,
 			pIDs,
 			pIDs[i],
