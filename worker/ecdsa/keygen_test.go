@@ -71,14 +71,14 @@ func TestKeygenEndToEnd(t *testing.T) {
 	}
 
 	for j := 0; j < batchSize; j++ {
-		// Check that everyone has the same output
+		// Check that everyone has the same public key.
 		for i := 0; i < totalParticipants; i++ {
 			assert.Equal(t, finalOutput[i][j].ECDSAPub.X(), finalOutput[0][j].ECDSAPub.X())
 			assert.Equal(t, finalOutput[i][j].ECDSAPub.Y(), finalOutput[0][j].ECDSAPub.Y())
 		}
 	}
 
-	// Save final outputs
+	// Save final outputs. Uncomment this line when you want to save keygen output to fixtures.
 	// saveKeysignOutput(finalOutput)
 }
 

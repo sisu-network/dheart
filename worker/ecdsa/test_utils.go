@@ -11,6 +11,7 @@ import (
 
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
+	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
@@ -22,7 +23,14 @@ const (
 
 	testKeygenSavedDataFixtureDirFormat  = "%s/../../data/_ecdsa_keygen_saved_data_fixtures"
 	testKeygenSavedDataFixtureFileFormat = "keygen_saved_data_%d.json"
+
+	testPresignSavedDataFixtureDirFormat  = "%s/../../data/_ecdsa_presign_saved_data_fixtures"
+	testPresignSavedDataFixtureFileFormat = "presign_saved_data_%d.json"
 )
+
+type PresignDataWrapper struct {
+	Outputs [][]*presign.LocalPresignData
+}
 
 type TestDispatcher struct {
 	msgCh chan *common.TssMessage
@@ -34,12 +42,11 @@ func NewTestDispatcher(msgCh chan *common.TssMessage) *TestDispatcher {
 	}
 }
 
-// Send a message to a single destination.
-
 func (d *TestDispatcher) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
 	d.msgCh <- tssMessage
 }
 
+// Send a message to a single destination.
 func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
 	d.msgCh <- tssMessage
 }
@@ -49,6 +56,7 @@ func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.Ts
 type TestWorkerCallback struct {
 	keygenCallback  func(workerId string, data []*keygen.LocalPartySaveData)
 	presignCallback func(workerId string, data []*presign.LocalPresignData)
+	signingCallback func(workerId string, data []*libCommon.SignatureData)
 }
 
 func NewTestKeygenCallback(keygenCallback func(workerId string, data []*keygen.LocalPartySaveData)) *TestWorkerCallback {
@@ -63,12 +71,22 @@ func NewTestPresignCallback(presignCallback func(workerId string, data []*presig
 	}
 }
 
+func NewTestSigningCallback(signingCallback func(workerId string, data []*libCommon.SignatureData)) *TestWorkerCallback {
+	return &TestWorkerCallback{
+		signingCallback: signingCallback,
+	}
+}
+
 func (cb *TestWorkerCallback) OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData) {
 	cb.keygenCallback(workerId, data)
 }
 
 func (cb *TestWorkerCallback) OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData) {
 	cb.presignCallback(workerId, data)
+}
+
+func (cb *TestWorkerCallback) OnWorkSigningFinished(workerId string, data []*libCommon.SignatureData) {
+	cb.signingCallback(workerId, data)
 }
 
 //---/

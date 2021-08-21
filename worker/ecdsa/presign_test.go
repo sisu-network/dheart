@@ -78,6 +78,10 @@ func TestPresignEndToEnd(t *testing.T) {
 	runAllWorkers(workers, outCh, errCh, done)
 
 	verifyPubKey(t, n, batchSize, presignOutputs)
+
+	// Save presign data. Uncomment this line to save presign data fixtures after test (these
+	// fixtures could be used in signing test)
+	// savePresignData(n, presignOutputs, 0)
 }
 
 func verifyPubKey(t *testing.T, n, batchSize int, presignOutputs [][]*presign.LocalPresignData) {
@@ -114,4 +118,23 @@ func loadKeygenSavedData(n int) []*keygen.LocalPartySaveData {
 	}
 
 	return savedData
+}
+
+func savePresignData(n int, data [][]*presign.LocalPresignData, testIndex int) error {
+	wrapper := &PresignDataWrapper{
+		Outputs: data,
+	}
+
+	fileName := getTestSavedFileName(testPresignSavedDataFixtureDirFormat, testPresignSavedDataFixtureFileFormat, testIndex)
+
+	bz, err := json.Marshal(wrapper)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := ioutil.WriteFile(fileName, bz, 0644); err != nil {
+		return err
+	}
+
+	return nil
 }

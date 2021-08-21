@@ -1,11 +1,14 @@
 package ecdsa
 
 import (
+	"math/big"
+
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	"github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 
 	wTypes "github.com/sisu-network/dheart/worker/types"
@@ -21,6 +24,8 @@ type JobCallback interface {
 
 	// Called when this presign job finishes.
 	OnJobPresignFinished(job *Job, data *presign.LocalPresignData)
+
+	OnJobSignFinished(job *Job, data *libCommon.SignatureData)
 }
 
 type Job struct {
@@ -73,6 +78,25 @@ func NewPresignJob(index int, pIDs tss.SortedPartyIDs, myPid *tss.PartyID, param
 	}
 }
 
+func NewSigningJob(index int, pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Parameters, msg string, signingInput *presign.LocalPresignData, callback JobCallback) *Job {
+	errCh := make(chan *tss.Error, len(pIDs))
+	outCh := make(chan tss.Message, len(pIDs))
+	endCh := make(chan libCommon.SignatureData, len(pIDs))
+
+	msgInt := new(big.Int).SetBytes([]byte(msg))
+	party := signing.NewLocalParty(msgInt, params, signingInput, outCh, endCh)
+
+	return &Job{
+		index:        index,
+		jobType:      wTypes.ECDSA_SIGNING,
+		party:        party,
+		errCh:        errCh,
+		outCh:        outCh,
+		endSigningCh: endCh,
+		callback:     callback,
+	}
+}
+
 func (job *Job) Start() {
 	if err := job.party.Start(); err != nil {
 		utils.LogError("Cannot start a keygen job, err =", err)
@@ -106,6 +130,9 @@ func (job *Job) startListening() {
 		case data := <-job.endPresignCh:
 			job.callback.OnJobPresignFinished(job, &data)
 			return
+
+		case data := <-job.endSigningCh:
+			job.callback.OnJobSignFinished(job, &data)
 		}
 	}
 }

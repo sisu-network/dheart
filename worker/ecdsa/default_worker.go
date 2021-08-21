@@ -10,6 +10,7 @@ import (
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/interfaces"
+	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
@@ -25,9 +26,11 @@ type WorkerCallback interface {
 	OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData)
 
 	OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData)
+
+	OnWorkSigningFinished(workerId string, data []*libCommon.SignatureData)
 }
 
-// Implements DefaultWorker interface
+// Implements worker.Worker interface
 type DefaultWorker struct {
 	batchSize int
 	myPid     *tss.PartyID
@@ -37,12 +40,14 @@ type DefaultWorker struct {
 	callback  WorkerCallback
 	errCh     chan error
 
-	threshold      int
-	jobs           []*Job
-	localPreparams *keygen.LocalPreParams
-	dispatcher     interfaces.MessageDispatcher
+	threshold  int
+	jobs       []*Job
+	dispatcher interfaces.MessageDispatcher
 
-	presignInput *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
+	keygenInput    *keygen.LocalPreParams
+	presignInput   *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
+	signingInput   []*presign.LocalPresignData
+	signingMessage string
 
 	// A map between of rounds and
 	// key: one of the 2 values
@@ -52,17 +57,17 @@ type DefaultWorker struct {
 	jobOutput     map[string][]tss.Message
 	jobOutputLock *sync.RWMutex
 
-	// List of final presign output. This array has length of batchSize.
-	keygenOutputs  []*keygen.LocalPartySaveData
-	presignOutputs []*presign.LocalPresignData
-	outputLock     *sync.RWMutex
+	keygenOutputs   []*keygen.LocalPartySaveData
+	presignOutputs  []*presign.LocalPresignData
+	signingOutputs  []*libCommon.SignatureData
+	finalOutputLock *sync.RWMutex
 }
 
 func NewKeygenWorker(
 	batchSize int,
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
-	localPreparams *keygen.LocalPreParams,
+	keygenInput *keygen.LocalPreParams,
 	threshold int,
 	dispatcher interfaces.MessageDispatcher,
 	errCh chan error,
@@ -71,7 +76,7 @@ func NewKeygenWorker(
 	worker := baseWorker(batchSize, pIDs, myPid, nil, dispatcher, errCh, callback)
 
 	worker.jobType = wTypes.ECDSA_KEYGEN
-	worker.localPreparams = localPreparams
+	worker.keygenInput = keygenInput
 	worker.threshold = threshold
 	worker.keygenOutputs = make([]*keygen.LocalPartySaveData, batchSize)
 
@@ -83,7 +88,7 @@ func NewPresignWorker(
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
 	params *tss.Parameters,
-	keygenOutput *keygen.LocalPartySaveData,
+	presignInput *keygen.LocalPartySaveData,
 	dispatcher interfaces.MessageDispatcher,
 	errCh chan error,
 	callback WorkerCallback,
@@ -91,8 +96,29 @@ func NewPresignWorker(
 	worker := baseWorker(batchSize, pIDs, myPid, params, dispatcher, errCh, callback)
 
 	worker.jobType = wTypes.ECDSA_PRESIGN
-	worker.presignInput = keygenOutput
+	worker.presignInput = presignInput
 	worker.presignOutputs = make([]*presign.LocalPresignData, batchSize)
+
+	return worker
+}
+
+func NewSigningWorker(
+	batchSize int,
+	pIDs tss.SortedPartyIDs,
+	myPid *tss.PartyID,
+	params *tss.Parameters,
+	msg string,
+	signingInput []*presign.LocalPresignData,
+	dispatcher interfaces.MessageDispatcher,
+	errCh chan error,
+	callback WorkerCallback,
+) worker.Worker {
+	worker := baseWorker(batchSize, pIDs, myPid, params, dispatcher, errCh, callback)
+
+	worker.jobType = wTypes.ECDSA_SIGNING
+	worker.signingInput = signingInput
+	worker.signingOutputs = make([]*libCommon.SignatureData, batchSize)
+	worker.signingMessage = msg
 
 	return worker
 }
@@ -108,17 +134,17 @@ func baseWorker(batchSize int,
 	p2pCtx := tss.NewPeerContext(pIDs)
 
 	return &DefaultWorker{
-		batchSize:     batchSize,
-		myPid:         myPid,
-		pIDs:          pIDs,
-		p2pCtx:        p2pCtx,
-		dispatcher:    dispatcher,
-		errCh:         errCh,
-		callback:      callback,
-		jobs:          make([]*Job, batchSize),
-		jobOutput:     make(map[string][]tss.Message),
-		jobOutputLock: &sync.RWMutex{},
-		outputLock:    &sync.RWMutex{},
+		batchSize:       batchSize,
+		myPid:           myPid,
+		pIDs:            pIDs,
+		p2pCtx:          p2pCtx,
+		dispatcher:      dispatcher,
+		errCh:           errCh,
+		callback:        callback,
+		jobs:            make([]*Job, batchSize),
+		jobOutput:       make(map[string][]tss.Message),
+		jobOutputLock:   &sync.RWMutex{},
+		finalOutputLock: &sync.RWMutex{},
 	}
 }
 
@@ -129,12 +155,13 @@ func (w *DefaultWorker) Start() error {
 	for i := range w.jobs {
 		switch w.jobType {
 		case wTypes.ECDSA_KEYGEN:
-			w.jobs[i] = NewKeygenJob(i, w.pIDs, w.myPid, params, w.localPreparams, w)
+			w.jobs[i] = NewKeygenJob(i, w.pIDs, w.myPid, params, w.keygenInput, w)
 
 		case wTypes.ECDSA_PRESIGN:
 			w.jobs[i] = NewPresignJob(i, w.pIDs, w.myPid, params, w.presignInput, w)
 
 		case wTypes.ECDSA_SIGNING:
+			w.jobs[i] = NewSigningJob(i, w.pIDs, w.myPid, params, w.signingMessage, w.signingInput[i], w)
 
 		default:
 			return errors.New(fmt.Sprint("Unknown job type", w.jobType))
@@ -252,19 +279,19 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 // Implements OnJobKeygenFinished of JobCallback. This function is called from a job after key
 // generation finishes.
 func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySaveData) {
-	w.outputLock.Lock()
+	w.finalOutputLock.Lock()
 	w.keygenOutputs[job.index] = data
-	w.outputLock.Unlock()
+	w.finalOutputLock.Unlock()
 
 	// Count the number of finished job.
-	w.outputLock.RLock()
+	w.finalOutputLock.RLock()
 	count := 0
 	for _, item := range w.keygenOutputs {
 		if item != nil {
 			count++
 		}
 	}
-	w.outputLock.RUnlock()
+	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
 		utils.LogVerbose(w.GetId(), "Done!")
@@ -272,24 +299,47 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 	}
 }
 
+// Implements OnJobPresignFinished of JobCallback.
 func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresignData) {
-	w.outputLock.Lock()
+	w.finalOutputLock.Lock()
 	w.presignOutputs[job.index] = data
-	w.outputLock.Unlock()
+	w.finalOutputLock.Unlock()
 
 	// Count the number of finished job.
-	w.outputLock.RLock()
+	w.finalOutputLock.RLock()
 	count := 0
 	for _, item := range w.presignOutputs {
 		if item != nil {
 			count++
 		}
 	}
-	w.outputLock.RUnlock()
+	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
 		utils.LogVerbose(w.GetId(), "Done!")
 		w.callback.OnWorkPresignFinished(w.GetId(), w.presignOutputs)
+	}
+}
+
+// Implements OnJobSignFinished of JobCallback.
+func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureData) {
+	w.finalOutputLock.Lock()
+	w.signingOutputs[job.index] = data
+	w.finalOutputLock.Unlock()
+
+	// Count the number of finished job.
+	w.finalOutputLock.RLock()
+	count := 0
+	for _, item := range w.signingOutputs {
+		if item != nil {
+			count++
+		}
+	}
+	w.finalOutputLock.RUnlock()
+
+	if count == w.batchSize {
+		utils.LogVerbose(w.GetId(), "Done!")
+		w.callback.OnWorkSigningFinished(w.GetId(), w.signingOutputs)
 	}
 }
 
