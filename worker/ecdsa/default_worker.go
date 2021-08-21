@@ -49,11 +49,13 @@ type DefaultWorker struct {
 	signingInput   []*presign.LocalPresignData
 	signingMessage string
 
-	// A map between of rounds and
+	// A map between of rounds and list of messages that have been produced. The size of the list
+	// is the same as batchSize.
+	//
 	// key: one of the 2 values
 	//      - round if a message is broadcast
 	//      - round-partyId if a message is unicast
-	// value: list of task that completes this message signing.
+	// value: list of messages that have been produced for the round.
 	jobOutput     map[string][]tss.Message
 	jobOutputLock *sync.RWMutex
 

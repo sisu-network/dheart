@@ -17,6 +17,7 @@ import (
 type JobCallback interface {
 	onError(job *Job, err error)
 
+	// Called when there is a tss message output.
 	OnJobMessage(job *Job, msg tss.Message)
 
 	// Called when this keygen job finishes.
@@ -25,6 +26,7 @@ type JobCallback interface {
 	// Called when this presign job finishes.
 	OnJobPresignFinished(job *Job, data *presign.LocalPresignData)
 
+	// Called when this signing job finishes.
 	OnJobSignFinished(job *Job, data *libCommon.SignatureData)
 }
 
