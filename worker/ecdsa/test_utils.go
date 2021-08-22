@@ -142,7 +142,7 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh
 			isBroadcast := tssMsg.IsBroadcast()
 			if isBroadcast {
 				for _, w := range workers {
-					if w.GetId() == tssMsg.From {
+					if w.GetPartyId() == tssMsg.From {
 						continue
 					}
 
@@ -154,7 +154,7 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh
 				}
 
 				for _, w := range workers {
-					if w.GetId() == tssMsg.To {
+					if w.GetPartyId() == tssMsg.To {
 						processMsgWithPanicOnFail(w, tssMsg)
 						break
 					}

@@ -2,6 +2,7 @@ package ecdsa
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -30,7 +31,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	finalOutput := make([][]*keygen.LocalPartySaveData, len(pIDs)) // n * batchSize
 	cb := func(workerId string, data []*keygen.LocalPartySaveData) {
 		for i, worker := range workers {
-			if worker.GetId() == workerId {
+			if worker.GetPartyId() == workerId {
 				finalOutput[i] = data
 				break
 			}
@@ -48,6 +49,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 		preparams := loadPreparams(i)
 
 		workers[i] = NewKeygenWorker(
+			fmt.Sprintf("worker%d", i),
 			batchSize,
 			pIDs,
 			pIDs[i],

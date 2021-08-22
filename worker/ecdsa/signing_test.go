@@ -3,6 +3,7 @@ package ecdsa
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"testing"
@@ -31,7 +32,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	outputs := make([][]*libCommon.SignatureData, len(pIDs)) // n * batchSize
 	cb := func(workerId string, data []*libCommon.SignatureData) {
 		for i, worker := range workers {
-			if worker.GetId() == workerId {
+			if worker.GetPartyId() == workerId {
 				outputs[i] = data
 				break
 			}
@@ -47,6 +48,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	for i := 0; i < n; i++ {
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), n-1)
 		worker := NewSigningWorker(
+			fmt.Sprintf("worker%d", i),
 			batchSize,
 			pIDs,
 			pIDs[i],

@@ -42,7 +42,7 @@ func TestPresignEndToEnd(t *testing.T) {
 	presignOutputs := make([][]*presign.LocalPresignData, len(pIDs)) // n * batchSize
 	cb := func(workerId string, data []*presign.LocalPresignData) {
 		for i, worker := range workers {
-			if worker.GetId() == workerId {
+			if worker.GetPartyId() == workerId {
 				presignOutputs[i] = data
 				break
 			}
@@ -58,6 +58,7 @@ func TestPresignEndToEnd(t *testing.T) {
 	for i := 0; i < n; i++ {
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), n-1)
 		worker := NewPresignWorker(
+			fmt.Sprintf("worker%d", i),
 			batchSize,
 			pIDs,
 			pIDs[i],
