@@ -38,7 +38,7 @@ type DefaultWorker struct {
 	p2pCtx    *tss.PeerContext
 	jobType   wTypes.WorkType
 	callback  WorkerCallback
-	id        string
+	workId    string
 	errCh     chan error
 
 	threshold  int
@@ -88,7 +88,7 @@ func NewKeygenWorker(
 }
 
 func NewPresignWorker(
-	id string,
+	workId string,
 	batchSize int,
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
@@ -98,7 +98,7 @@ func NewPresignWorker(
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(id, batchSize, pIDs, myPid, params, dispatcher, errCh, callback)
+	w := baseWorker(workId, batchSize, pIDs, myPid, params, dispatcher, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_PRESIGN
 	w.presignInput = presignInput
@@ -108,7 +108,7 @@ func NewPresignWorker(
 }
 
 func NewSigningWorker(
-	id string,
+	workId string,
 	batchSize int,
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
@@ -119,7 +119,7 @@ func NewSigningWorker(
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(id, batchSize, pIDs, myPid, params, dispatcher, errCh, callback)
+	w := baseWorker(workId, batchSize, pIDs, myPid, params, dispatcher, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_SIGNING
 	w.signingInput = signingInput
@@ -130,7 +130,7 @@ func NewSigningWorker(
 }
 
 func baseWorker(
-	id string,
+	workId string,
 	batchSize int,
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
@@ -142,6 +142,7 @@ func baseWorker(
 	p2pCtx := tss.NewPeerContext(pIDs)
 
 	return &DefaultWorker{
+		workId:          workId,
 		batchSize:       batchSize,
 		myPid:           myPid,
 		pIDs:            pIDs,
@@ -156,7 +157,7 @@ func baseWorker(
 	}
 }
 
-func (w *DefaultWorker) Start() error {
+func (w *DefaultWorker) Start(cachedMsgs []*commonTypes.TssMessage) error {
 	params := tss.NewParameters(w.p2pCtx, w.myPid, len(w.pIDs), w.threshold)
 
 	// Creates all jobs
@@ -356,6 +357,6 @@ func (w *DefaultWorker) GetPartyId() string {
 	return w.myPid.Id
 }
 
-func (w *DefaultWorker) GetId() string {
-	return w.id
+func (w *DefaultWorker) GetWorkId() string {
+	return w.workId
 }

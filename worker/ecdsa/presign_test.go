@@ -58,7 +58,7 @@ func TestPresignEndToEnd(t *testing.T) {
 	for i := 0; i < n; i++ {
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), n-1)
 		worker := NewPresignWorker(
-			fmt.Sprintf("worker%d", i),
+			"Presign0",
 			batchSize,
 			pIDs,
 			pIDs[i],

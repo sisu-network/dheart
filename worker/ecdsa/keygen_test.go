@@ -2,7 +2,6 @@ package ecdsa
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -49,7 +48,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 		preparams := loadPreparams(i)
 
 		workers[i] = NewKeygenWorker(
-			fmt.Sprintf("worker%d", i),
+			"Keygen0",
 			batchSize,
 			pIDs,
 			pIDs[i],

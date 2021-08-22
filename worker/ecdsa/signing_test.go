@@ -3,7 +3,6 @@ package ecdsa
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"testing"
@@ -48,7 +47,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	for i := 0; i < n; i++ {
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), n-1)
 		worker := NewSigningWorker(
-			fmt.Sprintf("worker%d", i),
+			"Signing0",
 			batchSize,
 			pIDs,
 			pIDs[i],

@@ -32,7 +32,8 @@ type Engine struct {
 	requestQueue *requestQueue
 	dispatcher   interfaces.MessageDispatcher
 
-	workLock *sync.RWMutex
+	workLock     *sync.RWMutex
+	preworkCache *PreworkMessageCache
 }
 
 func NewEngine(dispatcher interfaces.MessageDispatcher) *Engine {
@@ -40,6 +41,7 @@ func NewEngine(dispatcher interfaces.MessageDispatcher) *Engine {
 		dispatcher:   dispatcher,
 		workers:      make(map[string]worker.Worker),
 		requestQueue: &requestQueue{},
+		preworkCache: &PreworkMessageCache{},
 	}
 }
 
@@ -74,7 +76,9 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 	// TODO: Add this to the workers map
 	engine.workLock.Unlock()
 
-	w.Start()
+	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId)
+
+	w.Start(cachedMsgs)
 }
 
 func (engine *Engine) OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData) {
