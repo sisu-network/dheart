@@ -36,7 +36,7 @@ type Engine struct {
 	preworkCache *PreworkMessageCache
 }
 
-func NewEngine(dispatcher interfaces.MessageDispatcher) *Engine {
+func NewEngine(myPid *tss.PartyID, dispatcher interfaces.MessageDispatcher) *Engine {
 	return &Engine{
 		dispatcher:   dispatcher,
 		workers:      make(map[string]worker.Worker),
@@ -45,7 +45,7 @@ func NewEngine(dispatcher interfaces.MessageDispatcher) *Engine {
 	}
 }
 
-func (engine *Engine) NewRequest(request *types.WorkRequest) {
+func (engine *Engine) AddRequest(request *types.WorkRequest) {
 	if err := request.Validate(); err != nil {
 		utils.LogError(err)
 		return

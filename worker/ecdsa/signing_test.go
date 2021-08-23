@@ -2,24 +2,23 @@ package ecdsa
 
 import (
 	"crypto/ecdsa"
-	"encoding/json"
-	"io/ioutil"
 	"math/big"
 	"testing"
 
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
+	"github.com/sisu-network/dheart/worker/helper"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSigningEndToEnd(t *testing.T) {
-	wrapper := loadPresignSavedData(0)
+	wrapper := helper.LoadPresignSavedData(0)
 	n := len(wrapper.Outputs)
 	batchSize := len(wrapper.Outputs[0])
 
-	pIDs := generatePartyIds(n)
+	pIDs := helper.GeneratePartyIds(n)
 	p2pCtx := tss.NewPeerContext(pIDs)
 	outCh := make(chan *common.TssMessage)
 	errCh := make(chan error)
@@ -54,7 +53,7 @@ func TestSigningEndToEnd(t *testing.T) {
 			params,
 			signingMsg,
 			wrapper.Outputs[i],
-			NewTestDispatcher(outCh),
+			helper.NewTestDispatcher(outCh),
 			errCh,
 			NewTestSigningCallback(cb),
 		)
@@ -72,23 +71,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	verifySignature(t, signingMsg, outputs, wrapper)
 }
 
-func loadPresignSavedData(testIndex int) *PresignDataWrapper {
-	fileName := getTestSavedFileName(testPresignSavedDataFixtureDirFormat, testPresignSavedDataFixtureFileFormat, testIndex)
-	bz, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		panic(err)
-	}
-
-	wrapper := &PresignDataWrapper{}
-	err = json.Unmarshal(bz, wrapper)
-	if err != nil {
-		panic(err)
-	}
-
-	return wrapper
-}
-
-func verifySignature(t *testing.T, msg string, outputs [][]*libCommon.SignatureData, wrapper *PresignDataWrapper) {
+func verifySignature(t *testing.T, msg string, outputs [][]*libCommon.SignatureData, wrapper *helper.PresignDataWrapper) {
 	// Loop every single element in the batch
 	for j := range outputs[0] {
 		// Verify all workers have the same signature.

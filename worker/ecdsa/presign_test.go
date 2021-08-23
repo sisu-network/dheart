@@ -1,16 +1,14 @@
 package ecdsa
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"runtime"
 	"testing"
 
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
+	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
@@ -29,9 +27,9 @@ func TestPresignEndToEnd(t *testing.T) {
 	n := 3
 	batchSize := 4
 
-	pIDs := generatePartyIds(n)
+	pIDs := helper.GeneratePartyIds(n)
 
-	savedData := loadKeygenSavedData(n)
+	savedData := helper.LoadKeygenSavedData(n)
 	p2pCtx := tss.NewPeerContext(pIDs)
 	outCh := make(chan *common.TssMessage)
 	errCh := make(chan error)
@@ -64,7 +62,7 @@ func TestPresignEndToEnd(t *testing.T) {
 			pIDs[i],
 			params,
 			savedData[i],
-			NewTestDispatcher(outCh),
+			helper.NewTestDispatcher(outCh),
 			errCh,
 			NewTestPresignCallback(cb),
 		)
@@ -82,7 +80,7 @@ func TestPresignEndToEnd(t *testing.T) {
 
 	// Save presign data. Uncomment this line to save presign data fixtures after test (these
 	// fixtures could be used in signing test)
-	// savePresignData(n, presignOutputs, 0)
+	// helper.SavePresignData(n, presignOutputs, 0)
 }
 
 func verifyPubKey(t *testing.T, n, batchSize int, presignOutputs [][]*presign.LocalPresignData) {
@@ -97,45 +95,4 @@ func verifyPubKey(t *testing.T, n, batchSize int, presignOutputs [][]*presign.Lo
 		assert.Equal(t, px, presignOutputs[0][j].ECDSAPub.X())
 		assert.Equal(t, py, presignOutputs[0][j].ECDSAPub.Y())
 	}
-}
-
-func loadKeygenSavedData(n int) []*keygen.LocalPartySaveData {
-	savedData := make([]*keygen.LocalPartySaveData, n)
-
-	for i := 0; i < n; i++ {
-		fileName := getTestSavedFileName(testKeygenSavedDataFixtureDirFormat, testKeygenSavedDataFixtureFileFormat, i)
-
-		bz, err := ioutil.ReadFile(fileName)
-		if err != nil {
-			panic(err)
-		}
-
-		data := &keygen.LocalPartySaveData{}
-		if err := json.Unmarshal(bz, data); err != nil {
-			panic(err)
-		}
-
-		savedData[i] = data
-	}
-
-	return savedData
-}
-
-func savePresignData(n int, data [][]*presign.LocalPresignData, testIndex int) error {
-	wrapper := &PresignDataWrapper{
-		Outputs: data,
-	}
-
-	fileName := getTestSavedFileName(testPresignSavedDataFixtureDirFormat, testPresignSavedDataFixtureFileFormat, testIndex)
-
-	bz, err := json.Marshal(wrapper)
-	if err != nil {
-		panic(err)
-	}
-
-	if err := ioutil.WriteFile(fileName, bz, 0644); err != nil {
-		return err
-	}
-
-	return nil
 }

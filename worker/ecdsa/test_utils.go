@@ -2,10 +2,6 @@ package ecdsa
 
 import (
 	"errors"
-	"fmt"
-	"math/big"
-	"path/filepath"
-	"runtime"
 	"sync"
 	"time"
 
@@ -14,44 +10,7 @@ import (
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
-	"github.com/sisu-network/tss-lib/tss"
 )
-
-const (
-	testPreparamsFixtureDirFormat  = "%s/../../data/_ecdsa_preparams_fixtures"
-	testPreparamsFixtureFileFormat = "preparams_data_%d.json"
-
-	testKeygenSavedDataFixtureDirFormat  = "%s/../../data/_ecdsa_keygen_saved_data_fixtures"
-	testKeygenSavedDataFixtureFileFormat = "keygen_saved_data_%d.json"
-
-	testPresignSavedDataFixtureDirFormat  = "%s/../../data/_ecdsa_presign_saved_data_fixtures"
-	testPresignSavedDataFixtureFileFormat = "presign_saved_data_%d.json"
-)
-
-type PresignDataWrapper struct {
-	Outputs [][]*presign.LocalPresignData
-}
-
-type TestDispatcher struct {
-	msgCh chan *common.TssMessage
-}
-
-func NewTestDispatcher(msgCh chan *common.TssMessage) *TestDispatcher {
-	return &TestDispatcher{
-		msgCh: msgCh,
-	}
-}
-
-func (d *TestDispatcher) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
-	d.msgCh <- tssMessage
-}
-
-// Send a message to a single destination.
-func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
-	d.msgCh <- tssMessage
-}
-
-//---/
 
 type TestWorkerCallback struct {
 	keygenCallback  func(workerId string, data []*keygen.LocalPartySaveData)
@@ -91,34 +50,13 @@ func (cb *TestWorkerCallback) OnWorkSigningFinished(workerId string, data []*lib
 
 //---/
 
-func getTestSavedFileName(dirFormat, fileFormat string, index int) string {
-	_, callerFileName, _, _ := runtime.Caller(0)
-	srcDirName := filepath.Dir(callerFileName)
-	fixtureDirName := fmt.Sprintf(dirFormat, srcDirName)
-
-	return fmt.Sprintf("%s/"+fileFormat, fixtureDirName, index)
-}
-
-func generatePartyIds(n int) tss.SortedPartyIDs {
-	partyIDs := make(tss.UnSortedPartyIDs, n)
-	for i := 0; i < n; i++ {
-		pMoniker := fmt.Sprintf("%d", i+1)
-		partyIDs[i] = tss.NewPartyID(pMoniker, pMoniker, big.NewInt(int64(i*i)+1))
-		partyIDs[i].Index = i + 1
-	}
-
-	return tss.SortPartyIDs(partyIDs)
-}
-
-//---/
-
 func startAllWorkers(workers []worker.Worker) {
 	// Start all workers
 	wg := sync.WaitGroup{}
 	wg.Add(len(workers))
 	for i := 0; i < len(workers); i++ {
 		go func(w worker.Worker) {
-			if err := w.Start(); err != nil {
+			if err := w.Start(make([]*common.TssMessage, 0)); err != nil {
 				panic(err)
 			}
 			wg.Done()

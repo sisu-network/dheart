@@ -2,12 +2,12 @@ package ecdsa
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"testing"
 	"time"
 
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
+	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,7 +19,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	threshold := 1
 	batchSize := 1
 
-	pIDs := generatePartyIds(totalParticipants)
+	pIDs := helper.GeneratePartyIds(totalParticipants)
 	errCh := make(chan error)
 	outCh := make(chan *common.TssMessage)
 
@@ -45,7 +45,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 
 	// Generates n workers
 	for i := 0; i < totalParticipants; i++ {
-		preparams := loadPreparams(i)
+		preparams := helper.LoadPreparams(i)
 
 		workers[i] = NewKeygenWorker(
 			"Keygen0",
@@ -54,7 +54,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 			pIDs[i],
 			preparams,
 			threshold,
-			NewTestDispatcher(outCh),
+			helper.NewTestDispatcher(outCh),
 			errCh,
 			NewTestKeygenCallback(cb),
 		)
@@ -91,47 +91,9 @@ func generateTestPreparams(n int) {
 			panic(err)
 		}
 
-		err = saveTestPreparams(i, bz)
+		err = helper.SaveTestPreparams(i, bz)
 		if err != nil {
 			panic(err)
 		}
 	}
-}
-
-func saveTestPreparams(index int, bz []byte) error {
-	fileName := getTestSavedFileName(testPreparamsFixtureDirFormat, testPreparamsFixtureFileFormat, index)
-	return ioutil.WriteFile(fileName, bz, 0644)
-}
-
-func loadPreparams(index int) *keygen.LocalPreParams {
-	fileName := getTestSavedFileName(testPreparamsFixtureDirFormat, testPreparamsFixtureFileFormat, index)
-	bz, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		panic(err)
-	}
-
-	preparams := &keygen.LocalPreParams{}
-	err = json.Unmarshal(bz, preparams)
-	if err != nil {
-		panic(err)
-	}
-
-	return preparams
-}
-
-func saveKeysignOutput(outputs []*keygen.LocalPartySaveData) error {
-	for i, output := range outputs {
-		fileName := getTestSavedFileName(testKeygenSavedDataFixtureDirFormat, testKeygenSavedDataFixtureFileFormat, i)
-
-		bz, err := json.Marshal(output)
-		if err != nil {
-			panic(err)
-		}
-
-		if err := ioutil.WriteFile(fileName, bz, 0644); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
