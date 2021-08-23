@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"runtime"
 
+	libCommon "github.com/sisu-network/tss-lib/common"
+
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -24,6 +26,44 @@ const (
 	TestPresignSavedDataFixtureDirFormat  = "%s/../../data/_ecdsa_presign_saved_data_fixtures"
 	TestPresignSavedDataFixtureFileFormat = "presign_saved_data_%d.json"
 )
+
+type TestWorkerCallback struct {
+	keygenCallback  func(workerId string, data []*keygen.LocalPartySaveData)
+	presignCallback func(workerId string, data []*presign.LocalPresignData)
+	signingCallback func(workerId string, data []*libCommon.SignatureData)
+}
+
+func NewTestKeygenCallback(keygenCallback func(workerId string, data []*keygen.LocalPartySaveData)) *TestWorkerCallback {
+	return &TestWorkerCallback{
+		keygenCallback: keygenCallback,
+	}
+}
+
+func NewTestPresignCallback(presignCallback func(workerId string, data []*presign.LocalPresignData)) *TestWorkerCallback {
+	return &TestWorkerCallback{
+		presignCallback: presignCallback,
+	}
+}
+
+func NewTestSigningCallback(signingCallback func(workerId string, data []*libCommon.SignatureData)) *TestWorkerCallback {
+	return &TestWorkerCallback{
+		signingCallback: signingCallback,
+	}
+}
+
+func (cb *TestWorkerCallback) OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData) {
+	cb.keygenCallback(workerId, data)
+}
+
+func (cb *TestWorkerCallback) OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData) {
+	cb.presignCallback(workerId, data)
+}
+
+func (cb *TestWorkerCallback) OnWorkSigningFinished(workerId string, data []*libCommon.SignatureData) {
+	cb.signingCallback(workerId, data)
+}
+
+//---/
 
 type PresignDataWrapper struct {
 	Outputs [][]*presign.LocalPresignData

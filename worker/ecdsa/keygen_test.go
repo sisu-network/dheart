@@ -56,7 +56,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 			threshold,
 			helper.NewTestDispatcher(outCh),
 			errCh,
-			NewTestKeygenCallback(cb),
+			helper.NewTestKeygenCallback(cb),
 		)
 	}
 

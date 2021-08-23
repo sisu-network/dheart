@@ -55,7 +55,7 @@ func TestSigningEndToEnd(t *testing.T) {
 			wrapper.Outputs[i],
 			helper.NewTestDispatcher(outCh),
 			errCh,
-			NewTestSigningCallback(cb),
+			helper.NewTestSigningCallback(cb),
 		)
 
 		workers[i] = worker

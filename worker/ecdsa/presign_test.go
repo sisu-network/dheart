@@ -64,7 +64,7 @@ func TestPresignEndToEnd(t *testing.T) {
 			savedData[i],
 			helper.NewTestDispatcher(outCh),
 			errCh,
-			NewTestPresignCallback(cb),
+			helper.NewTestPresignCallback(cb),
 		)
 
 		workers[i] = worker
