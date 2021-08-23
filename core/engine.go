@@ -90,6 +90,10 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 			params, request.PresignInput, engine.dispatcher, errCh, engine)
 
 	case types.ECDSA_SIGNING:
+		p2pCtx := tss.NewPeerContext(request.PIDs)
+		params := tss.NewParameters(p2pCtx, engine.myPid, len(request.PIDs), len(request.PIDs)-1)
+		w = ecdsa.NewSigningWorker(request.WorkId, BATCH_SIZE, request.PIDs, engine.myPid, params,
+			request.Message, request.SigningInput, engine.dispatcher, errCh, engine)
 	}
 
 	engine.workLock.Lock()
