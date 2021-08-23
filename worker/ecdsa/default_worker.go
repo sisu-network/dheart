@@ -178,8 +178,15 @@ func (w *DefaultWorker) Start(cachedMsgs []*commonTypes.TssMessage) error {
 	}
 
 	// Start all job
+	wg := &sync.WaitGroup{}
+	wg.Add(len(w.jobs))
 	for _, job := range w.jobs {
-		job.Start()
+		job.Start(wg)
+	}
+
+	wg.Wait()
+	for _, msg := range cachedMsgs {
+		w.ProcessNewMessage(msg)
 	}
 
 	return nil
@@ -218,7 +225,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 			to = dest[0].Id
 		}
 
-		tssMsg, err := common.NewTssMessage(w.myPid.Id, to, list, msg.Type())
+		tssMsg, err := common.NewTssMessage(w.myPid.Id, to, w.workId, list, msg.Type())
 		if err != nil {
 			utils.LogCritical("Cannot build TSS message, err =", err)
 			return
@@ -259,7 +266,6 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 			return errors.New("Sender is nil")
 		}
 
-		// TODO: Check message size here.
 		updateMessage := tssMsg.UpdateMessages[i]
 		msg, err := tss.ParseWireMessage(updateMessage.Data, from, tssMsg.IsBroadcast())
 		if err != nil {

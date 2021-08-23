@@ -5,6 +5,7 @@ import (
 
 	libCommon "github.com/sisu-network/tss-lib/common"
 
+	commonTypes "github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/ecdsa"
@@ -103,6 +104,19 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId)
 
 	w.Start(cachedMsgs)
+}
+
+func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) {
+	engine.workLock.RLock()
+	worker := engine.workers[tssMsg.WorkId]
+	engine.workLock.RUnlock()
+
+	if worker != nil {
+		worker.ProcessNewMessage(tssMsg)
+	} else {
+		// This could be the case when a worker has not started yet. Save it to the cache.
+		engine.preworkCache.AddMessage(tssMsg)
+	}
 }
 
 func (engine *Engine) OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData) {

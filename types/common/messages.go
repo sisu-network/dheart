@@ -6,7 +6,7 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-func NewTssMessage(from string, to string, msgs []tss.Message, round string) (*TssMessage, error) {
+func NewTssMessage(from, to, workId string, msgs []tss.Message, round string) (*TssMessage, error) {
 	// Serialize tss messages
 	updateMessages := make([]*UpdateMessage, len(msgs))
 
@@ -28,6 +28,7 @@ func NewTssMessage(from string, to string, msgs []tss.Message, round string) (*T
 	return &TssMessage{
 		From:           from,
 		To:             to,
+		WorkId:         workId,
 		UpdateMessages: updateMessages,
 	}, nil
 }

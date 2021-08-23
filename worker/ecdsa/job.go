@@ -2,6 +2,7 @@ package ecdsa
 
 import (
 	"math/big"
+	"sync"
 
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
@@ -99,7 +100,9 @@ func NewSigningJob(index int, pIDs tss.SortedPartyIDs, myPid *tss.PartyID, param
 	}
 }
 
-func (job *Job) Start() {
+func (job *Job) Start(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	if err := job.party.Start(); err != nil {
 		utils.LogError("Cannot start a keygen job, err =", err)
 

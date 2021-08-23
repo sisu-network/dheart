@@ -11,7 +11,7 @@ import (
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 )
 
-func TestEngines(t *testing.T) {
+func TestEngineDelayStart(t *testing.T) {
 	n := 3
 
 	pIDs := helper.GeneratePartyIds(n)
@@ -38,7 +38,11 @@ func TestEngines(t *testing.T) {
 	// Start all engines
 	for i := 0; i < n; i++ {
 		request := types.NewPresignRequest(workId, pIDs, *savedData[i])
-		engines[i].AddRequest(request)
+		go func(engine *Engine, request *types.WorkRequest, delay time.Duration) {
+			// Deplay starting each engine to simluate that different workers can start at different times.
+			time.Sleep(delay)
+			engine.AddRequest(request)
+		}(engines[i], request, time.Millisecond*time.Duration(i*250))
 	}
 
 	// Run all engines
@@ -61,13 +65,11 @@ func runEngines(engines []*Engine, workId string, outCh chan *common.TssMessage,
 			if isBroadcast {
 				for _, engine := range engines {
 					w := engine.workers[workId]
-					if w.GetPartyId() == tssMsg.From {
+					if w != nil && w.GetPartyId() == tssMsg.From {
 						continue
 					}
 
-					if err := w.ProcessNewMessage(tssMsg); err != nil {
-						panic(err)
-					}
+					engine.ProcessNewMessage(tssMsg)
 				}
 			} else {
 				if tssMsg.From == tssMsg.To {
@@ -76,11 +78,13 @@ func runEngines(engines []*Engine, workId string, outCh chan *common.TssMessage,
 
 				for _, engine := range engines {
 					w := engine.workers[workId]
-					if w.GetPartyId() == tssMsg.To {
-						if err := w.ProcessNewMessage(tssMsg); err != nil {
-							panic(err)
+					if w != nil {
+						if w.GetPartyId() == tssMsg.To {
+							engine.ProcessNewMessage(tssMsg)
+							break
 						}
-						break
+					} else {
+						engine.ProcessNewMessage(tssMsg)
 					}
 				}
 			}
