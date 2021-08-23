@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MAX_MESSAGE_PER_NODE = BATCH_SIZE * 4
+	MAX_MESSAGE_PER_NODE = BATCH_SIZE * 16
 )
 
 type CacheValue struct {

@@ -6,13 +6,15 @@ import (
 	"time"
 
 	"github.com/sisu-network/dheart/types/common"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 )
 
 func TestEngineDelayStart(t *testing.T) {
-	n := 3
+	utils.LogVerbose("Running test with tss works starting at different time.")
+	n := 4
 
 	pIDs := helper.GeneratePartyIds(n)
 	savedData := helper.LoadKeygenSavedData(n)
@@ -42,7 +44,7 @@ func TestEngineDelayStart(t *testing.T) {
 			// Deplay starting each engine to simluate that different workers can start at different times.
 			time.Sleep(delay)
 			engine.AddRequest(request)
-		}(engines[i], request, time.Millisecond*time.Duration(i*250))
+		}(engines[i], request, time.Millisecond*time.Duration(i*350))
 	}
 
 	// Run all engines
@@ -65,7 +67,7 @@ func runEngines(engines []*Engine, workId string, outCh chan *common.TssMessage,
 			if isBroadcast {
 				for _, engine := range engines {
 					w := engine.workers[workId]
-					if w != nil && w.GetPartyId() == tssMsg.From {
+					if w != nil && engine.myPid.Id == tssMsg.From {
 						continue
 					}
 
@@ -77,14 +79,9 @@ func runEngines(engines []*Engine, workId string, outCh chan *common.TssMessage,
 				}
 
 				for _, engine := range engines {
-					w := engine.workers[workId]
-					if w != nil {
-						if w.GetPartyId() == tssMsg.To {
-							engine.ProcessNewMessage(tssMsg)
-							break
-						}
-					} else {
+					if engine.myPid.Id == tssMsg.To {
 						engine.ProcessNewMessage(tssMsg)
+						break
 					}
 				}
 			}
