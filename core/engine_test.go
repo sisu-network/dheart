@@ -1,15 +1,18 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	"github.com/tendermint/tendermint/crypto/ed25519"
 )
 
 func TestEngineDelayStart(t *testing.T) {
@@ -19,11 +22,13 @@ func TestEngineDelayStart(t *testing.T) {
 	pIDs := helper.GeneratePartyIds(n)
 	savedData := helper.LoadKeygenSavedData(n)
 	errCh := make(chan error)
-	outCh := make(chan *common.TssMessage)
+	outCh := make(chan *p2p.P2PMessage)
 	engines := make([]*Engine, n)
 	workId := "presign0"
 	done := make(chan bool)
 	finishedWorkerCount := 0
+	privKey := ed25519.GenPrivKey()
+	nodes := GetTestNodes(pIDs)
 
 	cb := func(workerId string, data []*presign.LocalPresignData) {
 		finishedWorkerCount += 1
@@ -34,7 +39,8 @@ func TestEngineDelayStart(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
-		engines[i] = NewEngine(pIDs[i], helper.NewTestDispatcher(outCh), helper.NewTestPresignCallback(cb))
+		engines[i] = NewEngine(pIDs[i], NewMockConnectionManager(outCh), helper.NewTestPresignCallback(cb), privKey)
+		engines[i].AddNodes(nodes)
 	}
 
 	// Start all engines
@@ -51,7 +57,7 @@ func TestEngineDelayStart(t *testing.T) {
 	runEngines(engines, workId, outCh, errCh, done)
 }
 
-func runEngines(engines []*Engine, workId string, outCh chan *common.TssMessage, errCh chan error, done chan bool) {
+func runEngines(engines []*Engine, workId string, outCh chan *p2p.P2PMessage, errCh chan error, done chan bool) {
 	// Run all engines
 	for {
 		select {
@@ -62,7 +68,11 @@ func runEngines(engines []*Engine, workId string, outCh chan *common.TssMessage,
 		case <-time.After(time.Second * 10):
 			panic(errors.New("Test timeout"))
 
-		case tssMsg := <-outCh:
+		case p2pMsg := <-outCh:
+			signedMessage := &common.SignedMessage{}
+			json.Unmarshal(p2pMsg.Data, signedMessage)
+			tssMsg := signedMessage.TssMessage
+
 			isBroadcast := tssMsg.IsBroadcast()
 			if isBroadcast {
 				for _, engine := range engines {

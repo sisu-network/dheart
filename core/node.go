@@ -7,7 +7,7 @@ import (
 )
 
 type Node struct {
-	networkId peer.ID
-	PubKey    tcrypto.PubKey
-	PartyId   *tss.PartyID
+	PeerId  peer.ID
+	PubKey  tcrypto.PubKey
+	PartyId *tss.PartyID
 }

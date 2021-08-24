@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -27,8 +28,8 @@ const (
 )
 
 type P2PMessage struct {
-	From string
-	Data []byte
+	FromPeerId string
+	Data       []byte
 }
 
 type ConnectionsConfig struct {
@@ -45,7 +46,14 @@ type P2PDataListener interface {
 }
 
 type ConnectionManager interface {
+	// Starts this connection manager using private key as identity of the node.
 	Start(privKeyBytes []byte) error
+
+	// Sends an array of byte to a particular peer.
+	WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error
+
+	// Adds data listener for a protocol.
+	AddListener(protocol protocol.ID, listener P2PDataListener)
 }
 
 // DefaultConnectionManager implements ConnectionManager interface.
@@ -148,8 +156,8 @@ func (cm *DefaultConnectionManager) handleTSSStream(stream network.Stream) {
 
 			go func() {
 				listener.OnNetworkMessage(&P2PMessage{
-					From: peerID,
-					Data: dataBuf,
+					FromPeerId: peerID,
+					Data:       dataBuf,
 				})
 			}()
 		}
@@ -218,4 +226,13 @@ func (cm *DefaultConnectionManager) connectToPeer(peerAddr maddr.Multiaddr) erro
 	}
 
 	return nil
+}
+
+func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error {
+	conn := cm.connections[pID]
+	if conn == nil {
+		return errors.New("pID not found")
+	}
+
+	return conn.writeToStream(msg, protocolId)
 }
