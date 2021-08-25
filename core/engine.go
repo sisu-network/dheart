@@ -94,16 +94,13 @@ func (engine *Engine) AddRequest(request *types.WorkRequest) error {
 		}
 	}
 
-	engine.workLock.Lock()
-	if engine.requestQueue.AddWork(request) && len(engine.workers) < MAX_WORKER {
-		work := engine.requestQueue.Pop()
-		go engine.startWork(work)
+	if engine.requestQueue.AddWork(request) {
+		engine.startNextWork()
 	}
-	engine.workLock.Unlock()
-
 	return nil
 }
 
+// startWork creates a new worker to execute a new task.
 func (engine *Engine) startWork(request *types.WorkRequest) {
 	var w worker.Worker
 	errCh := make(chan error)
@@ -132,11 +129,12 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 	engine.workLock.Unlock()
 
 	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId)
-	utils.LogInfo("Starting a work ", request.WorkId, "with cache size", len(cachedMsgs))
+	utils.LogInfo("Starting a work with id", request.WorkId, "with cache size", len(cachedMsgs))
 
 	w.Start(cachedMsgs)
 }
 
+// ProcessNewMessage processes new incoming tss message from network.
 func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) {
 	worker := engine.getWorker(tssMsg.WorkId)
 
@@ -148,19 +146,53 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) {
 	}
 }
 
-func (engine *Engine) OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData) {
+func (engine *Engine) OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData) {
 	// TODO: save output.
-	engine.callback.OnWorkKeygenFinished(workerId, data)
+	engine.callback.OnWorkKeygenFinished(workId, data)
+
+	engine.finishWorker(workId)
+	engine.startNextWork()
 }
 
-func (engine *Engine) OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData) {
+func (engine *Engine) OnWorkPresignFinished(workId string, data []*presign.LocalPresignData) {
 	// TODO: save output.
-	engine.callback.OnWorkPresignFinished(workerId, data)
+	engine.callback.OnWorkPresignFinished(workId, data)
+
+	engine.finishWorker(workId)
+	engine.startNextWork()
 }
 
-func (engine *Engine) OnWorkSigningFinished(workerId string, data []*libCommon.SignatureData) {
+func (engine *Engine) OnWorkSigningFinished(workId string, data []*libCommon.SignatureData) {
 	// TODO: save output.
-	engine.callback.OnWorkSigningFinished(workerId, data)
+	engine.callback.OnWorkSigningFinished(workId, data)
+
+	engine.finishWorker(workId)
+	engine.startNextWork()
+}
+
+// finishWorker removes a worker from the current worker pool.
+func (engine *Engine) finishWorker(workId string) {
+	engine.workLock.Lock()
+	delete(engine.workers, workId)
+	engine.workLock.Unlock()
+}
+
+// startNextWork gets a request from the queue (if not empty) and execute it. If there is no
+// available worker, wait for one of the current worker to finish before running.
+func (engine *Engine) startNextWork() {
+	engine.workLock.Lock()
+	if len(engine.workers) >= MAX_WORKER {
+		engine.workLock.Unlock()
+		return
+	}
+	nextWork := engine.requestQueue.Pop()
+	engine.workLock.Unlock()
+
+	if nextWork == nil {
+		return
+	}
+
+	engine.startWork(nextWork)
 }
 
 func (engine *Engine) getNodeFromPeerId(peerId string) *Node {
@@ -179,7 +211,7 @@ func (engine *Engine) getWorker(workId string) worker.Worker {
 
 // Broadcast a message to everyone in a list.
 func (engine *Engine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
-	bz, err := engine.GetSignedMessageBytes(tssMessage)
+	bz, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
 		utils.LogError("Cannot get signed message", err)
 		return
@@ -190,7 +222,7 @@ func (engine *Engine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.T
 
 // Send a message to a single destination.
 func (engine *Engine) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
-	bz, err := engine.GetSignedMessageBytes(tssMessage)
+	bz, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
 		utils.LogError("Cannot get signed message", err)
 		return
@@ -199,6 +231,7 @@ func (engine *Engine) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMe
 	engine.sendData(bz, []*tss.PartyID{dest})
 }
 
+// sendData sends data to the network.
 func (engine *Engine) sendData(data []byte, pIDs []*tss.PartyID) {
 	// Converts pids => peerIds
 	peerIds := make([]peer.ID, 0, len(pIDs))
@@ -220,7 +253,8 @@ func (engine *Engine) sendData(data []byte, pIDs []*tss.PartyID) {
 	}
 }
 
-func (engine *Engine) GetSignedMessageBytes(tssMessage *common.TssMessage) ([]byte, error) {
+// getSignedMessageBytes signs a tss message and returns serialized bytes of the signed message.
+func (engine *Engine) getSignedMessageBytes(tssMessage *common.TssMessage) ([]byte, error) {
 	serialized, err := json.Marshal(tssMessage)
 	if err != nil {
 		return nil, err
@@ -245,6 +279,7 @@ func (engine *Engine) GetSignedMessageBytes(tssMessage *common.TssMessage) ([]by
 	return bz, nil
 }
 
+// OnNetworkMessage implements P2PDataListener interface.
 func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
 	node := engine.getNodeFromPeerId(message.FromPeerId)
 	if node == nil {
