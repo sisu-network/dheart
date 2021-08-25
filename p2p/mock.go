@@ -98,9 +98,8 @@ func P2PIDFromKey(prvKey tcrypto.PrivKey) peer.ID {
 	return id
 }
 
-func GetMockPeers(n int) []string {
-	peerIds := make([]string, 0)
-	// for i, keyString := range KEYS {
+func GetMockPeers(n int) []peer.ID {
+	peerIds := make([]peer.ID, 0)
 	for i := 0; i < n; i++ {
 		keyString := KEYS[i]
 		key, err := hex.DecodeString(keyString)
@@ -109,7 +108,7 @@ func GetMockPeers(n int) []string {
 		}
 
 		prvKey := secp256k1.PrivKey(key)
-		peerId := P2PIDFromKey(prvKey).String()
+		peerId := P2PIDFromKey(prvKey)
 
 		peerIds = append(peerIds, peerId)
 	}
@@ -144,6 +143,6 @@ func GetMockConnectionConfig(n, index int) (*ConnectionsConfig, []byte) {
 		Rendezvous:     "rendezvous",
 		Protocol:       TSSProtocolID,
 		BootstrapPeers: peers,
-		HostId:         peerIds[index],
+		HostId:         peerIds[index].String(),
 	}, privateKey
 }

@@ -135,10 +135,10 @@ func (cm *DefaultConnectionManager) getListener(protocol protocol.ID) P2PDataLis
 }
 
 func (cm *DefaultConnectionManager) handleTSSStream(stream network.Stream) {
-	peerID := stream.Conn().RemotePeer().String()
-	protocol := stream.Protocol()
-
 	for {
+		peerID := stream.Conn().RemotePeer().String()
+		protocol := stream.Protocol()
+
 		// TODO: Add cancel channel here.
 		dataBuf, err := ReadStreamWithBuffer(stream)
 

@@ -3,17 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-
-	"github.com/ethereum/go-ethereum/rpc"
+	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/sisu-network/dheart/client"
-	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/p2p"
-	"github.com/sisu-network/dheart/server"
+	"github.com/sisu-network/dheart/utils"
 )
 
 type SimpleListener struct {
@@ -27,7 +21,8 @@ func NewSimpleListener(dataChan chan *p2p.P2PMessage) *SimpleListener {
 }
 
 func (listener *SimpleListener) OnNetworkMessage(message *p2p.P2PMessage) {
-	fmt.Println("There is a new message")
+	utils.LogVerbose("There is a new message from", message.FromPeerId)
+	utils.LogVerbose(string(message.Data))
 }
 
 func initialize() {
@@ -37,57 +32,50 @@ func initialize() {
 	}
 }
 
-func getSisuClient() *client.Client {
-	url := os.Getenv("SISU_SERVER_URL")
-	c := client.NewClient(url)
-	return c
-}
-
-func setupApiServer() {
-	c := getSisuClient()
-
-	dheart := core.NewTutTuk()
-
-	handler := rpc.NewServer()
-	if os.Getenv("USE_ON_MEMORY") == "" {
-		handler.RegisterName("tss", server.NewTssApi(dheart))
-	} else {
-		api := server.NewSingleNodeApi(dheart, c)
-		api.Init()
-
-		handler.RegisterName("tss", api)
-	}
-
-	s := server.NewServer(handler, "localhost", 5678)
-
-	go c.TryDial()
-	go s.Run()
-}
-
+// Runs this program on 2 different terminal with different index value.
 func main() {
-	// initialize()
-	// setupApiServer()
-
-	var index int
+	var index, n int
 	flag.IntVar(&index, "index", 0, "listening port")
 	flag.Parse()
 
-	config, privateKey := p2p.GetMockConnectionConfig(2, index)
-	con, err := p2p.NewConnectionManager(config)
+	n = 2
+
+	config, privateKey := p2p.GetMockConnectionConfig(n, index)
+	cm, err := p2p.NewConnectionManager(config)
 	if err != nil {
 		panic(err)
 	}
 
 	dataChan := make(chan *p2p.P2PMessage)
 
-	con.AddListener(p2p.TSSProtocolID, NewSimpleListener(dataChan))
+	cm.AddListener(p2p.TSSProtocolID, NewSimpleListener(dataChan))
 
-	err = con.Start(privateKey)
+	err = cm.Start(privateKey)
 	if err != nil {
 		panic(err)
 	}
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
+	time.Sleep(time.Second * 4)
+
+	go func() {
+		peerIds := p2p.GetMockPeers(n)
+		// Send a message to peers
+		for i := range peerIds {
+			if i == index {
+				continue
+			}
+
+			utils.LogVerbose("Sending a message to peer", peerIds[i])
+
+			err = cm.WriteToStream(peerIds[i], p2p.TSSProtocolID, []byte(fmt.Sprintf("Hello from index %d", index)))
+			if err != nil {
+				panic(err)
+			}
+		}
+	}()
+
+	select {
+	case msg := <-dataChan:
+		utils.LogVerbose("Message =", string(msg.Data))
+	}
 }
