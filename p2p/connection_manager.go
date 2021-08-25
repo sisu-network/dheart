@@ -202,6 +202,7 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 			for i := 0; i < 5; i++ {
 				if err := cm.host.Connect(ctx, *peerinfo); err != nil {
 					log.Printf("Error while connecting to node %q: %-v", peerinfo, err)
+					time.Sleep(time.Second * 3)
 				} else {
 					log.Printf("Connection established with bootstrap node: %q", *peerinfo)
 				}
