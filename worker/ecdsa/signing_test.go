@@ -18,7 +18,8 @@ func TestSigningEndToEnd(t *testing.T) {
 	n := len(wrapper.Outputs)
 	batchSize := len(wrapper.Outputs[0])
 
-	pIDs := helper.GeneratePartyIds(n)
+	// Batch should have the same set of party ids.
+	pIDs := wrapper.Outputs[0][0].PartyIds
 	p2pCtx := tss.NewPeerContext(pIDs)
 	outCh := make(chan *common.TssMessage)
 	errCh := make(chan error)
