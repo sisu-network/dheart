@@ -27,7 +27,7 @@ func TestPresignEndToEnd(t *testing.T) {
 	n := 4
 	batchSize := 1
 
-	pIDs := helper.GeneratePartyIds(n)
+	pIDs := helper.GetTestPartyIds(n)
 
 	savedData := helper.LoadKeygenSavedData(pIDs)
 	p2pCtx := tss.NewPeerContext(pIDs)

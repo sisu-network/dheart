@@ -1,13 +1,16 @@
 package core
 
 import (
-	"crypto/rand"
+	"encoding/hex"
+	"sort"
 
 	tcrypto "github.com/tendermint/tendermint/crypto"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	protocol "github.com/libp2p/go-libp2p-protocol"
 	"github.com/sisu-network/dheart/p2p"
+	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 )
@@ -41,25 +44,57 @@ func (mock *MockConnectionManager) AddListener(protocol protocol.ID, listener p2
 }
 
 // ---- /
-func generatePartyTestData(n int) ([]tcrypto.PrivKey, []*Node, tss.SortedPartyIDs) {
+func getEngineTestData(n int) ([]tcrypto.PrivKey, []*Node, tss.SortedPartyIDs, []*keygen.LocalPartySaveData) {
+	type dataWrapper struct {
+		key    secp256k1.PrivKey
+		pubKey tcrypto.PubKey
+		node   *Node
+	}
+
+	data := make([]*dataWrapper, n)
+
+	// Generate private key.
+	for i := 0; i < n; i++ {
+		secret, err := hex.DecodeString(helper.PRIVATE_KEY_HEX[i])
+		if err != nil {
+			panic(err)
+		}
+
+		var key secp256k1.PrivKey
+		key = secret[:32]
+		pubKey := key.PubKey()
+
+		node := NewNode(pubKey)
+
+		data[i] = &dataWrapper{
+			key, pubKey, node,
+		}
+	}
+
+	sort.SliceStable(data, func(i, j int) bool {
+		key1 := data[i].node.PartyId.KeyInt()
+		key2 := data[j].node.PartyId.KeyInt()
+		return key1.Cmp(key2) <= 0
+	})
+
 	nodes := make([]*Node, n)
 	keys := make([]tcrypto.PrivKey, n)
 	partyIds := make([]*tss.PartyID, n)
 
-	// Generate private key.
-	for i := 0; i < n; i++ {
-		secret := make([]byte, 32)
-		rand.Read(secret)
-
-		var priKey secp256k1.PrivKey
-		priKey = secret[:32]
-		pubKey := priKey.PubKey()
-		keys[i] = priKey
-
-		node := NewNode(pubKey)
-		nodes[i] = node
-		partyIds[i] = node.PartyId
+	for i := range data {
+		keys[i] = data[i].key
+		nodes[i] = data[i].node
+		partyIds[i] = data[i].node.PartyId
 	}
 
-	return keys, nodes, tss.SortPartyIDs(partyIds)
+	sorted := tss.SortPartyIDs(partyIds)
+
+	// Verify that sorted id are the same with the one in data array
+	for i := range data {
+		if data[i].node.PartyId.Id != sorted[i].Id {
+			panic("ID does not match")
+		}
+	}
+
+	return keys, nodes, sorted, helper.LoadKeygenSavedData(sorted)
 }

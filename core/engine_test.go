@@ -18,9 +18,8 @@ func TestEngineDelayStart(t *testing.T) {
 	utils.LogVerbose("Running test with tss works starting at different time.")
 	n := 4
 
-	privKeys, nodes, pIDs := generatePartyTestData(n)
+	privKeys, nodes, pIDs, savedData := getEngineTestData(n)
 
-	savedData := helper.LoadKeygenSavedData(pIDs)
 	errCh := make(chan error)
 	outCh := make(chan *p2p.P2PMessage)
 	engines := make([]*Engine, n)
@@ -63,7 +62,7 @@ func runEngines(engines []*Engine, workId string, outCh chan *p2p.P2PMessage, er
 			panic(err)
 		case <-done:
 			return
-		case <-time.After(time.Second * 10):
+		case <-time.After(time.Second * 30):
 			panic(errors.New("Test timeout"))
 
 		case p2pMsg := <-outCh:

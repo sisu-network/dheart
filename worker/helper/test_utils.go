@@ -130,7 +130,7 @@ func GeneratePrivateKey() tcrypto.PrivKey {
 	return priKey
 }
 
-func GeneratePartyIds(n int) tss.SortedPartyIDs {
+func GetTestPartyIds(n int) tss.SortedPartyIDs {
 	if n > len(PRIVATE_KEY_HEX) {
 		panic(fmt.Sprint("n is bigger than the private key array length", len(PRIVATE_KEY_HEX)))
 	}
@@ -223,7 +223,7 @@ func SaveKeygenOutput(data [][]*keygen.LocalPartySaveData) error {
 func LoadKeygenSavedData(pids tss.SortedPartyIDs) []*keygen.LocalPartySaveData {
 	savedData := make([]*keygen.LocalPartySaveData, 0)
 
-	for i := 0; i < len(pids); i++ {
+	for i := 0; i < len(PRIVATE_KEY_HEX); i++ {
 		fileName := GetTestSavedFileName(TestKeygenSavedDataFixtureDirFormat, TestKeygenSavedDataFixtureFileFormat, i)
 
 		bz, err := ioutil.ReadFile(fileName)
@@ -244,7 +244,7 @@ func LoadKeygenSavedData(pids tss.SortedPartyIDs) []*keygen.LocalPartySaveData {
 	}
 
 	if len(savedData) != len(pids) {
-		panic(fmt.Sprint("LocalSavedData array does not match"))
+		panic(fmt.Sprint("LocalSavedData array does not match ", len(savedData), len(pids)))
 	}
 
 	return savedData
