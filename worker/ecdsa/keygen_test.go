@@ -20,6 +20,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	batchSize := 1
 
 	pIDs := helper.GeneratePartyIds(totalParticipants)
+
 	errCh := make(chan error)
 	outCh := make(chan *common.TssMessage)
 

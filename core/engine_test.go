@@ -20,7 +20,7 @@ func TestEngineDelayStart(t *testing.T) {
 
 	privKeys, nodes, pIDs := generatePartyTestData(n)
 
-	savedData := helper.LoadKeygenSavedData(n)
+	savedData := helper.LoadKeygenSavedData(pIDs)
 	errCh := make(chan error)
 	outCh := make(chan *p2p.P2PMessage)
 	engines := make([]*Engine, n)

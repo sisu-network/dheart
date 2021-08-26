@@ -2,7 +2,6 @@ package ecdsa
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -45,8 +44,6 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh
 
 		case tssMsg := <-outCh:
 			isBroadcast := tssMsg.IsBroadcast()
-			fmt.Println("Message from -> to:", indexMap[tssMsg.From], indexMap[tssMsg.To], tssMsg.UpdateMessages[0].Round)
-
 			if isBroadcast {
 				for _, w := range workers {
 					if w.GetPartyId() == tssMsg.From {

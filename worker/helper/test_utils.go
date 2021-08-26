@@ -131,8 +131,13 @@ func GeneratePrivateKey() tcrypto.PrivKey {
 }
 
 func GeneratePartyIds(n int) tss.SortedPartyIDs {
-	partyIDs := make(tss.UnSortedPartyIDs, n)
-	for i := 0; i < n; i++ {
+	if n > len(PRIVATE_KEY_HEX) {
+		panic(fmt.Sprint("n is bigger than the private key array length", len(PRIVATE_KEY_HEX)))
+	}
+
+	partyIDs := make(tss.UnSortedPartyIDs, len(PRIVATE_KEY_HEX))
+
+	for i := 0; i < len(PRIVATE_KEY_HEX); i++ {
 		secret, err := hex.DecodeString(PRIVATE_KEY_HEX[i])
 		if err != nil {
 			panic(err)
@@ -148,13 +153,16 @@ func GeneratePartyIds(n int) tss.SortedPartyIDs {
 			return nil
 		}
 		peerId, err := peer.IDFromPublicKey(p2pPubKey)
+		pMoniker := peerId.String()
 
-		pMoniker := fmt.Sprintf("%d", i+1)
-		partyIDs[i] = tss.NewPartyID(peerId.String(), pMoniker, new(big.Int).SetBytes(pubKey.Bytes()))
-		partyIDs[i].Index = i + 1
+		bigIntKey := new(big.Int).SetBytes(pubKey.Bytes())
+		partyIDs[i] = tss.NewPartyID(pMoniker, pMoniker, bigIntKey)
 	}
 
-	return tss.SortPartyIDs(partyIDs)
+	pids := tss.SortPartyIDs(partyIDs, 0)
+	pids = pids[:n]
+
+	return pids
 }
 
 func GetTestSavedFileName(dirFormat, fileFormat string, index int) string {
@@ -211,10 +219,11 @@ func SaveKeygenOutput(data [][]*keygen.LocalPartySaveData) error {
 	return nil
 }
 
-func LoadKeygenSavedData(n int) []*keygen.LocalPartySaveData {
-	savedData := make([]*keygen.LocalPartySaveData, n)
+// LoadKeygenSavedData loads saved data for a sorted list of party ids.
+func LoadKeygenSavedData(pids tss.SortedPartyIDs) []*keygen.LocalPartySaveData {
+	savedData := make([]*keygen.LocalPartySaveData, 0)
 
-	for i := 0; i < n; i++ {
+	for i := 0; i < len(pids); i++ {
 		fileName := GetTestSavedFileName(TestKeygenSavedDataFixtureDirFormat, TestKeygenSavedDataFixtureFileFormat, i)
 
 		bz, err := ioutil.ReadFile(fileName)
@@ -227,7 +236,15 @@ func LoadKeygenSavedData(n int) []*keygen.LocalPartySaveData {
 			panic(err)
 		}
 
-		savedData[i] = data
+		for _, pid := range pids {
+			if pid.KeyInt().Cmp(data.ShareID) == 0 {
+				savedData = append(savedData, data)
+			}
+		}
+	}
+
+	if len(savedData) != len(pids) {
+		panic(fmt.Sprint("LocalSavedData array does not match"))
 	}
 
 	return savedData

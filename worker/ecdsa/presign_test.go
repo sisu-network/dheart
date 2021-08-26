@@ -24,12 +24,12 @@ func TestPresignBigTest(t *testing.T) {
 }
 
 func TestPresignEndToEnd(t *testing.T) {
-	n := 3
-	batchSize := 4
+	n := 4
+	batchSize := 1
 
 	pIDs := helper.GeneratePartyIds(n)
 
-	savedData := helper.LoadKeygenSavedData(n)
+	savedData := helper.LoadKeygenSavedData(pIDs)
 	p2pCtx := tss.NewPeerContext(pIDs)
 	outCh := make(chan *common.TssMessage)
 	errCh := make(chan error)
