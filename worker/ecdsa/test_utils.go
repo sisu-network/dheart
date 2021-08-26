@@ -2,6 +2,7 @@ package ecdsa
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -28,6 +29,11 @@ func startAllWorkers(workers []worker.Worker) {
 }
 
 func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh chan error, done chan bool) {
+	indexMap := make(map[string]int)
+	for i := range workers {
+		indexMap[workers[i].GetPartyId()] = i
+	}
+
 	for {
 		select {
 		case err := <-errCh:
@@ -39,6 +45,8 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh
 
 		case tssMsg := <-outCh:
 			isBroadcast := tssMsg.IsBroadcast()
+			fmt.Println("Message from -> to:", indexMap[tssMsg.From], indexMap[tssMsg.To], tssMsg.UpdateMessages[0].Round)
+
 			if isBroadcast {
 				for _, w := range workers {
 					if w.GetPartyId() == tssMsg.From {

@@ -1,12 +1,15 @@
 package core
 
 import (
-	"strconv"
+	"crypto/rand"
+
+	tcrypto "github.com/tendermint/tendermint/crypto"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	protocol "github.com/libp2p/go-libp2p-protocol"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/tss-lib/tss"
+	"github.com/tendermint/tendermint/crypto/secp256k1"
 )
 
 // MockConnectionManager implements p2p.ConnectionManager for testing purposes.
@@ -38,17 +41,25 @@ func (mock *MockConnectionManager) AddListener(protocol protocol.ID, listener p2
 }
 
 // ---- /
+func generatePartyTestData(n int) ([]tcrypto.PrivKey, []*Node, tss.SortedPartyIDs) {
+	nodes := make([]*Node, n)
+	keys := make([]tcrypto.PrivKey, n)
+	partyIds := make([]*tss.PartyID, n)
 
-func GetTestNodes(partyIds tss.SortedPartyIDs) []*Node {
-	nodes := make([]*Node, len(partyIds))
+	// Generate private key.
+	for i := 0; i < n; i++ {
+		secret := make([]byte, 32)
+		rand.Read(secret)
 
-	for i, partyId := range partyIds {
-		node := &Node{
-			PeerId:  peer.ID("peer" + strconv.Itoa(i)),
-			PartyId: partyId,
-		}
+		var priKey secp256k1.PrivKey
+		priKey = secret[:32]
+		pubKey := priKey.PubKey()
+		keys[i] = priKey
+
+		node := NewNode(pubKey)
 		nodes[i] = node
+		partyIds[i] = node.PartyId
 	}
 
-	return nodes
+	return keys, nodes, tss.SortPartyIDs(partyIds)
 }

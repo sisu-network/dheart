@@ -12,14 +12,14 @@ import (
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
-	"github.com/tendermint/tendermint/crypto/ed25519"
 )
 
 func TestEngineDelayStart(t *testing.T) {
 	utils.LogVerbose("Running test with tss works starting at different time.")
 	n := 4
 
-	pIDs := helper.GeneratePartyIds(n)
+	privKeys, nodes, pIDs := generatePartyTestData(n)
+
 	savedData := helper.LoadKeygenSavedData(n)
 	errCh := make(chan error)
 	outCh := make(chan *p2p.P2PMessage)
@@ -27,8 +27,6 @@ func TestEngineDelayStart(t *testing.T) {
 	workId := "presign0"
 	done := make(chan bool)
 	finishedWorkerCount := 0
-	privKey := ed25519.GenPrivKey()
-	nodes := GetTestNodes(pIDs)
 
 	cb := func(workerId string, data []*presign.LocalPresignData) {
 		finishedWorkerCount += 1
@@ -39,7 +37,7 @@ func TestEngineDelayStart(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
-		engines[i] = NewEngine(pIDs[i], NewMockConnectionManager(outCh), helper.NewTestPresignCallback(cb), privKey)
+		engines[i] = NewEngine(pIDs[i], NewMockConnectionManager(outCh), helper.NewTestPresignCallback(cb), privKeys[i])
 		engines[i].AddNodes(nodes)
 	}
 

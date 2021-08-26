@@ -152,8 +152,6 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("Waiting for data")
-
 	select {
 	case data := <-outCh:
 		fmt.Println("Data length = ", len(data))

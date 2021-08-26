@@ -80,7 +80,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	}
 
 	// Save final outputs. Uncomment this line when you want to save keygen output to fixtures.
-	// saveKeysignOutput(finalOutput)
+	// helper.SaveKeygenOutput(finalOutput)
 }
 
 func generateTestPreparams(n int) {
