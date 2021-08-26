@@ -67,6 +67,7 @@ type DefaultConnectionManager struct {
 	listenerLock     sync.RWMutex
 	protocolListener map[protocol.ID]P2PDataListener
 	hostId           string
+	statusManager    StatusManager
 }
 
 func NewConnectionManager(config *ConnectionsConfig) (ConnectionManager, error) {
@@ -99,13 +100,17 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte) error {
 	cm.host = host
 
 	// Set stream handlers
-	host.SetStreamHandler(TSSProtocolID, cm.handleTSSStream)
+	host.SetStreamHandler(TSSProtocolID, cm.handleStream)
+	host.SetStreamHandler(PingProtocolID, cm.handleStream)
 
 	// Advertise this node and discover other nodes
 	cm.discover(ctx, host)
 
 	// Connect to predefined peers.
 	cm.createConnections(ctx)
+
+	// Create status manager
+	cm.initializeStatusManager()
 
 	return nil
 }
@@ -134,9 +139,9 @@ func (cm *DefaultConnectionManager) getListener(protocol protocol.ID) P2PDataLis
 	return cm.protocolListener[protocol]
 }
 
-func (cm *DefaultConnectionManager) handleTSSStream(stream network.Stream) {
+func (cm *DefaultConnectionManager) handleStream(stream network.Stream) {
 	for {
-		peerID := stream.Conn().RemotePeer().String()
+		peerIDString := stream.Conn().RemotePeer().String()
 		protocol := stream.Protocol()
 
 		// TODO: Add cancel channel here.
@@ -156,9 +161,17 @@ func (cm *DefaultConnectionManager) handleTSSStream(stream network.Stream) {
 
 			go func() {
 				listener.OnNetworkMessage(&P2PMessage{
-					FromPeerId: peerID,
+					FromPeerId: peerIDString,
 					Data:       dataBuf,
 				})
+
+				// Update status manager
+				peerId, err := peer.Decode(peerIDString)
+				if err == nil {
+					cm.statusManager.UpdatePeerStatus(peerId, STATUS_CONNECTED)
+				} else {
+					utils.LogError(err)
+				}
 			}()
 		}
 	}
@@ -184,9 +197,9 @@ func (cm *DefaultConnectionManager) discover(ctx context.Context, host host.Host
 func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 	// Creates connection objects.
 	for _, peerAddr := range cm.bootstrapPeers {
-		pi, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-		conn := NewConnection(pi.ID, peerAddr, &cm.host)
-		cm.connections[pi.ID] = conn
+		addrInfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+		conn := NewConnection(addrInfo.ID, peerAddr, &cm.host)
+		cm.connections[addrInfo.ID] = conn
 	}
 
 	// Attempts to connect to every bootstrapped peers.
@@ -236,5 +249,22 @@ func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protoc
 		return errors.New("pID not found")
 	}
 
-	return conn.writeToStream(msg, protocolId)
+	err := conn.writeToStream(msg, protocolId)
+	if err != nil {
+		cm.statusManager.UpdatePeerStatus(pID, STATUS_DISCONNECTED)
+	} else {
+		cm.statusManager.UpdatePeerStatus(pID, STATUS_CONNECTED)
+	}
+	return err
+}
+
+func (cm *DefaultConnectionManager) initializeStatusManager() {
+	peerIds := make([]peer.ID, 0)
+	for _, peerAddr := range cm.bootstrapPeers {
+		addrInfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+		peerIds = append(peerIds, addrInfo.ID)
+	}
+
+	cm.statusManager = NewStatusManager(peerIds, cm)
+	cm.statusManager.Start()
 }
