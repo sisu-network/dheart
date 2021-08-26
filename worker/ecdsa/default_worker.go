@@ -23,11 +23,11 @@ import (
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
 // channel to avoid creating too many channels.
 type WorkerCallback interface {
-	OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData)
+	OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData)
 
-	OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData)
+	OnWorkPresignFinished(workId string, data []*presign.LocalPresignData)
 
-	OnWorkSigningFinished(workerId string, data []*libCommon.SignatureData)
+	OnWorkSigningFinished(workId string, data []*libCommon.SignatureData)
 }
 
 // Implements worker.Worker interface
@@ -309,8 +309,8 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		utils.LogVerbose(w.GetPartyId(), "Done!")
-		w.callback.OnWorkKeygenFinished(w.GetPartyId(), w.keygenOutputs)
+		utils.LogVerbose(w.GetWorkId(), "Done!")
+		w.callback.OnWorkKeygenFinished(w.GetWorkId(), w.keygenOutputs)
 	}
 }
 
@@ -331,8 +331,8 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		utils.LogVerbose(w.GetPartyId(), "Done!")
-		w.callback.OnWorkPresignFinished(w.GetPartyId(), w.presignOutputs)
+		utils.LogVerbose(w.GetWorkId(), "Done!")
+		w.callback.OnWorkPresignFinished(w.GetWorkId(), w.presignOutputs)
 	}
 }
 
@@ -353,8 +353,8 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		utils.LogVerbose(w.GetPartyId(), "Done!")
-		w.callback.OnWorkSigningFinished(w.GetPartyId(), w.signingOutputs)
+		utils.LogVerbose(w.GetWorkId(), "Done!")
+		w.callback.OnWorkSigningFinished(w.GetWorkId(), w.signingOutputs)
 	}
 }
 

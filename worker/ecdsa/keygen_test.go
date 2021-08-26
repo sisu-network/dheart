@@ -15,7 +15,7 @@ import (
 //--- Miscellaneous helpers functions -- /
 
 func TestKeygenEndToEnd(t *testing.T) {
-	totalParticipants := 15
+	totalParticipants := 6
 	threshold := 1
 	batchSize := 1
 
@@ -29,14 +29,8 @@ func TestKeygenEndToEnd(t *testing.T) {
 	finishedWorkerCount := 0
 
 	finalOutput := make([][]*keygen.LocalPartySaveData, len(pIDs)) // n * batchSize
-	cb := func(workerId string, data []*keygen.LocalPartySaveData) {
-		for i, worker := range workers {
-			if worker.GetPartyId() == workerId {
-				finalOutput[i] = data
-				break
-			}
-		}
-
+	cb := func(workerIndex int, workId string, data []*keygen.LocalPartySaveData) {
+		finalOutput[workerIndex] = data
 		finishedWorkerCount += 1
 
 		if finishedWorkerCount == totalParticipants {
@@ -57,7 +51,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 			threshold,
 			helper.NewTestDispatcher(outCh),
 			errCh,
-			helper.NewTestKeygenCallback(cb),
+			helper.NewTestKeygenCallback(i, cb),
 		)
 	}
 

@@ -55,39 +55,43 @@ var (
 )
 
 type TestWorkerCallback struct {
-	keygenCallback  func(workerId string, data []*keygen.LocalPartySaveData)
-	presignCallback func(workerId string, data []*presign.LocalPresignData)
-	signingCallback func(workerId string, data []*libCommon.SignatureData)
+	workerIndex     int
+	keygenCallback  func(workerIndex int, workId string, data []*keygen.LocalPartySaveData)
+	presignCallback func(workerIndex int, workId string, data []*presign.LocalPresignData)
+	signingCallback func(workerIndex int, workId string, data []*libCommon.SignatureData)
 }
 
-func NewTestKeygenCallback(keygenCallback func(workerId string, data []*keygen.LocalPartySaveData)) *TestWorkerCallback {
+func NewTestKeygenCallback(workerIndex int, keygenCallback func(workerIndex int, workId string, data []*keygen.LocalPartySaveData)) *TestWorkerCallback {
 	return &TestWorkerCallback{
+		workerIndex:    workerIndex,
 		keygenCallback: keygenCallback,
 	}
 }
 
-func NewTestPresignCallback(presignCallback func(workerId string, data []*presign.LocalPresignData)) *TestWorkerCallback {
+func NewTestPresignCallback(workerIndex int, presignCallback func(workerIndex int, workId string, data []*presign.LocalPresignData)) *TestWorkerCallback {
 	return &TestWorkerCallback{
+		workerIndex:     workerIndex,
 		presignCallback: presignCallback,
 	}
 }
 
-func NewTestSigningCallback(signingCallback func(workerId string, data []*libCommon.SignatureData)) *TestWorkerCallback {
+func NewTestSigningCallback(workerIndex int, signingCallback func(workerIndex int, workId string, data []*libCommon.SignatureData)) *TestWorkerCallback {
 	return &TestWorkerCallback{
+		workerIndex:     workerIndex,
 		signingCallback: signingCallback,
 	}
 }
 
-func (cb *TestWorkerCallback) OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData) {
-	cb.keygenCallback(workerId, data)
+func (cb *TestWorkerCallback) OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData) {
+	cb.keygenCallback(cb.workerIndex, workId, data)
 }
 
-func (cb *TestWorkerCallback) OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData) {
-	cb.presignCallback(workerId, data)
+func (cb *TestWorkerCallback) OnWorkPresignFinished(workId string, data []*presign.LocalPresignData) {
+	cb.presignCallback(cb.workerIndex, workId, data)
 }
 
-func (cb *TestWorkerCallback) OnWorkSigningFinished(workerId string, data []*libCommon.SignatureData) {
-	cb.signingCallback(workerId, data)
+func (cb *TestWorkerCallback) OnWorkSigningFinished(workId string, data []*libCommon.SignatureData) {
+	cb.signingCallback(cb.workerIndex, workId, data)
 }
 
 //---/

@@ -29,14 +29,8 @@ func TestSigningEndToEnd(t *testing.T) {
 	signingMsg := "This is a test"
 
 	outputs := make([][]*libCommon.SignatureData, len(pIDs)) // n * batchSize
-	cb := func(workerId string, data []*libCommon.SignatureData) {
-		for i, worker := range workers {
-			if worker.GetPartyId() == workerId {
-				outputs[i] = data
-				break
-			}
-		}
-
+	cb := func(workerIndex int, workerId string, data []*libCommon.SignatureData) {
+		outputs[workerIndex] = data
 		finishedWorkerCount += 1
 
 		if finishedWorkerCount == n {
@@ -56,7 +50,7 @@ func TestSigningEndToEnd(t *testing.T) {
 			wrapper.Outputs[i],
 			helper.NewTestDispatcher(outCh),
 			errCh,
-			helper.NewTestSigningCallback(cb),
+			helper.NewTestSigningCallback(i, cb),
 		)
 
 		workers[i] = worker

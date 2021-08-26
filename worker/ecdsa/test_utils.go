@@ -28,11 +28,6 @@ func startAllWorkers(workers []worker.Worker) {
 }
 
 func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh chan error, done chan bool) {
-	indexMap := make(map[string]int)
-	for i := range workers {
-		indexMap[workers[i].GetPartyId()] = i
-	}
-
 	for {
 		select {
 		case err := <-errCh:

@@ -38,13 +38,8 @@ func TestPresignEndToEnd(t *testing.T) {
 	finishedWorkerCount := 0
 
 	presignOutputs := make([][]*presign.LocalPresignData, len(pIDs)) // n * batchSize
-	cb := func(workerId string, data []*presign.LocalPresignData) {
-		for i, worker := range workers {
-			if worker.GetPartyId() == workerId {
-				presignOutputs[i] = data
-				break
-			}
-		}
+	cb := func(workerIndex int, workerId string, data []*presign.LocalPresignData) {
+		presignOutputs[workerIndex] = data
 
 		finishedWorkerCount += 1
 
@@ -64,7 +59,7 @@ func TestPresignEndToEnd(t *testing.T) {
 			savedData[i],
 			helper.NewTestDispatcher(outCh),
 			errCh,
-			helper.NewTestPresignCallback(cb),
+			helper.NewTestPresignCallback(i, cb),
 		)
 
 		workers[i] = worker
