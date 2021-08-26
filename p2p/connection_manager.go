@@ -205,6 +205,7 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 					time.Sleep(time.Second * 3)
 				} else {
 					log.Printf("Connection established with bootstrap node: %q", *peerinfo)
+					break
 				}
 			}
 		}()

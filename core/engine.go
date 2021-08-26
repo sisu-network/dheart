@@ -77,7 +77,7 @@ func (engine *Engine) AddNodes(nodes []*Node) {
 	defer engine.nodeLock.Unlock()
 
 	for _, node := range nodes {
-		engine.nodes[node.PartyId.KeyInt().String()] = node
+		engine.nodes[node.PeerId.String()] = node
 	}
 }
 
@@ -87,9 +87,11 @@ func (engine *Engine) AddRequest(request *types.WorkRequest) error {
 		return err
 	}
 
+	// Make sure that we know all the partyid in the request.
 	for _, partyId := range request.PIDs {
-		key := partyId.KeyInt().String()
-		if engine.nodes[key] == nil {
+		key := partyId.Id
+		node := engine.getNodeFromPeerId(key)
+		if node == nil && key != engine.myPid.Id {
 			return fmt.Errorf("A party is the request cannot be found in the node list: %s", key)
 		}
 	}
@@ -237,9 +239,15 @@ func (engine *Engine) sendData(data []byte, pIDs []*tss.PartyID) {
 	peerIds := make([]peer.ID, 0, len(pIDs))
 	engine.nodeLock.RLock()
 	for _, pid := range pIDs {
-		node := engine.nodes[pid.KeyInt().String()]
+		if pid.Id == engine.myPid.Id {
+			// Don't send to ourself.
+			continue
+		}
+
+		node := engine.getNodeFromPeerId(pid.Id)
+
 		if node == nil {
-			utils.LogError("Cannot find node with party key", pid.KeyInt().String())
+			utils.LogError("Cannot find node with party key", pid.Id)
 			return
 		}
 
@@ -249,7 +257,7 @@ func (engine *Engine) sendData(data []byte, pIDs []*tss.PartyID) {
 
 	// Write to stream
 	for _, peerId := range peerIds {
-		engine.cm.WriteToStream(peerId, p2p.PingProtocolID, data)
+		engine.cm.WriteToStream(peerId, p2p.TSSProtocolID, data)
 	}
 }
 
@@ -281,6 +289,7 @@ func (engine *Engine) getSignedMessageBytes(tssMessage *common.TssMessage) ([]by
 
 // OnNetworkMessage implements P2PDataListener interface.
 func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
+
 	node := engine.getNodeFromPeerId(message.FromPeerId)
 	if node == nil {
 		return

@@ -25,9 +25,10 @@ type WorkRequest struct {
 	Message      string
 }
 
-func NewKeygenRequest(workId string, PIDs tss.SortedPartyIDs, keygenInput keygen.LocalPreParams) *WorkRequest {
+func NewKeygenRequest(workId string, PIDs tss.SortedPartyIDs, keygenInput keygen.LocalPreParams, threshold int) *WorkRequest {
 	request := baseRequest(ECDSA_KEYGEN, workId, PIDs)
 	request.KeygenInput = &keygenInput
+	request.Threshold = threshold
 
 	return request
 }
