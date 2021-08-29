@@ -32,14 +32,15 @@ type WorkerCallback interface {
 
 // Implements worker.Worker interface
 type DefaultWorker struct {
-	batchSize int
-	myPid     *tss.PartyID
-	pIDs      tss.SortedPartyIDs
-	p2pCtx    *tss.PeerContext
-	jobType   wTypes.WorkType
-	callback  WorkerCallback
-	workId    string
-	errCh     chan error
+	batchSize  int
+	myPid      *tss.PartyID
+	allParties []*tss.PartyID
+	pIDs       tss.SortedPartyIDs
+	p2pCtx     *tss.PeerContext
+	jobType    wTypes.WorkType
+	callback   WorkerCallback
+	workId     string
+	errCh      chan error // TODO: Do this in the callback.
 
 	threshold  int
 	jobs       []*Job
@@ -69,6 +70,7 @@ type DefaultWorker struct {
 func NewKeygenWorker(
 	id string,
 	batchSize int,
+	allParties []*tss.PartyID,
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
 	keygenInput *keygen.LocalPreParams,
@@ -77,7 +79,7 @@ func NewKeygenWorker(
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(id, batchSize, pIDs, myPid, nil, dispatcher, errCh, callback)
+	w := baseWorker(id, batchSize, allParties, pIDs, myPid, nil, dispatcher, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_KEYGEN
 	w.keygenInput = keygenInput
@@ -90,6 +92,7 @@ func NewKeygenWorker(
 func NewPresignWorker(
 	workId string,
 	batchSize int,
+	allParties []*tss.PartyID,
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
 	params *tss.Parameters,
@@ -98,7 +101,7 @@ func NewPresignWorker(
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(workId, batchSize, pIDs, myPid, params, dispatcher, errCh, callback)
+	w := baseWorker(workId, batchSize, allParties, pIDs, myPid, params, dispatcher, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_PRESIGN
 	w.presignInput = presignInput
@@ -110,6 +113,7 @@ func NewPresignWorker(
 func NewSigningWorker(
 	workId string,
 	batchSize int,
+	allParties []*tss.PartyID,
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
 	params *tss.Parameters,
@@ -119,7 +123,7 @@ func NewSigningWorker(
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(workId, batchSize, pIDs, myPid, params, dispatcher, errCh, callback)
+	w := baseWorker(workId, batchSize, allParties, pIDs, myPid, params, dispatcher, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_SIGNING
 	w.signingInput = signingInput
@@ -132,6 +136,7 @@ func NewSigningWorker(
 func baseWorker(
 	workId string,
 	batchSize int,
+	allParties []*tss.PartyID,
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
 	params *tss.Parameters,
@@ -145,6 +150,7 @@ func baseWorker(
 		workId:          workId,
 		batchSize:       batchSize,
 		myPid:           myPid,
+		allParties:      allParties,
 		pIDs:            pIDs,
 		p2pCtx:          p2pCtx,
 		dispatcher:      dispatcher,
@@ -190,6 +196,11 @@ func (w *DefaultWorker) Start(cachedMsgs []*commonTypes.TssMessage) error {
 	}
 
 	return nil
+}
+
+// findPids finds list of nodes who are available for signing this work.
+func (w *DefaultWorker) findPids() {
+
 }
 
 func (w *DefaultWorker) onError(job *Job, err error) {

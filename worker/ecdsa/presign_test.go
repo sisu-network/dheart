@@ -54,6 +54,7 @@ func TestPresignEndToEnd(t *testing.T) {
 			"Presign0",
 			batchSize,
 			pIDs,
+			pIDs,
 			pIDs[i],
 			params,
 			savedData[i],

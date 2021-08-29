@@ -27,7 +27,7 @@ func TestEngineDelayStart(t *testing.T) {
 	done := make(chan bool)
 	finishedWorkerCount := 0
 
-	cb := func(workerId string, data []*presign.LocalPresignData) {
+	cb := func(workerIndex int, workerId string, data []*presign.LocalPresignData) {
 		finishedWorkerCount += 1
 
 		if finishedWorkerCount == n {
@@ -36,7 +36,7 @@ func TestEngineDelayStart(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
-		engines[i] = NewEngine(pIDs[i], NewMockConnectionManager(outCh), helper.NewTestPresignCallback(cb), privKeys[i])
+		engines[i] = NewEngine(pIDs[i], NewMockConnectionManager(outCh), helper.NewTestPresignCallback(i, cb), privKeys[i])
 		engines[i].AddNodes(nodes)
 	}
 

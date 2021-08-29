@@ -109,20 +109,20 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 	// Create a new worker.
 	switch request.WorkType {
 	case types.ECDSA_KEYGEN:
-		w = ecdsa.NewKeygenWorker(request.WorkId, BATCH_SIZE, request.PIDs, engine.myPid,
+		w = ecdsa.NewKeygenWorker(request.WorkId, BATCH_SIZE, request.PIDs, request.PIDs, engine.myPid,
 			request.KeygenInput, request.Threshold, engine, errCh, engine)
 
 	case types.ECDSA_PRESIGN:
 		p2pCtx := tss.NewPeerContext(request.PIDs)
 		params := tss.NewParameters(p2pCtx, engine.myPid, len(request.PIDs), len(request.PIDs)-1)
 
-		w = ecdsa.NewPresignWorker(request.WorkId, BATCH_SIZE, request.PIDs, engine.myPid,
+		w = ecdsa.NewPresignWorker(request.WorkId, BATCH_SIZE, request.PIDs, request.PIDs, engine.myPid,
 			params, request.PresignInput, engine, errCh, engine)
 
 	case types.ECDSA_SIGNING:
 		p2pCtx := tss.NewPeerContext(request.PIDs)
 		params := tss.NewParameters(p2pCtx, engine.myPid, len(request.PIDs), len(request.PIDs)-1)
-		w = ecdsa.NewSigningWorker(request.WorkId, BATCH_SIZE, request.PIDs, engine.myPid, params,
+		w = ecdsa.NewSigningWorker(request.WorkId, BATCH_SIZE, request.PIDs, request.PIDs, engine.myPid, params,
 			request.Message, request.SigningInput, engine, errCh, engine)
 	}
 

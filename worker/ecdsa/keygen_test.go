@@ -46,6 +46,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 			"Keygen0",
 			batchSize,
 			pIDs,
+			pIDs,
 			pIDs[i],
 			preparams,
 			threshold,

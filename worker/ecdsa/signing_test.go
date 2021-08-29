@@ -44,6 +44,7 @@ func TestSigningEndToEnd(t *testing.T) {
 			"Signing0",
 			batchSize,
 			pIDs,
+			pIDs,
 			pIDs[i],
 			params,
 			signingMsg,
