@@ -9,6 +9,7 @@ import (
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +31,6 @@ func TestPresignEndToEnd(t *testing.T) {
 	pIDs := helper.GetTestPartyIds(n)
 
 	savedData := helper.LoadKeygenSavedData(pIDs)
-	p2pCtx := tss.NewPeerContext(pIDs)
 	outCh := make(chan *common.TssMessage)
 	errCh := make(chan error)
 	workers := make([]worker.Worker, n)
@@ -49,15 +49,18 @@ func TestPresignEndToEnd(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
-		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), n-1)
+		request := &types.WorkRequest{
+			WorkId:       "Presign0",
+			AllParties:   pIDs,
+			PIDs:         pIDs,
+			PresignInput: savedData[i],
+			Threshold:    len(pIDs) - 1,
+		}
+
 		worker := NewPresignWorker(
-			"Presign0",
 			batchSize,
-			pIDs,
-			pIDs,
+			request,
 			pIDs[i],
-			params,
-			savedData[i],
 			helper.NewTestDispatcher(outCh),
 			errCh,
 			helper.NewTestPresignCallback(i, cb),

@@ -8,6 +8,7 @@ import (
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/dheart/worker/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +21,6 @@ func TestSigningEndToEnd(t *testing.T) {
 
 	// Batch should have the same set of party ids.
 	pIDs := wrapper.Outputs[0][0].PartyIds
-	p2pCtx := tss.NewPeerContext(pIDs)
 	outCh := make(chan *common.TssMessage)
 	errCh := make(chan error)
 	workers := make([]worker.Worker, n)
@@ -39,16 +39,19 @@ func TestSigningEndToEnd(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
-		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), n-1)
+		request := &types.WorkRequest{
+			WorkId:       "Signing0",
+			AllParties:   pIDs,
+			PIDs:         pIDs,
+			SigningInput: wrapper.Outputs[i],
+			Threshold:    len(pIDs) - 1,
+			Message:      signingMsg,
+		}
+
 		worker := NewSigningWorker(
-			"Signing0",
 			batchSize,
-			pIDs,
-			pIDs,
+			request,
 			pIDs[i],
-			params,
-			signingMsg,
-			wrapper.Outputs[i],
 			helper.NewTestDispatcher(outCh),
 			errCh,
 			helper.NewTestSigningCallback(i, cb),

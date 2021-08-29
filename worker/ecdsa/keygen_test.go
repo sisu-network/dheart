@@ -8,6 +8,7 @@ import (
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/stretchr/testify/assert"
 )
@@ -42,14 +43,18 @@ func TestKeygenEndToEnd(t *testing.T) {
 	for i := 0; i < totalParticipants; i++ {
 		preparams := helper.LoadPreparams(i)
 
+		request := &types.WorkRequest{
+			WorkId:      "Keygen0",
+			AllParties:  pIDs,
+			PIDs:        pIDs,
+			KeygenInput: preparams,
+			Threshold:   threshold,
+		}
+
 		workers[i] = NewKeygenWorker(
-			"Keygen0",
 			batchSize,
-			pIDs,
-			pIDs,
+			request,
 			pIDs[i],
-			preparams,
-			threshold,
 			helper.NewTestDispatcher(outCh),
 			errCh,
 			helper.NewTestKeygenCallback(i, cb),

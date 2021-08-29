@@ -10,6 +10,7 @@ import (
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/interfaces"
+	"github.com/sisu-network/dheart/worker/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -68,67 +69,54 @@ type DefaultWorker struct {
 }
 
 func NewKeygenWorker(
-	id string,
 	batchSize int,
-	allParties []*tss.PartyID,
-	pIDs tss.SortedPartyIDs,
+	request *types.WorkRequest,
 	myPid *tss.PartyID,
-	keygenInput *keygen.LocalPreParams,
-	threshold int,
 	dispatcher interfaces.MessageDispatcher,
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(id, batchSize, allParties, pIDs, myPid, nil, dispatcher, errCh, callback)
+	w := baseWorker(request.WorkId, batchSize, request.AllParties, request.PIDs, myPid, dispatcher, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_KEYGEN
-	w.keygenInput = keygenInput
-	w.threshold = threshold
+	w.keygenInput = request.KeygenInput
+	w.threshold = request.Threshold
 	w.keygenOutputs = make([]*keygen.LocalPartySaveData, batchSize)
 
 	return w
 }
 
 func NewPresignWorker(
-	workId string,
 	batchSize int,
-	allParties []*tss.PartyID,
-	pIDs tss.SortedPartyIDs,
+	request *types.WorkRequest,
 	myPid *tss.PartyID,
-	params *tss.Parameters,
-	presignInput *keygen.LocalPartySaveData,
 	dispatcher interfaces.MessageDispatcher,
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(workId, batchSize, allParties, pIDs, myPid, params, dispatcher, errCh, callback)
+	w := baseWorker(request.WorkId, batchSize, request.AllParties, request.PIDs, myPid, dispatcher, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_PRESIGN
-	w.presignInput = presignInput
+	w.presignInput = request.PresignInput
 	w.presignOutputs = make([]*presign.LocalPresignData, batchSize)
 
 	return w
 }
 
 func NewSigningWorker(
-	workId string,
 	batchSize int,
-	allParties []*tss.PartyID,
-	pIDs tss.SortedPartyIDs,
+	request *types.WorkRequest,
 	myPid *tss.PartyID,
-	params *tss.Parameters,
-	msg string,
-	signingInput []*presign.LocalPresignData,
 	dispatcher interfaces.MessageDispatcher,
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(workId, batchSize, allParties, pIDs, myPid, params, dispatcher, errCh, callback)
+	w := baseWorker(request.WorkId, batchSize, request.AllParties, request.PIDs, myPid, dispatcher, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_SIGNING
-	w.signingInput = signingInput
+	w.signingInput = request.SigningInput
 	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
-	w.signingMessage = msg
+	w.signingMessage = request.Message
 
 	return w
 }
@@ -139,7 +127,6 @@ func baseWorker(
 	allParties []*tss.PartyID,
 	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
-	params *tss.Parameters,
 	dispatcher interfaces.MessageDispatcher,
 	errCh chan error,
 	callback WorkerCallback,

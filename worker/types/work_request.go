@@ -9,9 +9,10 @@ import (
 )
 
 type WorkRequest struct {
-	WorkType WorkType
-	PIDs     tss.SortedPartyIDs
-	WorkId   string
+	WorkType   WorkType
+	AllParties []*tss.PartyID
+	PIDs       tss.SortedPartyIDs
+	WorkId     string
 
 	// Used only for keygen, presign & signing
 	KeygenInput *keygen.LocalPreParams
