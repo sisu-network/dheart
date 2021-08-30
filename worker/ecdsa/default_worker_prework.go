@@ -106,6 +106,8 @@ func (w *DefaultWorker) waitForMemberResponse() {
 
 				// TODO: Do check with database in case of signing a message. We only want to do pick up
 				// participants who are in a presign set.
+			} else {
+				utils.LogError("Cannot find party from", tssMsg.From)
 			}
 		}
 

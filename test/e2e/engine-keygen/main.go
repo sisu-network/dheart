@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/p2p"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
@@ -77,28 +77,35 @@ func main() {
 		panic(err)
 	}
 
-	time.Sleep(time.Second * 5)
-
-	sortedPartyIds := getSortedPartyIds(n)
+	pids := make([]*tss.PartyID, n)
 	allKeys := p2p.GetAllPrivateKeys(n)
-
-	// Create new engine
-	outCh := make(chan []*keygen.LocalPartySaveData)
-	cb := NewEngineCallback(outCh, nil, nil)
-	engine := core.NewEngine(sortedPartyIds[index], cm, cb, allKeys[index])
-	cm.AddListener(p2p.TSSProtocolID, engine)
+	nodes := make([]*core.Node, n)
 
 	// Add nodes
 	privKeys := p2p.GetAllPrivateKeys(n)
 	for i := 0; i < n; i++ {
 		pubKey := privKeys[i].PubKey()
 		node := core.NewNode(pubKey)
-		engine.AddNodes([]*core.Node{node})
+		nodes[i] = node
+		pids[i] = node.PartyId
 	}
+
+	// Create new engine
+	outCh := make(chan []*keygen.LocalPartySaveData)
+	cb := NewEngineCallback(outCh, nil, nil)
+	engine := core.NewEngine(nodes[index], cm, cb, allKeys[index])
+	cm.AddListener(p2p.TSSProtocolID, engine)
+
+	// Add nodes
+	for i := 0; i < n; i++ {
+		engine.AddNodes(nodes)
+	}
+
+	time.Sleep(time.Second * 3)
 
 	// Add request
 	workId := "keygen0"
-	request := types.NewKeygenRequest(workId, sortedPartyIds, *helper.LoadPreparams(index), n-1)
+	request := types.NewKeygenRequest(workId, n, pids, *helper.LoadPreparams(index), n-1)
 	err = engine.AddRequest(request)
 	if err != nil {
 		panic(err)
@@ -106,6 +113,6 @@ func main() {
 
 	select {
 	case data := <-outCh:
-		fmt.Println("Data length = ", len(data))
+		utils.LogInfo("Data length = ", len(data))
 	}
 }

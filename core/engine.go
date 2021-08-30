@@ -296,7 +296,6 @@ func (engine *Engine) getSignedMessageBytes(tssMessage *common.TssMessage) ([]by
 
 // OnNetworkMessage implements P2PDataListener interface.
 func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
-
 	node := engine.getNodeFromPeerId(message.FromPeerId)
 	if node == nil {
 		return
@@ -314,12 +313,7 @@ func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
 		return
 	}
 
-	worker := engine.getWorker(tssMessage.WorkId)
-	if worker == nil {
-		return
-	}
-
-	worker.ProcessNewMessage(tssMessage)
+	engine.ProcessNewMessage(tssMessage)
 }
 
 func (engine *Engine) OnPreExecutionFinished(workId string) {}

@@ -159,7 +159,7 @@ func (cm *DefaultConnectionManager) handleStream(stream network.Stream) {
 				return
 			}
 
-			go func() {
+			go func(peerIDString string, dataBuf []byte) {
 				listener.OnNetworkMessage(&P2PMessage{
 					FromPeerId: peerIDString,
 					Data:       dataBuf,
@@ -172,7 +172,7 @@ func (cm *DefaultConnectionManager) handleStream(stream network.Stream) {
 				} else {
 					utils.LogError(err)
 				}
-			}()
+			}(peerIDString, dataBuf)
 		}
 	}
 }
