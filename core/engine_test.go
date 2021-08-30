@@ -42,7 +42,7 @@ func TestEngineDelayStart(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, pIDs, *savedData[i])
+		request := types.NewPresignRequest(workId, n, pIDs, *savedData[i])
 		go func(engine *Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simluate that different workers can start at different times.
 			time.Sleep(delay)

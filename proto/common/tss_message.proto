@@ -5,15 +5,59 @@ option go_package = "github.com/sisu-network/dheart/types/common";
 package common;
 
 message TssMessage {
-  string from = 1;
-  string to = 2;
-  string workId = 3;
+  enum Type {
+    UPDATE_MESSAGES = 0;
 
-  repeated UpdateMessage updateMessages = 4;
+    // A message sent from leader to everyeone to check if anyone is available to participant
+    // another optional (presign) tss work.
+    AVAILABILITY_REQUEST = 1;
+
+    // A response from a node to the leader to indicate if it still has available resource for
+    // another tss work. The leader can take a look at everyone's response to decide who are the
+    // nodes to participate for tss work.
+    //
+    // For optional work (like presign), if a leader cannot find enough participants, it will cancel
+    // the round. For required work (keygen, keysign, forced presign), the leader will forcefully
+    // choose some online nodes (even though they say they are busy) for the work if the leader
+    // cannot find enough candidates.
+    AVAILABILITY_RESPONSE = 2;
+
+    // A message sent from leader to everyone else with a list of participants to a tss work.
+    WORK_PARTICIPANTS = 3;
+  }
+
+  Type type = 1;
+  string from = 2;
+  string to = 3;
+  string workId = 4;
+
+  repeated UpdateMessage updateMessages = 5;
+
+  AvailabilityResponseMessage availabilityResponseMessage = 6;
+  WorkParticipantsMessage workParticipantsMessage = 7;
 }
 
 message UpdateMessage {
   bytes data = 1;
   bytes serializedMessageRouting = 2;
   string round = 3;
+}
+
+// An answer from a party member to the leader to indicate its available for signing.
+message AvailabilityResponseMessage {
+ enum ANSWER {
+   YES = 0;
+   NO = 1;
+ }
+
+ ANSWER answer = 1;
+}
+
+// A message from a leader to send to everyone with a list of participants for a particular work
+message WorkParticipantsMessage {
+  // This value is true if there are enough participants for the tss work and false otherwise.
+  bool success = 1;
+
+  // List of participants that will join this tss work.
+  repeated string pids = 2;
 }

@@ -17,10 +17,10 @@ func startAllWorkers(workers []worker.Worker) {
 	wg.Add(len(workers))
 	for i := 0; i < len(workers); i++ {
 		go func(w worker.Worker) {
+			wg.Done()
 			if err := w.Start(make([]*common.TssMessage, 0)); err != nil {
 				panic(err)
 			}
-			wg.Done()
 		}(workers[i])
 	}
 
@@ -38,6 +38,10 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh
 			panic(errors.New("Test timeout"))
 
 		case tssMsg := <-outCh:
+			if tssMsg.From == tssMsg.To {
+				continue
+			}
+
 			isBroadcast := tssMsg.IsBroadcast()
 			if isBroadcast {
 				for _, w := range workers {

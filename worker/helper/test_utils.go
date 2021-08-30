@@ -94,6 +94,14 @@ func (cb *TestWorkerCallback) OnWorkSigningFinished(workId string, data []*libCo
 	cb.signingCallback(cb.workerIndex, workId, data)
 }
 
+func (cb *TestWorkerCallback) OnPreExecutionFinished(workId string) {
+	// Do nothing.
+}
+
+func (cb *TestWorkerCallback) OnWorkFailed(workId string) {
+	// Do nothing.
+}
+
 //---/
 
 type PresignDataWrapper struct {

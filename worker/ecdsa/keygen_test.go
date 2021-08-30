@@ -2,6 +2,7 @@ package ecdsa
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -46,9 +47,9 @@ func TestKeygenEndToEnd(t *testing.T) {
 		request := &types.WorkRequest{
 			WorkId:      "Keygen0",
 			AllParties:  pIDs,
-			PIDs:        pIDs,
 			KeygenInput: preparams,
 			Threshold:   threshold,
+			N:           totalParticipants,
 		}
 
 		workers[i] = NewKeygenWorker(
@@ -61,8 +62,11 @@ func TestKeygenEndToEnd(t *testing.T) {
 		)
 	}
 
+	fmt.Println("Starting all workers")
 	// Start all workers
 	startAllWorkers(workers)
+
+	fmt.Println("Running all workers")
 
 	// Run all workers
 	runAllWorkers(workers, outCh, errCh, done)

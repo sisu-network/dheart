@@ -2,31 +2,12 @@ package core
 
 import (
 	"crypto"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strconv"
 
 	"github.com/sisu-network/dheart/worker/types"
 )
-
-func chooseLeader(block int64, chain string, index int, nodes []*Node) *Node {
-	keyStore := make(map[string]int)
-	sortedHashes := make([]string, len(nodes))
-
-	extra := strconv.FormatInt(block, 10) + chain + strconv.FormatInt(int64(index), 10)
-	for i, node := range nodes {
-		sum := sha256.Sum256([]byte(node.PartyId.Id + extra))
-		encodedSum := hex.EncodeToString(sum[:])
-		keyStore[encodedSum] = i
-		sortedHashes[i] = encodedSum
-	}
-
-	sort.Strings(sortedHashes)
-
-	return nodes[keyStore[sortedHashes[0]]]
-}
 
 func getWorkId(workType types.WorkType, block int64, chain string, index int, nodes []*Node) string {
 	var prefix string

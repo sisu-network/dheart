@@ -6,18 +6,7 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-func NewTssGetOnlineNodesRequest(from, to, workId string) *TssMessage {
-	msg := &TssMessage{}
-
-	// msg.Type = TssMessage_GET_ONLINE_NODES_REQUEST
-	msg.From = from
-	msg.To = to
-	msg.WorkId = workId
-
-	return msg
-}
-
-func NewTssUpdateMessages(from, to, workId string, msgs []tss.Message, round string) (*TssMessage, error) {
+func NewTssMessage(from, to, workId string, msgs []tss.Message, round string) (*TssMessage, error) {
 	// Serialize tss messages
 	updateMessages := make([]*UpdateMessage, len(msgs))
 
@@ -36,12 +25,50 @@ func NewTssUpdateMessages(from, to, workId string, msgs []tss.Message, round str
 		}
 	}
 
+	msg := baseMessage(TssMessage_UPDATE_MESSAGES, from, to, workId)
+	msg.UpdateMessages = updateMessages
+
+	return msg, nil
+}
+
+func NewAvailabilityRequestMessage(from, to, workId string) *TssMessage {
+	msg := baseMessage(TssMessage_AVAILABILITY_REQUEST, from, to, workId)
+	return msg
+}
+
+func NewAvailabilityResponseMessage(from, to, workId string, answer AvailabilityResponseMessage_ANSWER) *TssMessage {
+	msg := baseMessage(TssMessage_AVAILABILITY_RESPONSE, from, to, workId)
+	msg.AvailabilityResponseMessage = &AvailabilityResponseMessage{
+		Answer: AvailabilityResponseMessage_YES,
+	}
+
+	return msg
+}
+
+func NewWorkParticipantsMessage(from, to, workId string, success bool, pids []*tss.PartyID) *TssMessage {
+	msg := baseMessage(TssMessage_WORK_PARTICIPANTS, from, to, workId)
+
+	// get all pid strings
+	s := make([]string, len(pids))
+	for i, p := range pids {
+		s[i] = p.Id
+	}
+
+	msg.WorkParticipantsMessage = &WorkParticipantsMessage{
+		Success: success,
+		Pids:    s,
+	}
+
+	return msg
+}
+
+func baseMessage(typez TssMessage_Type, from, to, workId string) *TssMessage {
 	return &TssMessage{
-		From:           from,
-		To:             to,
-		WorkId:         workId,
-		UpdateMessages: updateMessages,
-	}, nil
+		Type:   typez,
+		From:   from,
+		To:     to,
+		WorkId: workId,
+	}
 }
 
 func (msg *TssMessage) IsBroadcast() bool {

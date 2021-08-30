@@ -52,9 +52,9 @@ func TestPresignEndToEnd(t *testing.T) {
 		request := &types.WorkRequest{
 			WorkId:       "Presign0",
 			AllParties:   pIDs,
-			PIDs:         pIDs,
 			PresignInput: savedData[i],
 			Threshold:    len(pIDs) - 1,
+			N:            n,
 		}
 
 		worker := NewPresignWorker(

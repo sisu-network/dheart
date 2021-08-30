@@ -11,8 +11,8 @@ import (
 type WorkRequest struct {
 	WorkType   WorkType
 	AllParties []*tss.PartyID
-	PIDs       tss.SortedPartyIDs
 	WorkId     string
+	N          int // The number of avaiable participants required to do this task.
 
 	// Used only for keygen, presign & signing
 	KeygenInput *keygen.LocalPreParams
@@ -26,34 +26,34 @@ type WorkRequest struct {
 	Message      string
 }
 
-func NewKeygenRequest(workId string, PIDs tss.SortedPartyIDs, keygenInput keygen.LocalPreParams, threshold int) *WorkRequest {
-	request := baseRequest(ECDSA_KEYGEN, workId, PIDs)
+func NewKeygenRequest(workId string, n int, PIDs tss.SortedPartyIDs, keygenInput keygen.LocalPreParams, threshold int) *WorkRequest {
+	request := baseRequest(ECDSA_KEYGEN, workId, n, PIDs)
 	request.KeygenInput = &keygenInput
 	request.Threshold = threshold
 
 	return request
 }
 
-func NewPresignRequest(workId string, PIDs tss.SortedPartyIDs, presignInput keygen.LocalPartySaveData) *WorkRequest {
-	request := baseRequest(ECDSA_PRESIGN, workId, PIDs)
+func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInput keygen.LocalPartySaveData) *WorkRequest {
+	request := baseRequest(ECDSA_PRESIGN, workId, n, PIDs)
 	request.PresignInput = &presignInput
 
 	return request
 }
 
-func NewSigningRequets(workId string, PIDs tss.SortedPartyIDs, signingInput []*presign.LocalPresignData, message string) *WorkRequest {
-	request := baseRequest(ECDSA_SIGNING, workId, PIDs)
+func NewSigningRequets(workId string, n int, PIDs tss.SortedPartyIDs, signingInput []*presign.LocalPresignData, message string) *WorkRequest {
+	request := baseRequest(ECDSA_SIGNING, workId, n, PIDs)
 	request.SigningInput = signingInput
 	request.Message = message
 
 	return request
 }
 
-func baseRequest(workType WorkType, workdId string, pIDs tss.SortedPartyIDs) *WorkRequest {
+func baseRequest(workType WorkType, workdId string, n int, pIDs tss.SortedPartyIDs) *WorkRequest {
 	return &WorkRequest{
 		WorkType: workType,
 		WorkId:   workdId,
-		PIDs:     pIDs,
+		N:        n,
 	}
 }
 

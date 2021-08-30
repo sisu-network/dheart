@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
@@ -21,9 +23,18 @@ import (
 	wTypes "github.com/sisu-network/dheart/worker/types"
 )
 
+var (
+	LEADER_WAIT_TIME                = 10 * time.Second
+	PRE_EXECUTION_REQUEST_WAIT_TIME = 3 * time.Second
+)
+
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
 // channel to avoid creating too many channels.
 type WorkerCallback interface {
+	OnPreExecutionFinished(workId string)
+
+	OnWorkFailed(workId string)
+
 	OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData)
 
 	OnWorkPresignFinished(workId string, data []*presign.LocalPresignData)
@@ -34,23 +45,34 @@ type WorkerCallback interface {
 // Implements worker.Worker interface
 type DefaultWorker struct {
 	batchSize  int
+	request    *types.WorkRequest
 	myPid      *tss.PartyID
 	allParties []*tss.PartyID
 	pIDs       tss.SortedPartyIDs
-	p2pCtx     *tss.PeerContext
 	jobType    wTypes.WorkType
 	callback   WorkerCallback
 	workId     string
 	errCh      chan error // TODO: Do this in the callback.
 
+	// PreExecution
+	workParticipantCh chan *common.WorkParticipantsMessage
+	memberResponseCh  chan *common.TssMessage
+	// List of parties who indicate that they are available for current tss work.
+	availableParties     map[string]*tss.PartyID
+	availablePartiesLock *sync.RWMutex
+	// Cache all tss update messages when some parties start executing while this node has not.
+	preExecutionCache *worker.MessageCache
+
+	// Execution
 	threshold  int
 	jobs       []*Job
 	dispatcher interfaces.MessageDispatcher
 
-	keygenInput    *keygen.LocalPreParams
-	presignInput   *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
-	signingInput   []*presign.LocalPresignData
-	signingMessage string
+	isExecutionStarted atomic.Value
+	keygenInput        *keygen.LocalPreParams
+	presignInput       *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
+	signingInput       []*presign.LocalPresignData
+	signingMessage     string
 
 	// A map between of rounds and list of messages that have been produced. The size of the list
 	// is the same as batchSize.
@@ -76,7 +98,7 @@ func NewKeygenWorker(
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(request.WorkId, batchSize, request.AllParties, request.PIDs, myPid, dispatcher, errCh, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_KEYGEN
 	w.keygenInput = request.KeygenInput
@@ -94,7 +116,7 @@ func NewPresignWorker(
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(request.WorkId, batchSize, request.AllParties, request.PIDs, myPid, dispatcher, errCh, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_PRESIGN
 	w.presignInput = request.PresignInput
@@ -111,7 +133,7 @@ func NewSigningWorker(
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(request.WorkId, batchSize, request.AllParties, request.PIDs, myPid, dispatcher, errCh, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_SIGNING
 	w.signingInput = request.SigningInput
@@ -122,36 +144,50 @@ func NewSigningWorker(
 }
 
 func baseWorker(
-	workId string,
+	request *types.WorkRequest,
 	batchSize int,
 	allParties []*tss.PartyID,
-	pIDs tss.SortedPartyIDs,
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
 	errCh chan error,
 	callback WorkerCallback,
 ) *DefaultWorker {
-	p2pCtx := tss.NewPeerContext(pIDs)
-
 	return &DefaultWorker{
-		workId:          workId,
-		batchSize:       batchSize,
-		myPid:           myPid,
-		allParties:      allParties,
-		pIDs:            pIDs,
-		p2pCtx:          p2pCtx,
-		dispatcher:      dispatcher,
-		errCh:           errCh,
-		callback:        callback,
-		jobs:            make([]*Job, batchSize),
-		jobOutput:       make(map[string][]tss.Message),
-		jobOutputLock:   &sync.RWMutex{},
-		finalOutputLock: &sync.RWMutex{},
+		request:              request,
+		workId:               request.WorkId,
+		batchSize:            batchSize,
+		myPid:                myPid,
+		allParties:           allParties,
+		dispatcher:           dispatcher,
+		errCh:                errCh,
+		callback:             callback,
+		jobs:                 make([]*Job, batchSize),
+		jobOutput:            make(map[string][]tss.Message),
+		jobOutputLock:        &sync.RWMutex{},
+		finalOutputLock:      &sync.RWMutex{},
+		workParticipantCh:    make(chan *commonTypes.WorkParticipantsMessage),
+		memberResponseCh:     make(chan *commonTypes.TssMessage),
+		availableParties:     make(map[string]*tss.PartyID),
+		availablePartiesLock: &sync.RWMutex{},
+		preExecutionCache:    worker.NewMessageCache(),
 	}
 }
 
-func (w *DefaultWorker) Start(cachedMsgs []*commonTypes.TssMessage) error {
-	params := tss.NewParameters(w.p2pCtx, w.myPid, len(w.pIDs), w.threshold)
+func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
+	for _, msg := range preworkCache {
+		w.preExecutionCache.AddMessage(msg)
+	}
+
+	// Do leader election and participants selection first.
+	w.preExecution()
+
+	return nil
+}
+
+// Start actual execution of the work.
+func (w *DefaultWorker) executeWork() error {
+	p2pCtx := tss.NewPeerContext(w.pIDs)
+	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.threshold)
 
 	// Creates all jobs
 	for i := range w.jobs {
@@ -176,18 +212,19 @@ func (w *DefaultWorker) Start(cachedMsgs []*commonTypes.TssMessage) error {
 	for _, job := range w.jobs {
 		job.Start(wg)
 	}
-
 	wg.Wait()
-	for _, msg := range cachedMsgs {
-		w.ProcessNewMessage(msg)
+
+	// Mark execution started.
+	w.isExecutionStarted.Store(true)
+
+	msgCache := w.preExecutionCache.PopAllMessages(w.workId)
+	for _, msg := range msgCache {
+		if msg.Type == common.TssMessage_UPDATE_MESSAGES {
+			w.ProcessNewMessage(msg)
+		}
 	}
 
 	return nil
-}
-
-// findPids finds list of nodes who are available for signing this work.
-func (w *DefaultWorker) findPids() {
-
 }
 
 func (w *DefaultWorker) onError(job *Job, err error) {
@@ -251,6 +288,31 @@ func (w *DefaultWorker) getCompletedJobCount(list []tss.Message) int {
 
 // Process incoming update message.
 func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
+	switch tssMsg.Type {
+	case common.TssMessage_UPDATE_MESSAGES:
+		return w.processUpdateMessages(tssMsg)
+
+	case common.TssMessage_AVAILABILITY_REQUEST:
+		return w.onPreExecutionRequest(tssMsg)
+
+	case common.TssMessage_AVAILABILITY_RESPONSE:
+		return w.onPreExecutionResponse(tssMsg)
+
+	case common.TssMessage_WORK_PARTICIPANTS:
+		w.workParticipantCh <- tssMsg.WorkParticipantsMessage
+		return nil
+	}
+
+	return errors.New("Invalid message" + tssMsg.Type.String())
+}
+
+func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) error {
+	// If execution has not started, save this in the cache
+	if w.isExecutionStarted.Load() != true {
+		w.preExecutionCache.AddMessage(tssMsg)
+		return nil
+	}
+
 	if w.batchSize != len(tssMsg.UpdateMessages) {
 		return errors.New("Batch size does not match")
 	}
@@ -259,7 +321,7 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 	msgs := make([]tss.ParsedMessage, w.batchSize)
 	for i := range w.jobs {
 		fromString := tssMsg.From
-		from := helper.GetFromPid(fromString, w.pIDs)
+		from := helper.GetPidFromString(fromString, w.pIDs)
 		if from == nil {
 			return errors.New("Sender is nil")
 		}
@@ -363,4 +425,14 @@ func (w *DefaultWorker) GetPartyId() string {
 
 func (w *DefaultWorker) GetWorkId() string {
 	return w.workId
+}
+
+func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {
+	for _, p := range w.allParties {
+		if p.Id == pid {
+			return p
+		}
+	}
+
+	return nil
 }

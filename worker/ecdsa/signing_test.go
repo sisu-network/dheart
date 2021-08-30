@@ -42,10 +42,10 @@ func TestSigningEndToEnd(t *testing.T) {
 		request := &types.WorkRequest{
 			WorkId:       "Signing0",
 			AllParties:   pIDs,
-			PIDs:         pIDs,
 			SigningInput: wrapper.Outputs[i],
 			Threshold:    len(pIDs) - 1,
 			Message:      signingMsg,
+			N:            n,
 		}
 
 		worker := NewSigningWorker(

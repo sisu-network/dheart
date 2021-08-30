@@ -47,7 +47,7 @@ type Engine struct {
 	requestQueue *requestQueue
 
 	workLock     *sync.RWMutex
-	preworkCache *PreworkMessageCache
+	preworkCache *worker.MessageCache
 
 	callback EngineCallback
 	cm       p2p.ConnectionManager
@@ -64,7 +64,7 @@ func NewEngine(myPid *tss.PartyID, cm p2p.ConnectionManager, callback EngineCall
 		workers:      make(map[string]worker.Worker),
 		requestQueue: NewRequestQueue(),
 		workLock:     &sync.RWMutex{},
-		preworkCache: NewPreworkMessageCache(),
+		preworkCache: worker.NewMessageCache(),
 		callback:     callback,
 		nodes:        make(map[string]*Node),
 		signer:       signer.NewDefaultSigner(privateKey),
@@ -88,7 +88,7 @@ func (engine *Engine) AddRequest(request *types.WorkRequest) error {
 	}
 
 	// Make sure that we know all the partyid in the request.
-	for _, partyId := range request.PIDs {
+	for _, partyId := range request.AllParties {
 		key := partyId.Id
 		node := engine.getNodeFromPeerId(key)
 		if node == nil && key != engine.myPid.Id {
@@ -205,6 +205,10 @@ func (engine *Engine) getWorker(workId string) worker.Worker {
 
 // Broadcast a message to everyone in a list.
 func (engine *Engine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
+	if tssMessage.To == engine.myPid.Id {
+		return
+	}
+
 	bz, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
 		utils.LogError("Cannot get signed message", err)
@@ -216,6 +220,10 @@ func (engine *Engine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.T
 
 // Send a message to a single destination.
 func (engine *Engine) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
+	if tssMessage.To == engine.myPid.Id {
+		return
+	}
+
 	bz, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
 		utils.LogError("Cannot get signed message", err)
@@ -306,3 +314,7 @@ func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
 
 	worker.ProcessNewMessage(tssMessage)
 }
+
+func (engine *Engine) OnPreExecutionFinished(workId string) {}
+
+func (engine *Engine) OnWorkFailed(workId string) {}
