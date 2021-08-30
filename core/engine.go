@@ -41,7 +41,8 @@ type EngineCallback interface {
 //      networking performing the same work might not start at the same time.
 // - Route a message to appropriate worker.
 type Engine struct {
-	myPid *tss.PartyID
+	myPid  *tss.PartyID
+	myNode *Node
 
 	workers      map[string]worker.Worker
 	requestQueue *requestQueue
@@ -57,9 +58,10 @@ type Engine struct {
 	nodeLock *sync.RWMutex
 }
 
-func NewEngine(myPid *tss.PartyID, cm p2p.ConnectionManager, callback EngineCallback, privateKey tcrypto.PrivKey) *Engine {
+func NewEngine(myNode *Node, cm p2p.ConnectionManager, callback EngineCallback, privateKey tcrypto.PrivKey) *Engine {
 	return &Engine{
-		myPid:        myPid,
+		myNode:       myNode,
+		myPid:        myNode.PartyId,
 		cm:           cm,
 		workers:      make(map[string]worker.Worker),
 		requestQueue: NewRequestQueue(),
@@ -135,8 +137,13 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) {
 	if worker != nil {
 		worker.ProcessNewMessage(tssMsg)
 	} else {
-		// This could be the case when a worker has not started yet. Save it to the cache.
-		engine.preworkCache.AddMessage(tssMsg)
+		if tssMsg.Type == common.TssMessage_AVAILABILITY_REQUEST {
+			// TODO: Check if we still have some available workers, create a worker and respond to the
+			// leader.
+		} else {
+			// This could be the case when a worker has not started yet. Save it to the cache.
+			engine.preworkCache.AddMessage(tssMsg)
+		}
 	}
 }
 

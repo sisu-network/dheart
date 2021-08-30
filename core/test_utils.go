@@ -15,14 +15,21 @@ import (
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 )
 
-// MockConnectionManager implements p2p.ConnectionManager for testing purposes.
-type MockConnectionManager struct {
-	msgCh chan *p2p.P2PMessage
+type p2pDataWrapper struct {
+	msg *p2p.P2PMessage
+	To  string
 }
 
-func NewMockConnectionManager(msgCh chan *p2p.P2PMessage) p2p.ConnectionManager {
+// MockConnectionManager implements p2p.ConnectionManager for testing purposes.
+type MockConnectionManager struct {
+	msgCh          chan *p2pDataWrapper
+	fromPeerString string
+}
+
+func NewMockConnectionManager(fromPeerString string, msgCh chan *p2pDataWrapper) p2p.ConnectionManager {
 	return &MockConnectionManager{
-		msgCh: msgCh,
+		msgCh:          msgCh,
+		fromPeerString: fromPeerString,
 	}
 }
 
@@ -31,10 +38,15 @@ func (mock *MockConnectionManager) Start(privKeyBytes []byte) error {
 }
 
 // Sends an array of byte to a particular peer.
-func (mock *MockConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error {
-	mock.msgCh <- &p2p.P2PMessage{
-		FromPeerId: string(pID),
+func (mock *MockConnectionManager) WriteToStream(toPeerId peer.ID, protocolId protocol.ID, msg []byte) error {
+	p2pMsg := &p2p.P2PMessage{
+		FromPeerId: mock.fromPeerString,
 		Data:       msg,
+	}
+
+	mock.msgCh <- &p2pDataWrapper{
+		msg: p2pMsg,
+		To:  toPeerId.String(),
 	}
 	return nil
 }

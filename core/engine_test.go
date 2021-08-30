@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
@@ -21,7 +20,7 @@ func TestEngineDelayStart(t *testing.T) {
 	privKeys, nodes, pIDs, savedData := getEngineTestData(n)
 
 	errCh := make(chan error)
-	outCh := make(chan *p2p.P2PMessage)
+	outCh := make(chan *p2pDataWrapper)
 	engines := make([]*Engine, n)
 	workId := "presign0"
 	done := make(chan bool)
@@ -36,13 +35,14 @@ func TestEngineDelayStart(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
-		engines[i] = NewEngine(pIDs[i], NewMockConnectionManager(outCh), helper.NewTestPresignCallback(i, cb), privKeys[i])
+		engines[i] = NewEngine(nodes[i], NewMockConnectionManager(nodes[i].PeerId.String(), outCh), helper.NewTestPresignCallback(i, cb), privKeys[i])
 		engines[i].AddNodes(nodes)
 	}
 
 	// Start all engines
 	for i := 0; i < n; i++ {
 		request := types.NewPresignRequest(workId, n, pIDs, *savedData[i])
+
 		go func(engine *Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simluate that different workers can start at different times.
 			time.Sleep(delay)
@@ -54,7 +54,7 @@ func TestEngineDelayStart(t *testing.T) {
 	runEngines(engines, workId, outCh, errCh, done)
 }
 
-func runEngines(engines []*Engine, workId string, outCh chan *p2p.P2PMessage, errCh chan error, done chan bool) {
+func runEngines(engines []*Engine, workId string, outCh chan *p2pDataWrapper, errCh chan error, done chan bool) {
 	// Run all engines
 	for {
 		select {
@@ -65,31 +65,14 @@ func runEngines(engines []*Engine, workId string, outCh chan *p2p.P2PMessage, er
 		case <-time.After(time.Second * 30):
 			panic(errors.New("Test timeout"))
 
-		case p2pMsg := <-outCh:
-			signedMessage := &common.SignedMessage{}
-			json.Unmarshal(p2pMsg.Data, signedMessage)
-			tssMsg := signedMessage.TssMessage
+		case p2pMsgWrapper := <-outCh:
+			for _, engine := range engines {
+				if engine.myNode.PeerId.String() == p2pMsgWrapper.To {
+					signedMessage := &common.SignedMessage{}
+					json.Unmarshal(p2pMsgWrapper.msg.Data, signedMessage)
 
-			isBroadcast := tssMsg.IsBroadcast()
-			if isBroadcast {
-				for _, engine := range engines {
-					w := engine.workers[workId]
-					if w != nil && engine.myPid.Id == tssMsg.From {
-						continue
-					}
-
-					engine.ProcessNewMessage(tssMsg)
-				}
-			} else {
-				if tssMsg.From == tssMsg.To {
-					panic("A worker cannot send a message to itself")
-				}
-
-				for _, engine := range engines {
-					if engine.myPid.Id == tssMsg.To {
-						engine.ProcessNewMessage(tssMsg)
-						break
-					}
+					engine.ProcessNewMessage(signedMessage.TssMessage)
+					break
 				}
 			}
 		}

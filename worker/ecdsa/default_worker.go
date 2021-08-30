@@ -58,8 +58,8 @@ type DefaultWorker struct {
 	workParticipantCh chan *common.WorkParticipantsMessage
 	memberResponseCh  chan *common.TssMessage
 	// List of parties who indicate that they are available for current tss work.
-	availableParties     map[string]*tss.PartyID
-	availablePartiesLock *sync.RWMutex
+	availableParties map[string]*tss.PartyID
+	preExecutionLock *sync.RWMutex
 	// Cache all tss update messages when some parties start executing while this node has not.
 	preExecutionCache *worker.MessageCache
 
@@ -153,23 +153,23 @@ func baseWorker(
 	callback WorkerCallback,
 ) *DefaultWorker {
 	return &DefaultWorker{
-		request:              request,
-		workId:               request.WorkId,
-		batchSize:            batchSize,
-		myPid:                myPid,
-		allParties:           allParties,
-		dispatcher:           dispatcher,
-		errCh:                errCh,
-		callback:             callback,
-		jobs:                 make([]*Job, batchSize),
-		jobOutput:            make(map[string][]tss.Message),
-		jobOutputLock:        &sync.RWMutex{},
-		finalOutputLock:      &sync.RWMutex{},
-		workParticipantCh:    make(chan *commonTypes.WorkParticipantsMessage),
-		memberResponseCh:     make(chan *commonTypes.TssMessage),
-		availableParties:     make(map[string]*tss.PartyID),
-		availablePartiesLock: &sync.RWMutex{},
-		preExecutionCache:    worker.NewMessageCache(),
+		request:           request,
+		workId:            request.WorkId,
+		batchSize:         batchSize,
+		myPid:             myPid,
+		allParties:        allParties,
+		dispatcher:        dispatcher,
+		errCh:             errCh,
+		callback:          callback,
+		jobs:              make([]*Job, batchSize),
+		jobOutput:         make(map[string][]tss.Message),
+		jobOutputLock:     &sync.RWMutex{},
+		finalOutputLock:   &sync.RWMutex{},
+		workParticipantCh: make(chan *commonTypes.WorkParticipantsMessage),
+		memberResponseCh:  make(chan *commonTypes.TssMessage),
+		availableParties:  make(map[string]*tss.PartyID),
+		preExecutionLock:  &sync.RWMutex{},
+		preExecutionCache: worker.NewMessageCache(),
 	}
 }
 
@@ -299,7 +299,12 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 		return w.onPreExecutionResponse(tssMsg)
 
 	case common.TssMessage_WORK_PARTICIPANTS:
-		w.workParticipantCh <- tssMsg.WorkParticipantsMessage
+		if len(w.pIDs) == 0 {
+			// This output of workParticipantCh is called only once. We do checking for pids length to
+			// make sure we only send message to this channel once.
+			w.workParticipantCh <- tssMsg.WorkParticipantsMessage
+		}
+
 		return nil
 	}
 

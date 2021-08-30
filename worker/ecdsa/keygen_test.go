@@ -2,7 +2,6 @@ package ecdsa
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -62,11 +61,8 @@ func TestKeygenEndToEnd(t *testing.T) {
 		)
 	}
 
-	fmt.Println("Starting all workers")
 	// Start all workers
 	startAllWorkers(workers)
-
-	fmt.Println("Running all workers")
 
 	// Run all workers
 	runAllWorkers(workers, outCh, errCh, done)

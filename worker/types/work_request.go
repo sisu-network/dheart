@@ -51,9 +51,10 @@ func NewSigningRequets(workId string, n int, PIDs tss.SortedPartyIDs, signingInp
 
 func baseRequest(workType WorkType, workdId string, n int, pIDs tss.SortedPartyIDs) *WorkRequest {
 	return &WorkRequest{
-		WorkType: workType,
-		WorkId:   workdId,
-		N:        n,
+		AllParties: pIDs,
+		WorkType:   workType,
+		WorkId:     workdId,
+		N:          n,
 	}
 }
 

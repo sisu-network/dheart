@@ -22,18 +22,20 @@ import (
 func (w *DefaultWorker) preExecution() {
 	// Step1: choose leader.
 	request := w.request
+
 	leader := worker.ChooseLeader(request.WorkId, request.AllParties)
 	w.setAvailableParty(w.myPid)
 
 	// Step2: If this node is the leader, sends check availability to everyone.
 	if w.myPid.Id == leader.Id {
-		w.doPreExecutionkAsLeader()
+		w.doPreExecutionAsLeader()
 	} else {
 		w.doPreExecutionAsMember(leader)
 	}
 }
 
-func (w *DefaultWorker) doPreExecutionkAsLeader() {
+// Do preExecution as a leader for the tss work.
+func (w *DefaultWorker) doPreExecutionAsLeader() {
 	preWorkCache := w.preExecutionCache.GetAllMessages(w.workId)
 
 	// Update availability from cache first.
@@ -42,7 +44,7 @@ func (w *DefaultWorker) doPreExecutionkAsLeader() {
 			// update the availability.
 			for _, p := range w.allParties {
 				if p.Id == tssMsg.From {
-					w.availableParties[tssMsg.From] = p
+					w.setAvailableParty(p)
 					break
 				}
 			}
@@ -61,6 +63,19 @@ func (w *DefaultWorker) doPreExecutionkAsLeader() {
 		}
 	}
 
+	if w.getAvailablePartyLength() < w.request.N {
+		// Waits for all members to respond.
+		w.waitForMemberResponse()
+	}
+
+	if w.getAvailablePartyLength() >= w.request.N {
+		w.leaderFinalized()
+	} else {
+		// TODO: make callback that this preExecution fails.
+	}
+}
+
+func (w *DefaultWorker) waitForMemberResponse() {
 	// Wait for everyone to reply or timeout.
 	end := time.Now().Add(PRE_EXECUTION_REQUEST_WAIT_TIME)
 	for {
@@ -95,14 +110,8 @@ func (w *DefaultWorker) doPreExecutionkAsLeader() {
 		}
 
 		if w.getAvailablePartyLength() >= w.request.N {
-			break
+			return
 		}
-	}
-
-	if w.getAvailablePartyLength() >= w.request.N {
-		w.leaderFinalized()
-	} else {
-		// TODO: make callback that this preExecution fails.
 	}
 }
 
@@ -111,13 +120,12 @@ func (w *DefaultWorker) leaderFinalized() {
 	// Get list of parties
 	pIDs := make([]*tss.PartyID, 0)
 
-	w.availablePartiesLock.Lock()
+	w.preExecutionLock.Lock()
 	for _, p := range w.availableParties {
 		pIDs = append(pIDs, p)
 	}
-	w.availablePartiesLock.Unlock()
-
 	w.pIDs = tss.SortPartyIDs(pIDs)
+	w.preExecutionLock.Unlock()
 
 	// Broadcast success to everyone
 	msg := common.NewWorkParticipantsMessage(w.myPid.Id, "", w.workId, true, w.pIDs)
@@ -127,22 +135,22 @@ func (w *DefaultWorker) leaderFinalized() {
 }
 
 func (w *DefaultWorker) setAvailableParty(p *tss.PartyID) {
-	w.availablePartiesLock.Lock()
-	defer w.availablePartiesLock.Unlock()
+	w.preExecutionLock.Lock()
+	defer w.preExecutionLock.Unlock()
 
 	w.availableParties[p.Id] = p
 }
 
 func (w *DefaultWorker) getAvailableParty(pid string) *tss.PartyID {
-	w.availablePartiesLock.RLock()
-	defer w.availablePartiesLock.RUnlock()
+	w.preExecutionLock.RLock()
+	defer w.preExecutionLock.RUnlock()
 
 	return w.availableParties[pid]
 }
 
 func (w *DefaultWorker) getAvailablePartyLength() int {
-	w.availablePartiesLock.RLock()
-	defer w.availablePartiesLock.RUnlock()
+	w.preExecutionLock.RLock()
+	defer w.preExecutionLock.RUnlock()
 
 	return len(w.availableParties)
 }
@@ -167,6 +175,7 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 	select {
 	case <-time.After(LEADER_WAIT_TIME):
 		// TODO: Report as failure here.
+		utils.LogError("member: leader wait timed out.")
 
 	case msg := <-w.workParticipantCh:
 		w.memberFinalized(msg)
