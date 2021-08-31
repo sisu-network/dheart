@@ -35,7 +35,8 @@ func TestEngineDelayStart(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
-		engines[i] = NewEngine(nodes[i], NewMockConnectionManager(nodes[i].PeerId.String(), outCh), helper.NewTestPresignCallback(i, cb), privKeys[i])
+		engines[i] = NewEngine(nodes[i], NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
+			helper.NewMockDatabase(nil), helper.NewTestPresignCallback(i, cb), privKeys[i])
 		engines[i].AddNodes(nodes)
 	}
 

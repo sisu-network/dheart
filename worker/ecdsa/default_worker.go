@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
@@ -53,6 +54,7 @@ type DefaultWorker struct {
 	callback   WorkerCallback
 	workId     string
 	errCh      chan error // TODO: Do this in the callback.
+	db         db.Database
 
 	// PreExecution
 	workParticipantCh chan *common.WorkParticipantsMessage
@@ -95,10 +97,11 @@ func NewKeygenWorker(
 	request *types.WorkRequest,
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
+	db db.Database,
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, errCh, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_KEYGEN
 	w.keygenInput = request.KeygenInput
@@ -113,10 +116,11 @@ func NewPresignWorker(
 	request *types.WorkRequest,
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
+	db db.Database,
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, errCh, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_PRESIGN
 	w.presignInput = request.PresignInput
@@ -130,10 +134,11 @@ func NewSigningWorker(
 	request *types.WorkRequest,
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
+	db db.Database,
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, errCh, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_SIGNING
 	w.signingInput = request.SigningInput
@@ -149,6 +154,7 @@ func baseWorker(
 	allParties []*tss.PartyID,
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
+	db db.Database,
 	errCh chan error,
 	callback WorkerCallback,
 ) *DefaultWorker {
@@ -156,6 +162,7 @@ func baseWorker(
 		request:           request,
 		workId:            request.WorkId,
 		batchSize:         batchSize,
+		db:                db,
 		myPid:             myPid,
 		allParties:        allParties,
 		dispatcher:        dispatcher,

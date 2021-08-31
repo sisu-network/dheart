@@ -10,6 +10,7 @@ import (
 	tcrypto "github.com/tendermint/tendermint/crypto"
 
 	"github.com/sisu-network/dheart/core/signer"
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
@@ -43,6 +44,7 @@ type EngineCallback interface {
 type Engine struct {
 	myPid  *tss.PartyID
 	myNode *Node
+	db     db.Database
 
 	workers      map[string]worker.Worker
 	requestQueue *requestQueue
@@ -58,10 +60,11 @@ type Engine struct {
 	nodeLock *sync.RWMutex
 }
 
-func NewEngine(myNode *Node, cm p2p.ConnectionManager, callback EngineCallback, privateKey tcrypto.PrivKey) *Engine {
+func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback, privateKey tcrypto.PrivKey) *Engine {
 	return &Engine{
 		myNode:       myNode,
 		myPid:        myNode.PartyId,
+		db:           db,
 		cm:           cm,
 		workers:      make(map[string]worker.Worker),
 		requestQueue: NewRequestQueue(),
@@ -111,13 +114,13 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 	// Create a new worker.
 	switch request.WorkType {
 	case types.ECDSA_KEYGEN:
-		w = ecdsa.NewKeygenWorker(BATCH_SIZE, request, engine.myPid, engine, errCh, engine)
+		w = ecdsa.NewKeygenWorker(BATCH_SIZE, request, engine.myPid, engine, engine.db, errCh, engine)
 
 	case types.ECDSA_PRESIGN:
-		w = ecdsa.NewPresignWorker(BATCH_SIZE, request, engine.myPid, engine, errCh, engine)
+		w = ecdsa.NewPresignWorker(BATCH_SIZE, request, engine.myPid, engine, engine.db, errCh, engine)
 
 	case types.ECDSA_SIGNING:
-		w = ecdsa.NewSigningWorker(BATCH_SIZE, request, engine.myPid, engine, errCh, engine)
+		w = ecdsa.NewSigningWorker(BATCH_SIZE, request, engine.myPid, engine, engine.db, errCh, engine)
 	}
 
 	engine.workLock.Lock()

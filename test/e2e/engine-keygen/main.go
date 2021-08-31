@@ -93,7 +93,7 @@ func main() {
 	// Create new engine
 	outCh := make(chan []*keygen.LocalPartySaveData)
 	cb := NewEngineCallback(outCh, nil, nil)
-	engine := core.NewEngine(nodes[index], cm, cb, allKeys[index])
+	engine := core.NewEngine(nodes[index], cm, helper.NewMockDatabase(nil), cb, allKeys[index])
 	cm.AddListener(p2p.TSSProtocolID, engine)
 
 	// Add nodes

@@ -16,6 +16,7 @@ import (
 	tcrypto "github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
@@ -100,6 +101,22 @@ func (cb *TestWorkerCallback) OnPreExecutionFinished(workId string) {
 
 func (cb *TestWorkerCallback) OnWorkFailed(workId string) {
 	// Do nothing.
+}
+
+//---/
+
+type MockDatabase struct {
+	signingInput []*presign.LocalPresignData
+}
+
+func NewMockDatabase(signingInput []*presign.LocalPresignData) db.Database {
+	return &MockDatabase{
+		signingInput: signingInput,
+	}
+}
+
+func (m *MockDatabase) FindPresignDataByPids(count int, pids tss.SortedPartyIDs) []*presign.LocalPresignData {
+	return m.signingInput
 }
 
 //---/

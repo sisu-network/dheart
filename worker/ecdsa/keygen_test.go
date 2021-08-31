@@ -56,6 +56,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh),
+			helper.NewMockDatabase(nil),
 			errCh,
 			helper.NewTestKeygenCallback(i, cb),
 		)

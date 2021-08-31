@@ -30,7 +30,7 @@ func TestPresignEndToEnd(t *testing.T) {
 
 	pIDs := helper.GetTestPartyIds(n)
 
-	savedData := helper.LoadKeygenSavedData(pIDs)
+	presignInputs := helper.LoadKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
 	errCh := make(chan error)
 	workers := make([]worker.Worker, n)
@@ -52,7 +52,7 @@ func TestPresignEndToEnd(t *testing.T) {
 		request := &types.WorkRequest{
 			WorkId:       "Presign0",
 			AllParties:   pIDs,
-			PresignInput: savedData[i],
+			PresignInput: presignInputs[i],
 			Threshold:    len(pIDs) - 1,
 			N:            n,
 		}
@@ -62,6 +62,7 @@ func TestPresignEndToEnd(t *testing.T) {
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh),
+			helper.NewMockDatabase(nil),
 			errCh,
 			helper.NewTestPresignCallback(i, cb),
 		)
