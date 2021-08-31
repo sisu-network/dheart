@@ -5,6 +5,8 @@ go 1.16
 require (
 	github.com/deckarep/golang-set v1.7.1 // indirect
 	github.com/ethereum/go-ethereum v1.10.3
+	github.com/go-sql-driver/mysql v1.6.0 // indirect
+	github.com/golang-migrate/migrate v3.5.4+incompatible // indirect
 	github.com/golang/protobuf v1.5.2
 	github.com/joho/godotenv v1.3.0
 	github.com/libp2p/go-libp2p v0.13.0

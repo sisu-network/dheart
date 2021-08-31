@@ -115,6 +115,10 @@ func NewMockDatabase(signingInput []*presign.LocalPresignData) db.Database {
 	}
 }
 
+func (m *MockDatabase) Init() error {
+	return nil
+}
+
 func (m *MockDatabase) FindPresignDataByPids(count int, pids tss.SortedPartyIDs) []*presign.LocalPresignData {
 	return m.signingInput
 }
