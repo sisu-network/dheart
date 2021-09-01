@@ -158,12 +158,15 @@ func (engine *Engine) OnWorkKeygenFinished(workId string, data []*keygen.LocalPa
 	engine.startNextWork()
 }
 
-func (engine *Engine) OnWorkPresignFinished(workId string, data []*presign.LocalPresignData) {
-
+func (engine *Engine) OnWorkPresignFinished(workId string, pids []*tss.PartyID, data []*presign.LocalPresignData) {
 	engine.callback.OnWorkPresignFinished(workId, data)
 
 	engine.finishWorker(workId)
 	engine.startNextWork()
+
+	// Save to database
+	// TODO: Pass in correct string here.
+	engine.db.SavePresignData("", workId, pids, data)
 }
 
 func (engine *Engine) OnWorkSigningFinished(workId string, data []*libCommon.SignatureData) {

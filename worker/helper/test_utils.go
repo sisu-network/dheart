@@ -58,7 +58,7 @@ var (
 type TestWorkerCallback struct {
 	workerIndex     int
 	keygenCallback  func(workerIndex int, workId string, data []*keygen.LocalPartySaveData)
-	presignCallback func(workerIndex int, workId string, data []*presign.LocalPresignData)
+	presignCallback func(workerIndex int, workId string, pids []*tss.PartyID, data []*presign.LocalPresignData)
 	signingCallback func(workerIndex int, workId string, data []*libCommon.SignatureData)
 }
 
@@ -69,7 +69,7 @@ func NewTestKeygenCallback(workerIndex int, keygenCallback func(workerIndex int,
 	}
 }
 
-func NewTestPresignCallback(workerIndex int, presignCallback func(workerIndex int, workId string, data []*presign.LocalPresignData)) *TestWorkerCallback {
+func NewTestPresignCallback(workerIndex int, presignCallback func(workerIndex int, workId string, pids []*tss.PartyID, data []*presign.LocalPresignData)) *TestWorkerCallback {
 	return &TestWorkerCallback{
 		workerIndex:     workerIndex,
 		presignCallback: presignCallback,
@@ -87,8 +87,8 @@ func (cb *TestWorkerCallback) OnWorkKeygenFinished(workId string, data []*keygen
 	cb.keygenCallback(cb.workerIndex, workId, data)
 }
 
-func (cb *TestWorkerCallback) OnWorkPresignFinished(workId string, data []*presign.LocalPresignData) {
-	cb.presignCallback(cb.workerIndex, workId, data)
+func (cb *TestWorkerCallback) OnWorkPresignFinished(workId string, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+	cb.presignCallback(cb.workerIndex, workId, pids, data)
 }
 
 func (cb *TestWorkerCallback) OnWorkSigningFinished(workId string, data []*libCommon.SignatureData) {
@@ -100,6 +100,52 @@ func (cb *TestWorkerCallback) OnPreExecutionFinished(workId string) {
 }
 
 func (cb *TestWorkerCallback) OnWorkFailed(workId string) {
+	// Do nothing.
+}
+
+//---/
+
+type MockEngineCallback struct {
+	workerIndex     int
+	keygenCallback  func(workerIndex int, workId string, data []*keygen.LocalPartySaveData)
+	presignCallback func(workerIndex int, workId string, data []*presign.LocalPresignData)
+	signingCallback func(workerIndex int, workId string, data []*libCommon.SignatureData)
+}
+
+func NewMockEngineKeygenCallback(workerIndex int, keygenCallback func(workerIndex int, workId string, data []*keygen.LocalPartySaveData)) *MockEngineCallback {
+	return &MockEngineCallback{
+		workerIndex:    workerIndex,
+		keygenCallback: keygenCallback,
+	}
+}
+
+func NewMockEnginePresignCallback(workerIndex int, presignCallback func(workerIndex int, workId string, data []*presign.LocalPresignData)) *MockEngineCallback {
+	return &MockEngineCallback{
+		workerIndex:     workerIndex,
+		presignCallback: presignCallback,
+	}
+}
+
+func NewMockEngineSigningCallback(workerIndex int, signingCallback func(workerIndex int, workId string, data []*libCommon.SignatureData)) *MockEngineCallback {
+	return &MockEngineCallback{
+		workerIndex:     workerIndex,
+		signingCallback: signingCallback,
+	}
+}
+
+func (cb *MockEngineCallback) OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData) {
+	cb.keygenCallback(cb.workerIndex, workId, data)
+}
+
+func (cb *MockEngineCallback) OnWorkPresignFinished(workId string, data []*presign.LocalPresignData) {
+	cb.presignCallback(cb.workerIndex, workId, data)
+}
+
+func (cb *MockEngineCallback) OnWorkSigningFinished(workId string, data []*libCommon.SignatureData) {
+	cb.signingCallback(cb.workerIndex, workId, data)
+}
+
+func (cb *MockEngineCallback) OnPreExecutionFinished(workId string) {
 	// Do nothing.
 }
 

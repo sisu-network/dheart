@@ -38,7 +38,7 @@ type WorkerCallback interface {
 
 	OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData)
 
-	OnWorkPresignFinished(workId string, data []*presign.LocalPresignData)
+	OnWorkPresignFinished(workId string, pids []*tss.PartyID, data []*presign.LocalPresignData)
 
 	OnWorkSigningFinished(workId string, data []*libCommon.SignatureData)
 }
@@ -404,7 +404,7 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 
 	if count == w.batchSize {
 		utils.LogVerbose(w.GetWorkId(), "Done!")
-		w.callback.OnWorkPresignFinished(w.GetWorkId(), w.presignOutputs)
+		w.callback.OnWorkPresignFinished(w.GetWorkId(), w.pIDs, w.presignOutputs)
 	}
 }
 
