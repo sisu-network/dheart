@@ -32,6 +32,9 @@ var (
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
 // channel to avoid creating too many channels.
 type WorkerCallback interface {
+	// GetPresignData returns a list of presign output that will be used for signing.
+	GetPresignData(count int, n int, pids []*tss.PartyID) []*presign.LocalPresignData
+
 	OnPreExecutionFinished(request *types.WorkRequest)
 
 	OnWorkFailed(request *types.WorkRequest)

@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -58,23 +59,48 @@ type Engine struct {
 
 	nodes    map[string]*Node
 	nodeLock *sync.RWMutex
+
+	availablePresigns []*common.AvailablePresign
+	apLock            *sync.RWMutex
 }
 
 func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback, privateKey tcrypto.PrivKey) *Engine {
 	return &Engine{
-		myNode:       myNode,
-		myPid:        myNode.PartyId,
-		db:           db,
-		cm:           cm,
-		workers:      make(map[string]worker.Worker),
-		requestQueue: NewRequestQueue(),
-		workLock:     &sync.RWMutex{},
-		preworkCache: worker.NewMessageCache(),
-		callback:     callback,
-		nodes:        make(map[string]*Node),
-		signer:       signer.NewDefaultSigner(privateKey),
-		nodeLock:     &sync.RWMutex{},
+		myNode:            myNode,
+		myPid:             myNode.PartyId,
+		db:                db,
+		cm:                cm,
+		workers:           make(map[string]worker.Worker),
+		requestQueue:      NewRequestQueue(),
+		workLock:          &sync.RWMutex{},
+		preworkCache:      worker.NewMessageCache(),
+		callback:          callback,
+		nodes:             make(map[string]*Node),
+		signer:            signer.NewDefaultSigner(privateKey),
+		nodeLock:          &sync.RWMutex{},
+		availablePresigns: make([]*common.AvailablePresign, 0),
+		apLock:            &sync.RWMutex{},
 	}
+}
+
+func (engine *Engine) Init() {
+	// Initialize available presigns.
+	pidStrings, workIds, indexes, err := engine.db.GetAvailablePresignShortForm()
+	if err != nil {
+		panic("Cannot load presigns")
+	}
+
+	engine.apLock.Lock()
+	for i, pidString := range pidStrings {
+		ap := &common.AvailablePresign{
+			Pids:       strings.Split(pidString, ","),
+			WorkId:     workIds[i],
+			BatchIndex: indexes[i],
+		}
+
+		engine.availablePresigns = append(engine.availablePresigns, ap)
+	}
+	engine.apLock.Unlock()
 }
 
 func (engine *Engine) AddNodes(nodes []*Node) {
@@ -328,4 +354,62 @@ func (engine *Engine) OnPreExecutionFinished(request *types.WorkRequest) {
 
 func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 	// TODO: implements this
+}
+
+func (engine *Engine) GetPresignData(batchSize int, n int, pids []*tss.PartyID) []*presign.LocalPresignData {
+	pidMap := make(map[string]bool)
+	for _, pid := range pids {
+		pidMap[pid.Id] = true
+	}
+
+	selected := make([]*common.AvailablePresign, 0)
+
+	engine.apLock.RLock()
+	for _, ap := range engine.availablePresigns {
+		if len(ap.Pids) != n {
+			continue
+		}
+
+		ok := true
+		for _, pid := range ap.Pids {
+			if pidMap[pid] != true {
+				ok = false
+				break
+			}
+		}
+
+		if ok {
+			selected = append(selected, ap)
+			if len(selected) == batchSize {
+				break
+			}
+		}
+	}
+	engine.apLock.RUnlock()
+
+	if len(selected) == 0 {
+		return make([]*presign.LocalPresignData, 0)
+	}
+
+	return engine.loadPresignData(selected)
+}
+
+// loadPresignData loads full available data from a list of work ids and batch indexes. For
+// convenient, these 2 values are stored inside AvailablePresign struct.
+func (engine *Engine) loadPresignData(aps []*common.AvailablePresign) []*presign.LocalPresignData {
+	workIds := make([]string, len(aps))
+	batchIndexes := make([]int, len(aps))
+
+	for i, ap := range aps {
+		workIds[i] = ap.WorkId
+		batchIndexes[i] = ap.BatchIndex
+	}
+
+	loaded, err := engine.db.LoadPresign(workIds, batchIndexes)
+	if err != nil {
+		utils.LogError("Cannot load presign. err =", err)
+		return make([]*presign.LocalPresignData, 0)
+	}
+
+	return loaded
 }

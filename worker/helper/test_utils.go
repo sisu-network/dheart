@@ -56,52 +56,56 @@ var (
 	}
 )
 
-type TestWorkerCallback struct {
+type MockWorkerCallback struct {
 	workerIndex     int
 	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)
 	presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
 	signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData)
 }
 
-func NewTestKeygenCallback(workerIndex int, keygenCallback func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)) *TestWorkerCallback {
-	return &TestWorkerCallback{
+func NewTestKeygenCallback(workerIndex int, keygenCallback func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)) *MockWorkerCallback {
+	return &MockWorkerCallback{
 		workerIndex:    workerIndex,
 		keygenCallback: keygenCallback,
 	}
 }
 
-func NewTestPresignCallback(workerIndex int, presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)) *TestWorkerCallback {
-	return &TestWorkerCallback{
+func NewTestPresignCallback(workerIndex int, presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)) *MockWorkerCallback {
+	return &MockWorkerCallback{
 		workerIndex:     workerIndex,
 		presignCallback: presignCallback,
 	}
 }
 
-func NewTestSigningCallback(workerIndex int, signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData)) *TestWorkerCallback {
-	return &TestWorkerCallback{
+func NewTestSigningCallback(workerIndex int, signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData)) *MockWorkerCallback {
+	return &MockWorkerCallback{
 		workerIndex:     workerIndex,
 		signingCallback: signingCallback,
 	}
 }
 
-func (cb *TestWorkerCallback) OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
+func (cb *MockWorkerCallback) OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
 	cb.keygenCallback(cb.workerIndex, request, data)
 }
 
-func (cb *TestWorkerCallback) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+func (cb *MockWorkerCallback) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
 	cb.presignCallback(cb.workerIndex, request, pids, data)
 }
 
-func (cb *TestWorkerCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+func (cb *MockWorkerCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
 	cb.signingCallback(cb.workerIndex, request, data)
 }
 
-func (cb *TestWorkerCallback) OnPreExecutionFinished(request *types.WorkRequest) {
+func (cb *MockWorkerCallback) OnPreExecutionFinished(request *types.WorkRequest) {
 	// Do nothing.
 }
 
-func (cb *TestWorkerCallback) OnWorkFailed(request *types.WorkRequest) {
+func (cb *MockWorkerCallback) OnWorkFailed(request *types.WorkRequest) {
 	// Do nothing.
+}
+
+func (cb *MockWorkerCallback) GetPresignData(count int, n int, pids []*tss.PartyID) []*presign.LocalPresignData {
+	return nil
 }
 
 //---/
@@ -172,6 +176,10 @@ func (m *MockDatabase) SavePresignData(chain string, workId string, pids []*tss.
 
 func (m *MockDatabase) GetAvailablePresignShortForm() ([]string, []string, []int, error) {
 	return []string{}, []string{}, []int{}, nil
+}
+
+func (m *MockDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
+	return nil, nil
 }
 
 //---/

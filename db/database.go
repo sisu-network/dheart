@@ -11,6 +11,7 @@ import (
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/mysql"
 	_ "github.com/golang-migrate/migrate/source/file"
+	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
@@ -27,6 +28,8 @@ type Database interface {
 	SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
 
 	GetAvailablePresignShortForm() ([]string, []string, []int, error)
+
+	LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error)
 }
 
 type SqlDbConfig struct {
@@ -179,7 +182,7 @@ func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.P
 // GetAllPresignIndexes returns all available presign data sets in short form (pids, workId, index)
 // We don't want to load full data of presign sets since it might take too much memmory.
 func (d *SqlDatabase) GetAvailablePresignShortForm() ([]string, []string, []int, error) {
-	query := "SELECT work_id, batch_index, pids_string FROM presign"
+	query := "SELECT work_id, batch_index, pids_string FROM presign where status='not_used'"
 
 	pids := make([]string, 0)
 	workIds := make([]string, 0)
@@ -212,4 +215,63 @@ func (d *SqlDatabase) GetAvailablePresignShortForm() ([]string, []string, []int,
 func (d *SqlDatabase) DeletePresignWork(workId string) error {
 	_, err := d.db.Exec("DELETE FROM presign where work_id = ?", workId)
 	return err
+}
+
+func (d *SqlDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
+	// 1. Constract the query
+	questions := ""
+	for i, _ := range workIds {
+		questions = questions + "?"
+		if i < len(workIds)-1 {
+			questions = questions + ","
+		}
+	}
+
+	query := "SELECT work_id, batch_index, pids_string, presign_output FROM presign WHERE status='not_used' AND work_id IN (" + questions + ")"
+
+	// Execute the query
+	loaded := make([]*common.AvailablePresign, 0)
+	rows, err := d.db.Query(query, workIds)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Scan every rows and save it to loaded array
+	for {
+		if rows.Next() {
+			var pid, workId string
+			var batchIndex int
+			var bz []byte
+			rows.Scan(&workId, &batchIndex, &pid, &bz)
+
+			var data *presign.LocalPresignData
+			err := json.Unmarshal(bz, data)
+			if err != nil {
+				utils.LogError("Cannot unmarshall data")
+			} else {
+				loaded = append(loaded, &common.AvailablePresign{
+					WorkId:     workId,
+					Pids:       strings.Split(pid, ","),
+					BatchIndex: batchIndex,
+					Output:     data,
+				})
+			}
+		} else {
+			break
+		}
+	}
+
+	// 3. Extract the data from what we loaded and compare with the function params
+	results := make([]*presign.LocalPresignData, 0)
+	for _, row := range loaded {
+		for i, workId := range workIds {
+			if row.WorkId == workId && row.BatchIndex == batchIndexes[i] {
+				results = append(results, row.Output)
+				break
+			}
+		}
+	}
+
+	return results, nil
 }
