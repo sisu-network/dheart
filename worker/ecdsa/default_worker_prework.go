@@ -224,10 +224,10 @@ func (w *DefaultWorker) memberFinalized(msg *common.WorkParticipantsMessage) {
 			w.executeWork()
 		} else {
 			// We are not in the participant list. Terminate this work. No thing else to do.
-			w.callback.OnPreExecutionFinished(w.workId)
+			w.callback.OnPreExecutionFinished(w.request)
 		}
 	} else {
 		// This work fails because leader cannot find enough participants.
-		w.callback.OnWorkFailed(w.workId)
+		w.callback.OnWorkFailed(w.request)
 	}
 }

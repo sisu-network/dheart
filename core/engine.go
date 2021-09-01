@@ -29,11 +29,11 @@ const (
 )
 
 type EngineCallback interface {
-	OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData)
+	OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData)
 
-	OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData)
+	OnWorkPresignFinished(workId string, data []*presign.LocalPresignData)
 
-	OnWorkSigningFinished(workerId string, data []*libCommon.SignatureData)
+	OnWorkSigningFinished(workId string, data []*libCommon.SignatureData)
 }
 
 // An Engine is a main component for TSS signing. It takes the following roles:
@@ -150,30 +150,30 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) {
 	}
 }
 
-func (engine *Engine) OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData) {
+func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
 	// TODO: save output.
-	engine.callback.OnWorkKeygenFinished(workId, data)
+	engine.callback.OnWorkKeygenFinished(request.WorkId, data)
 
-	engine.finishWorker(workId)
+	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
 }
 
-func (engine *Engine) OnWorkPresignFinished(workId string, pids []*tss.PartyID, data []*presign.LocalPresignData) {
-	engine.callback.OnWorkPresignFinished(workId, data)
+func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+	engine.callback.OnWorkPresignFinished(request.WorkId, data)
 
-	engine.finishWorker(workId)
+	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
 
 	// Save to database
 	// TODO: Pass in correct string here.
-	engine.db.SavePresignData("", workId, pids, data)
+	engine.db.SavePresignData(request.Chain, request.WorkId, pids, data)
 }
 
-func (engine *Engine) OnWorkSigningFinished(workId string, data []*libCommon.SignatureData) {
+func (engine *Engine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
 	// TODO: save output.
-	engine.callback.OnWorkSigningFinished(workId, data)
+	engine.callback.OnWorkSigningFinished(request.WorkId, data)
 
-	engine.finishWorker(workId)
+	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
 }
 
@@ -322,6 +322,10 @@ func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
 	engine.ProcessNewMessage(tssMessage)
 }
 
-func (engine *Engine) OnPreExecutionFinished(workId string) {}
+func (engine *Engine) OnPreExecutionFinished(request *types.WorkRequest) {
+	// TODO: implements this
+}
 
-func (engine *Engine) OnWorkFailed(workId string) {}
+func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
+	// TODO: implements this
+}

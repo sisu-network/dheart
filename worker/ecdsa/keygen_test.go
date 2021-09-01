@@ -30,7 +30,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	finishedWorkerCount := 0
 
 	finalOutput := make([][]*keygen.LocalPartySaveData, len(pIDs)) // n * batchSize
-	cb := func(workerIndex int, workId string, data []*keygen.LocalPartySaveData) {
+	cb := func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
 		finalOutput[workerIndex] = data
 		finishedWorkerCount += 1
 

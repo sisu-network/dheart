@@ -19,6 +19,7 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
@@ -57,49 +58,49 @@ var (
 
 type TestWorkerCallback struct {
 	workerIndex     int
-	keygenCallback  func(workerIndex int, workId string, data []*keygen.LocalPartySaveData)
-	presignCallback func(workerIndex int, workId string, pids []*tss.PartyID, data []*presign.LocalPresignData)
-	signingCallback func(workerIndex int, workId string, data []*libCommon.SignatureData)
+	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)
+	presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
+	signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData)
 }
 
-func NewTestKeygenCallback(workerIndex int, keygenCallback func(workerIndex int, workId string, data []*keygen.LocalPartySaveData)) *TestWorkerCallback {
+func NewTestKeygenCallback(workerIndex int, keygenCallback func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)) *TestWorkerCallback {
 	return &TestWorkerCallback{
 		workerIndex:    workerIndex,
 		keygenCallback: keygenCallback,
 	}
 }
 
-func NewTestPresignCallback(workerIndex int, presignCallback func(workerIndex int, workId string, pids []*tss.PartyID, data []*presign.LocalPresignData)) *TestWorkerCallback {
+func NewTestPresignCallback(workerIndex int, presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)) *TestWorkerCallback {
 	return &TestWorkerCallback{
 		workerIndex:     workerIndex,
 		presignCallback: presignCallback,
 	}
 }
 
-func NewTestSigningCallback(workerIndex int, signingCallback func(workerIndex int, workId string, data []*libCommon.SignatureData)) *TestWorkerCallback {
+func NewTestSigningCallback(workerIndex int, signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData)) *TestWorkerCallback {
 	return &TestWorkerCallback{
 		workerIndex:     workerIndex,
 		signingCallback: signingCallback,
 	}
 }
 
-func (cb *TestWorkerCallback) OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData) {
-	cb.keygenCallback(cb.workerIndex, workId, data)
+func (cb *TestWorkerCallback) OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
+	cb.keygenCallback(cb.workerIndex, request, data)
 }
 
-func (cb *TestWorkerCallback) OnWorkPresignFinished(workId string, pids []*tss.PartyID, data []*presign.LocalPresignData) {
-	cb.presignCallback(cb.workerIndex, workId, pids, data)
+func (cb *TestWorkerCallback) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+	cb.presignCallback(cb.workerIndex, request, pids, data)
 }
 
-func (cb *TestWorkerCallback) OnWorkSigningFinished(workId string, data []*libCommon.SignatureData) {
-	cb.signingCallback(cb.workerIndex, workId, data)
+func (cb *TestWorkerCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+	cb.signingCallback(cb.workerIndex, request, data)
 }
 
-func (cb *TestWorkerCallback) OnPreExecutionFinished(workId string) {
+func (cb *TestWorkerCallback) OnPreExecutionFinished(request *types.WorkRequest) {
 	// Do nothing.
 }
 
-func (cb *TestWorkerCallback) OnWorkFailed(workId string) {
+func (cb *TestWorkerCallback) OnWorkFailed(request *types.WorkRequest) {
 	// Do nothing.
 }
 

@@ -9,6 +9,7 @@ import (
 )
 
 type WorkRequest struct {
+	Chain      string
 	WorkType   WorkType
 	AllParties []*tss.PartyID
 	WorkId     string

@@ -38,7 +38,7 @@ func TestPresignEndToEnd(t *testing.T) {
 	finishedWorkerCount := 0
 
 	presignOutputs := make([][]*presign.LocalPresignData, len(pIDs)) // n * batchSize
-	cb := func(workerIndex int, workerId string, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+	cb := func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
 		presignOutputs[workerIndex] = data
 
 		finishedWorkerCount += 1

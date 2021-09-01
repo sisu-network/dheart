@@ -29,7 +29,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	signingMsg := "This is a test"
 
 	outputs := make([][]*libCommon.SignatureData, len(pIDs)) // n * batchSize
-	cb := func(workerIndex int, workerId string, data []*libCommon.SignatureData) {
+	cb := func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData) {
 		outputs[workerIndex] = data
 		finishedWorkerCount += 1
 
