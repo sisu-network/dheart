@@ -119,8 +119,12 @@ func (m *MockDatabase) Init() error {
 	return nil
 }
 
-func (m *MockDatabase) FindPresignDataByPids(count int, pids tss.SortedPartyIDs) []*presign.LocalPresignData {
-	return m.signingInput
+func (m *MockDatabase) SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
+	return nil
+}
+
+func (m *MockDatabase) GetAvailablePresignShortForm() ([]string, []string, []int, error) {
+	return []string{}, []string{}, []int{}, nil
 }
 
 //---/

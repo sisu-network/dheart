@@ -159,7 +159,7 @@ func (engine *Engine) OnWorkKeygenFinished(workId string, data []*keygen.LocalPa
 }
 
 func (engine *Engine) OnWorkPresignFinished(workId string, data []*presign.LocalPresignData) {
-	// TODO: save output.
+
 	engine.callback.OnWorkPresignFinished(workId, data)
 
 	engine.finishWorker(workId)

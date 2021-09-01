@@ -1,1 +1,1 @@
-CREATE TABLE presign(work_id VARCHAR(256), pids_string text, presign_id VARCHAR(256), data_bytes BLOB, PRIMARY KEY (work_id, presign_id));
+CREATE TABLE presign(chain VARCHAR(256), work_id VARCHAR(256), batch_index INTEGER, pids_string text, status VARCHAR(64), presign_output BLOB, PRIMARY KEY (chain, work_id, batch_index));

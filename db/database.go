@@ -2,7 +2,10 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate"
@@ -13,10 +16,17 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
+const (
+	PRESIGN_STATUS_NOT_USED = "not_used"
+	PRESIGN_STATUS_USED     = "used"
+)
+
 type Database interface {
 	Init() error
 
-	FindPresignDataByPids(count int, pids tss.SortedPartyIDs) []*presign.LocalPresignData
+	SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
+
+	GetAvailablePresignShortForm() ([]string, []string, []int, error)
 }
 
 type SqlDbConfig struct {
@@ -51,10 +61,6 @@ func NewDatabase(config *SqlDbConfig) Database {
 	return &SqlDatabase{
 		config: config,
 	}
-}
-
-func (database *SqlDatabase) FindPresignDataByPids(count int, pids tss.SortedPartyIDs) []*presign.LocalPresignData {
-	return nil
 }
 
 func (d *SqlDatabase) Connect() error {
@@ -123,4 +129,87 @@ func (d *SqlDatabase) Init() error {
 	}
 
 	return nil
+}
+
+func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
+	if len(presignOutputs) == 0 {
+		return nil
+	}
+
+	idArr := make([]string, 0)
+	for _, p := range pids {
+		idArr = append(idArr, p.Id)
+	}
+	// Sort the id array
+	sort.Strings(idArr)
+
+	pidString := strings.Join(idArr, ",")
+
+	// Constructs multi-insert query to do all insertion in 1 query.
+	params := make([]interface{}, 0)
+
+	query := "INSERT IGNORE INTO presign (chain, work_id, pids_string, batch_index, status, presign_output) VALUES "
+	for i := range presignOutputs {
+		query = query + "(?, ?, ?, ?, ?, ?)"
+		if i < len(presignOutputs)-1 {
+			query = query + ", "
+		}
+	}
+
+	for i, output := range presignOutputs {
+		params = append(params, chain)
+		params = append(params, workId)
+		params = append(params, pidString)
+		j, err := json.Marshal(output)
+		if err != nil {
+			return err
+		}
+
+		params = append(params, i) // batch_index
+		params = append(params, PRESIGN_STATUS_NOT_USED)
+
+		params = append(params, j)
+	}
+
+	_, err := d.db.Exec(query, params...)
+
+	return err
+}
+
+// GetAllPresignIndexes returns all available presign data sets in short form (pids, workId, index)
+// We don't want to load full data of presign sets since it might take too much memmory.
+func (d *SqlDatabase) GetAvailablePresignShortForm() ([]string, []string, []int, error) {
+	query := "SELECT work_id, batch_index, pids_string FROM presign"
+
+	pids := make([]string, 0)
+	workIds := make([]string, 0)
+	indexes := make([]int, 0)
+
+	rows, err := d.db.Query(query)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	for {
+		if rows.Next() {
+			var id, workId string
+			var index int
+
+			rows.Scan(&id, &workId, &index)
+			pids = append(pids, id)
+			workIds = append(workIds, workId)
+			indexes = append(indexes, index)
+		} else {
+			break
+		}
+	}
+
+	return pids, workIds, indexes, nil
+}
+
+// This is not part of Database interface. Should ony be used in testing since we don't want to delete
+// presign rows.
+func (d *SqlDatabase) DeletePresignWork(workId string) error {
+	_, err := d.db.Exec("DELETE FROM presign where work_id = ?", workId)
+	return err
 }
