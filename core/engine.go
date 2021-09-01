@@ -60,6 +60,7 @@ type Engine struct {
 	nodes    map[string]*Node
 	nodeLock *sync.RWMutex
 
+	// TODO: Remove used presigns after getting a match to avoid using duplicated presigns.
 	availablePresigns []*common.AvailablePresign
 	apLock            *sync.RWMutex
 }
@@ -176,23 +177,23 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) {
 	}
 }
 
-func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
-	// TODO: save output.
-	engine.callback.OnWorkKeygenFinished(request.WorkId, data)
+func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
+	// Save to database
+	engine.db.SaveKeygenData(request.Chain, request.WorkId, request.AllParties, output)
 
+	// Make a callback and start next work.
+	engine.callback.OnWorkKeygenFinished(request.WorkId, output)
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
 }
 
 func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+	engine.db.SavePresignData(request.Chain, request.WorkId, pids, data)
+
 	engine.callback.OnWorkPresignFinished(request.WorkId, data)
 
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
-
-	// Save to database
-	// TODO: Pass in correct string here.
-	engine.db.SavePresignData(request.Chain, request.WorkId, pids, data)
 }
 
 func (engine *Engine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
@@ -365,7 +366,9 @@ func (engine *Engine) GetPresignData(batchSize int, n int, pids []*tss.PartyID) 
 	selected := make([]*common.AvailablePresign, 0)
 
 	engine.apLock.RLock()
-	for _, ap := range engine.availablePresigns {
+	remaining := make([]*common.AvailablePresign, 0, len(engine.availablePresigns))
+	// Loop through all available presigns set and choose a set that is also a subset of pids.
+	for i, ap := range engine.availablePresigns {
 		if len(ap.Pids) != n {
 			continue
 		}
@@ -381,8 +384,16 @@ func (engine *Engine) GetPresignData(batchSize int, n int, pids []*tss.PartyID) 
 		if ok {
 			selected = append(selected, ap)
 			if len(selected) == batchSize {
+				// Add the rest of available presign to remaining array and set this to be the new
+				// availablePresigns
+				for j := i + 1; j < len(engine.availablePresigns); j++ {
+					remaining = append(remaining, engine.availablePresigns[j])
+				}
+				engine.availablePresigns = remaining
 				break
 			}
+		} else {
+			remaining = append(remaining, ap)
 		}
 	}
 	engine.apLock.RUnlock()

@@ -170,6 +170,10 @@ func (m *MockDatabase) Init() error {
 	return nil
 }
 
+func (m *MockDatabase) SaveKeygenData(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
+	return nil
+}
+
 func (m *MockDatabase) SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
 	return nil
 }
@@ -179,6 +183,10 @@ func (m *MockDatabase) GetAvailablePresignShortForm() ([]string, []string, []int
 }
 
 func (m *MockDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
+	return nil, nil
+}
+
+func (m *MockDatabase) LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error) {
 	return nil, nil
 }
 

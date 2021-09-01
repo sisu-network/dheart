@@ -12,7 +12,7 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-// preExecution finds list of nodes who are available for signing this work.
+// preExecution finds list of nodes who are available for doing this TSS task.
 // Step1: Find a leader using the hash of workId and list of all party ids. This leader should be
 //      the same among all parties.
 // Step2:

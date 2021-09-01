@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -13,6 +12,7 @@ import (
 	_ "github.com/golang-migrate/migrate/source/file"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 )
@@ -25,6 +25,11 @@ const (
 type Database interface {
 	Init() error
 
+	SaveKeygenData(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
+
+	LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error)
+
+	// SavePresignData saves presign output into this database
 	SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
 
 	GetAvailablePresignShortForm() ([]string, []string, []int, error)
@@ -134,44 +139,91 @@ func (d *SqlDatabase) Init() error {
 	return nil
 }
 
+func (d *SqlDatabase) SaveKeygenData(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
+	if len(keygenOutput) == 0 {
+		return nil
+	}
+
+	pidString := getPidString(pids)
+	// Constructs multi-insert query to do all insertion in 1 query.
+	query := "INSERT keygen (chain, work_id, pids_string, batch_index, keygen_output) VALUES "
+	query = query + getQueryQuestionMark(len(keygenOutput), 5)
+
+	params := make([]interface{}, 0)
+	for i, output := range keygenOutput {
+		bz, err := json.Marshal(output)
+		if err != nil {
+			return err
+		}
+
+		params = append(params, chain)
+		params = append(params, workId)
+		params = append(params, pidString)
+		params = append(params, i) // batch index
+		params = append(params, bz)
+	}
+
+	_, err := d.db.Exec(query, params...)
+
+	return err
+}
+
+func (d *SqlDatabase) LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error) {
+	query := "SELECT keygen_output FROM keygen WHERE chain=? AND work_id=? AND batch_index=0"
+
+	params := []interface{}{
+		chain,
+		workId,
+	}
+
+	rows, err := d.db.Query(query, params...)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &keygen.LocalPartySaveData{}
+
+	if rows.Next() {
+		var bz []byte
+
+		rows.Scan(&bz)
+		err := json.Unmarshal(bz, result)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		utils.LogVerbose("There is no such keygen output for ", chain, workId)
+	}
+
+	return result, nil
+}
+
 func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
 	if len(presignOutputs) == 0 {
 		return nil
 	}
 
-	idArr := make([]string, 0)
-	for _, p := range pids {
-		idArr = append(idArr, p.Id)
-	}
-	// Sort the id array
-	sort.Strings(idArr)
-
-	pidString := strings.Join(idArr, ",")
+	pidString := getPidString(pids)
 
 	// Constructs multi-insert query to do all insertion in 1 query.
+	query := "INSERT INTO presign (chain, work_id, pids_string, batch_index, status, presign_output) VALUES "
+	query = query + getQueryQuestionMark(len(presignOutputs), 6)
+
 	params := make([]interface{}, 0)
-
-	query := "INSERT IGNORE INTO presign (chain, work_id, pids_string, batch_index, status, presign_output) VALUES "
-	for i := range presignOutputs {
-		query = query + "(?, ?, ?, ?, ?, ?)"
-		if i < len(presignOutputs)-1 {
-			query = query + ", "
-		}
-	}
-
 	for i, output := range presignOutputs {
-		params = append(params, chain)
-		params = append(params, workId)
-		params = append(params, pidString)
-		j, err := json.Marshal(output)
+		bz, err := json.Marshal(output)
 		if err != nil {
 			return err
 		}
 
+		params = append(params, chain)
+		params = append(params, workId)
+		params = append(params, pidString)
+
 		params = append(params, i) // batch_index
 		params = append(params, PRESIGN_STATUS_NOT_USED)
 
-		params = append(params, j)
+		params = append(params, bz)
 	}
 
 	_, err := d.db.Exec(query, params...)
@@ -217,6 +269,11 @@ func (d *SqlDatabase) DeletePresignWork(workId string) error {
 	return err
 }
 
+func (d *SqlDatabase) DeleteKeygenWork(workId string) error {
+	_, err := d.db.Exec("DELETE FROM keygen where work_id = ?", workId)
+	return err
+}
+
 func (d *SqlDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
 	// 1. Constract the query
 	questions := ""
@@ -227,7 +284,7 @@ func (d *SqlDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*pres
 		}
 	}
 
-	query := "SELECT work_id, batch_index, pids_string, presign_output FROM presign WHERE status='not_used' AND work_id IN (" + questions + ")"
+	query := "SELECT work_id, batch_index, pids_string, presign_output FROM presign WHERE status='not_used' AND work_id IN (" + questions + ") ORDER BY created_time DESC"
 
 	// Execute the query
 	loaded := make([]*common.AvailablePresign, 0)

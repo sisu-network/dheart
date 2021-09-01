@@ -6,6 +6,8 @@ import (
 	"github.com/sisu-network/dheart/worker/types"
 )
 
+// TODO: add job priority for this queue. Keygen &signing should have more priority than presign even
+// though they could be inserted later.
 type requestQueue struct {
 	queue []*types.WorkRequest
 	lock  *sync.RWMutex
