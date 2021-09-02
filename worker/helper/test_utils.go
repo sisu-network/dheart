@@ -157,13 +157,15 @@ func (cb *MockEngineCallback) OnPreExecutionFinished(workId string) {
 //---/
 
 type MockDatabase struct {
+	// TODO: remove this unused variable
 	signingInput []*presign.LocalPresignData
+
+	GetAvailablePresignShortFormFunc func() ([]string, []string, []int, error)
+	LoadPresignFunc                  func(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error)
 }
 
-func NewMockDatabase(signingInput []*presign.LocalPresignData) db.Database {
-	return &MockDatabase{
-		signingInput: signingInput,
-	}
+func NewMockDatabase() db.Database {
+	return &MockDatabase{}
 }
 
 func (m *MockDatabase) Init() error {
@@ -179,10 +181,18 @@ func (m *MockDatabase) SavePresignData(chain string, workId string, pids []*tss.
 }
 
 func (m *MockDatabase) GetAvailablePresignShortForm() ([]string, []string, []int, error) {
+	if m.GetAvailablePresignShortFormFunc != nil {
+		return m.GetAvailablePresignShortFormFunc()
+	}
+
 	return []string{}, []string{}, []int{}, nil
 }
 
 func (m *MockDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
+	if m.LoadPresignFunc != nil {
+		return m.LoadPresignFunc(workIds, batchIndexes)
+	}
+
 	return nil, nil
 }
 

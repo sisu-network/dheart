@@ -1,9 +1,7 @@
 package ecdsa
 
 import (
-	"fmt"
 	"math/big"
-	"runtime"
 	"testing"
 
 	"github.com/sisu-network/dheart/types/common"
@@ -15,14 +13,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPresignBigTest(t *testing.T) {
-	fmt.Printf("START: ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
-	for i := 0; i < 3; i++ {
-		TestPresignEndToEnd(t)
-	}
+// func TestPresignBigTest(t *testing.T) {
+// 	fmt.Printf("START: ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
+// 	for i := 0; i < 3; i++ {
+// 		TestPresignEndToEnd(t)
+// 	}
 
-	fmt.Printf("END: ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
-}
+// 	fmt.Printf("END: ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
+// }
 
 func TestPresignEndToEnd(t *testing.T) {
 	n := 4
@@ -62,7 +60,7 @@ func TestPresignEndToEnd(t *testing.T) {
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh),
-			helper.NewMockDatabase(nil),
+			helper.NewMockDatabase(),
 			errCh,
 			helper.NewTestPresignCallback(i, cb),
 		)

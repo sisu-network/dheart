@@ -53,7 +53,7 @@ func TestSigningEndToEnd(t *testing.T) {
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh),
-			helper.NewMockDatabase(wrapper.Outputs[i]),
+			helper.NewMockDatabase(),
 			errCh,
 			helper.NewTestSigningCallback(i, cb),
 		)
