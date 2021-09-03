@@ -3,6 +3,7 @@ package ecdsa
 import (
 	"crypto/ecdsa"
 	"math/big"
+	"sync"
 	"testing"
 
 	"github.com/sisu-network/dheart/types/common"
@@ -29,10 +30,13 @@ func TestSigningEndToEnd(t *testing.T) {
 	signingMsg := "This is a test"
 
 	outputs := make([][]*libCommon.SignatureData, len(pIDs)) // n * batchSize
+	outputLock := &sync.Mutex{}
 	cb := func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData) {
+		outputLock.Lock()
+		defer outputLock.Unlock()
+
 		outputs[workerIndex] = data
 		finishedWorkerCount += 1
-
 		if finishedWorkerCount == n {
 			done <- true
 		}

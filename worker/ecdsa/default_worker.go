@@ -190,7 +190,7 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 	}
 
 	// Do leader election and participants selection first.
-	w.preExecution()
+	go w.preExecution()
 
 	return nil
 }

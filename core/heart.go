@@ -121,6 +121,8 @@ func (h *Heart) SisuHandshake(encodedKey string, keyType string) error {
 }
 
 func (h *Heart) Keygen(chain string, block int64, tPubKeys []tcrypto.PubKey) {
+	// TODO: Check if our pubkey is one of the pubkeys.
+
 	n := len(tPubKeys)
 
 	nodes := NewNodes(tPubKeys)

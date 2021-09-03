@@ -2,6 +2,7 @@ package ecdsa
 
 import (
 	"math/big"
+	"sync"
 	"testing"
 
 	"github.com/sisu-network/dheart/types/common"
@@ -36,11 +37,14 @@ func TestPresignEndToEnd(t *testing.T) {
 	finishedWorkerCount := 0
 
 	presignOutputs := make([][]*presign.LocalPresignData, len(pIDs)) // n * batchSize
+	outputLock := &sync.Mutex{}
+
 	cb := func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+		outputLock.Lock()
+		defer outputLock.Unlock()
+
 		presignOutputs[workerIndex] = data
-
 		finishedWorkerCount += 1
-
 		if finishedWorkerCount == n {
 			done <- true
 		}

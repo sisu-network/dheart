@@ -2,6 +2,7 @@ package ecdsa
 
 import (
 	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,7 +31,12 @@ func TestKeygenEndToEnd(t *testing.T) {
 	finishedWorkerCount := 0
 
 	finalOutput := make([][]*keygen.LocalPartySaveData, len(pIDs)) // n * batchSize
+	outputLock := &sync.Mutex{}
+
 	cb := func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
+		outputLock.Lock()
+		defer outputLock.Unlock()
+
 		finalOutput[workerIndex] = data
 		finishedWorkerCount += 1
 
