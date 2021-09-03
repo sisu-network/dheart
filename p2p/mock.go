@@ -136,7 +136,7 @@ func GetMockPeers(n int) []peer.ID {
 	return peerIds
 }
 
-func GetMockConnectionConfig(n, index int) (*ConnectionsConfig, []byte) {
+func GetMockConnectionConfig(n, index int) (ConnectionsConfig, []byte) {
 	peerIds := GetMockPeers(n)
 
 	privateKey := GetPrivateKeyBytes(index)
@@ -158,7 +158,7 @@ func GetMockConnectionConfig(n, index int) (*ConnectionsConfig, []byte) {
 		peers = append(peers, peer)
 	}
 
-	return &ConnectionsConfig{
+	return ConnectionsConfig{
 		Port:           TEST_PORT_BASE * (index + 1),
 		Rendezvous:     "rendezvous",
 		Protocol:       TSSProtocolID,

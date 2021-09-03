@@ -10,12 +10,12 @@ import (
 
 type TssApi struct {
 	isSetup bool
-	dheart  *core.Dheart
+	heart   *core.Heart
 }
 
-func NewTssApi(dheart *core.Dheart) *TssApi {
+func NewTssApi(heart *core.Heart) *TssApi {
 	return &TssApi{
-		dheart: dheart,
+		heart: heart,
 	}
 }
 
@@ -40,6 +40,6 @@ func (api *TssApi) Setup(configs []common.ChainConfig) error {
 	return nil
 }
 
-func (api *TssApi) Halt() {
-
+func (api *TssApi) SisuHandshake(encodedKey string, keyType string) error {
+	return api.heart.SisuHandshake(encodedKey, keyType)
 }

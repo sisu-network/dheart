@@ -1,13 +1,13 @@
 package main
 
 import (
-	"flag"
 	"math/big"
-	"time"
+	"os/signal"
+	"strconv"
+	"syscall"
 
 	"os"
 
-	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/tss"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -15,42 +15,10 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/sisu-network/dheart/client"
 	"github.com/sisu-network/dheart/core"
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/server"
-	"github.com/sisu-network/dheart/utils"
-	"github.com/sisu-network/dheart/worker/helper"
-	"github.com/sisu-network/dheart/worker/types"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
 )
-
-type EngineCallback struct {
-	keygenDataCh  chan []*keygen.LocalPartySaveData
-	presignDataCh chan []*presign.LocalPresignData
-	signingDataCh chan []*libCommon.SignatureData
-}
-
-func NewEngineCallback(
-	keygenDataCh chan []*keygen.LocalPartySaveData,
-	presignDataCh chan []*presign.LocalPresignData,
-	signingDataCh chan []*libCommon.SignatureData,
-) *EngineCallback {
-	return &EngineCallback{
-		keygenDataCh, presignDataCh, signingDataCh,
-	}
-}
-
-func (cb *EngineCallback) OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData) {
-	cb.keygenDataCh <- data
-}
-
-func (cb *EngineCallback) OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData) {
-	cb.presignDataCh <- data
-}
-
-func (cb *EngineCallback) OnWorkSigningFinished(workerId string, data []*libCommon.SignatureData) {
-	cb.signingDataCh <- data
-}
 
 func initialize() {
 	err := godotenv.Load()
@@ -59,19 +27,45 @@ func initialize() {
 	}
 }
 
-func getSisuClient() *client.Client {
+func getSisuClient() *client.DefaultClient {
 	url := os.Getenv("SISU_SERVER_URL")
 	c := client.NewClient(url)
 	return c
 }
 
+func getHeart() *core.Heart {
+	// DB Config
+	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
+	if err != nil {
+		panic(err)
+	}
+
+	dbConfig := config.DbConfig{
+		Port:          port,
+		Host:          os.Getenv("DB_HOST"),
+		Username:      os.Getenv("DB_USERNAME"),
+		Password:      os.Getenv("DB_PASSWORD"),
+		Schema:        os.Getenv("DB_SCHEMA"),
+		MigrationPath: os.Getenv("DB_MIGRATION_PATH"),
+	}
+
+	// Heart Config
+	heartConfig := config.HeartConfig{
+		Db:     dbConfig,
+		AesKey: os.Getenv("AES_KEY"),
+	}
+
+	return core.NewHeart(heartConfig)
+}
+
 func setupApiServer() {
 	c := getSisuClient()
 
-	dheart := core.NewTutTuk()
+	dheart := getHeart()
 
 	handler := rpc.NewServer()
 	if os.Getenv("USE_ON_MEMORY") == "" {
+		// handler.RegisterName("tss", getHeart())
 		handler.RegisterName("tss", server.NewTssApi(dheart))
 	} else {
 		api := server.NewSingleNodeApi(dheart, c)
@@ -102,65 +96,11 @@ func getSortedPartyIds(n int) tss.SortedPartyIDs {
 }
 
 func main() {
-	// initialize()
-	// setupApiServer()
+	initialize()
+	setupApiServer()
 
-	// c := make(chan os.Signal, 1)
-	// signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	// <-c
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
 
-	var index, n int
-	flag.IntVar(&index, "index", 0, "listening port")
-	flag.Parse()
-
-	n = 2
-
-	config, privateKey := p2p.GetMockConnectionConfig(n, index)
-	cm, err := p2p.NewConnectionManager(config)
-	if err != nil {
-		panic(err)
-	}
-	err = cm.Start(privateKey)
-	if err != nil {
-		panic(err)
-	}
-
-	pids := make([]*tss.PartyID, n)
-	allKeys := p2p.GetAllPrivateKeys(n)
-	nodes := make([]*core.Node, n)
-
-	// Add nodes
-	privKeys := p2p.GetAllPrivateKeys(n)
-	for i := 0; i < n; i++ {
-		pubKey := privKeys[i].PubKey()
-		node := core.NewNode(pubKey)
-		nodes[i] = node
-		pids[i] = node.PartyId
-	}
-
-	// Create new engine
-	outCh := make(chan []*keygen.LocalPartySaveData)
-	cb := NewEngineCallback(outCh, nil, nil)
-	engine := core.NewEngine(nodes[index], cm, helper.NewMockDatabase(), cb, allKeys[index])
-	cm.AddListener(p2p.TSSProtocolID, engine)
-
-	// Add nodes
-	for i := 0; i < n; i++ {
-		engine.AddNodes(nodes)
-	}
-
-	time.Sleep(time.Second * 3)
-
-	// Add request
-	workId := "keygen0"
-	request := types.NewKeygenRequest(workId, n, pids, *helper.LoadPreparams(index), n-1)
-	err = engine.AddRequest(request)
-	if err != nil {
-		panic(err)
-	}
-
-	select {
-	case data := <-outCh:
-		utils.LogInfo("Data length = ", len(data))
-	}
 }

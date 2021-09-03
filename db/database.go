@@ -10,6 +10,7 @@ import (
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/mysql"
 	_ "github.com/golang-migrate/migrate/source/file"
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
@@ -37,15 +38,6 @@ type Database interface {
 	LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error)
 }
 
-type SqlDbConfig struct {
-	Port          int
-	Host          string
-	Username      string
-	Password      string
-	Schema        string
-	MigrationPath string
-}
-
 type dbLogger struct {
 }
 
@@ -62,10 +54,10 @@ func (loggger *dbLogger) Verbose() bool {
 // SqlDatabase implements Database interface.
 type SqlDatabase struct {
 	db     *sql.DB
-	config *SqlDbConfig
+	config *config.DbConfig
 }
 
-func NewDatabase(config *SqlDbConfig) Database {
+func NewDatabase(config *config.DbConfig) Database {
 	return &SqlDatabase{
 		config: config,
 	}

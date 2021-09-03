@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
@@ -98,7 +99,7 @@ func testInsertingPresignData(database db.Database) {
 }
 
 func main() {
-	config := &db.SqlDbConfig{
+	config := &config.DbConfig{
 		Port:          3306,
 		Host:          "localhost",
 		Username:      "root",

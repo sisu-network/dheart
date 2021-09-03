@@ -69,11 +69,8 @@ func main() {
 	n = 2
 
 	config, privateKey := p2p.GetMockConnectionConfig(n, index)
-	cm, err := p2p.NewConnectionManager(config)
-	if err != nil {
-		panic(err)
-	}
-	err = cm.Start(privateKey)
+	cm := p2p.NewConnectionManager(config)
+	err := cm.Start(privateKey)
 	if err != nil {
 		panic(err)
 	}

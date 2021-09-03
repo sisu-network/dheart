@@ -18,20 +18,24 @@ var (
 	SISU_SERVER_NOT_CONNECTED = errors.New("Sisu server is not connected")
 )
 
+type Client interface {
+	TryDial()
+}
+
 // A client that connects to Sisu server
-type Client struct {
+type DefaultClient struct {
 	client    *rpc.Client
 	url       string
 	connected bool
 }
 
-func NewClient(url string) *Client {
-	return &Client{
+func NewClient(url string) *DefaultClient {
+	return &DefaultClient{
 		url: url,
 	}
 }
 
-func (c *Client) TryDial() {
+func (c *DefaultClient) TryDial() {
 	utils.LogInfo("Trying to dial Sisu server")
 
 	for {
@@ -48,7 +52,7 @@ func (c *Client) TryDial() {
 	utils.LogInfo("Sisu server is connected")
 }
 
-func (c *Client) CheckHealth() error {
+func (c *DefaultClient) CheckHealth() error {
 	var result interface{}
 	err := c.client.CallContext(context.Background(), &result, "tss_checkHealth")
 	if err != nil {
@@ -59,7 +63,7 @@ func (c *Client) CheckHealth() error {
 	return nil
 }
 
-func (c *Client) BroadcastKeygenResult(chain string, pubKey []byte) error {
+func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKey []byte) error {
 	utils.LogDebug("c.connected = ", c.connected)
 
 	if !c.connected {
@@ -84,7 +88,7 @@ func (c *Client) BroadcastKeygenResult(chain string, pubKey []byte) error {
 	return nil
 }
 
-func (c *Client) BroadcastKeySignResult(result *types.KeysignResult) error {
+func (c *DefaultClient) BroadcastKeySignResult(result *types.KeysignResult) error {
 	var r interface{}
 	err := c.client.CallContext(context.Background(), &r, "tss_keySignResult", result)
 	if err != nil {

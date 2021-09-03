@@ -41,16 +41,13 @@ func main() {
 	n = 2
 
 	config, privateKey := p2p.GetMockConnectionConfig(n, index)
-	cm, err := p2p.NewConnectionManager(config)
-	if err != nil {
-		panic(err)
-	}
+	cm := p2p.NewConnectionManager(config)
 
 	dataChan := make(chan *p2p.P2PMessage)
 
 	cm.AddListener(p2p.TSSProtocolID, NewSimpleListener(dataChan))
 
-	err = cm.Start(privateKey)
+	err := cm.Start(privateKey)
 	if err != nil {
 		panic(err)
 	}

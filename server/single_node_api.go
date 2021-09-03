@@ -25,15 +25,15 @@ const (
 // This is a mock API to use for single localhost node. It does not have TSS signing round and
 // generates a private key instead.
 type SingleNodeApi struct {
-	dheart   *core.Dheart
+	dheart   *core.Heart
 	keyMap   map[string]interface{}
 	store    *store.Store
 	ethKeys  map[string]*ecdsa.PrivateKey
 	chainIds map[string]*big.Int
-	c        *client.Client
+	c        *client.DefaultClient
 }
 
-func NewSingleNodeApi(dheart *core.Dheart, c *client.Client) *SingleNodeApi {
+func NewSingleNodeApi(dheart *core.Heart, c *client.DefaultClient) *SingleNodeApi {
 	return &SingleNodeApi{
 		dheart:  dheart,
 		keyMap:  make(map[string]interface{}),
@@ -203,4 +203,8 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 	}
 
 	return err
+}
+
+func (api *SingleNodeApi) SisuHandshake(encodedKey string, keyType string) error {
+	return nil
 }

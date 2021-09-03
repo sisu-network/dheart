@@ -70,7 +70,7 @@ type DefaultConnectionManager struct {
 	statusManager    StatusManager
 }
 
-func NewConnectionManager(config *ConnectionsConfig) (ConnectionManager, error) {
+func NewConnectionManager(config ConnectionsConfig) ConnectionManager {
 	return &DefaultConnectionManager{
 		port:             config.Port,
 		rendezvous:       config.Rendezvous,
@@ -78,7 +78,7 @@ func NewConnectionManager(config *ConnectionsConfig) (ConnectionManager, error) 
 		hostId:           config.HostId,
 		connections:      make(map[peer.ID]*Connection),
 		protocolListener: make(map[protocol.ID]P2PDataListener),
-	}, nil
+	}
 }
 
 func (cm *DefaultConnectionManager) Start(privKeyBytes []byte) error {
