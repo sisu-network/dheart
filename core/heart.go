@@ -30,10 +30,13 @@ type Heart struct {
 func NewHeart(config config.HeartConfig) *Heart {
 	return &Heart{
 		config: config,
+		aesKey: []byte(config.AesKey),
 	}
 }
 
 func (h *Heart) Start() {
+	utils.LogInfo("Starting heart...")
+
 	// Connection manager
 	h.cm = p2p.NewConnectionManager(h.config.Connection)
 	// Create db
@@ -69,9 +72,6 @@ func (h *Heart) OnWorkSigningFinished(workId string, data []*libCommon.Signature
 
 // --- Implements Server API  /
 
-func (h *Heart) Keygen(tPubKeys []tcrypto.PubKey) {
-}
-
 // SisuHandshake receives encrypted private key from Sisu, decrypts it and start the engine,
 // network communication, etc.
 func (h *Heart) SisuHandshake(encodedKey string, keyType string) error {
@@ -99,6 +99,19 @@ func (h *Heart) SisuHandshake(encodedKey string, keyType string) error {
 	}
 
 	return nil
+}
+
+func (h *Heart) Keygen(chain string, block int64, tPubKeys []tcrypto.PubKey) {
+	// n := len(tPubKeys)
+
+	// nodes := core.NewNodes(tPubKeys)
+	// workId := core.GetWorkId(types.ECDSA_KEYGEN, block, chain, 0, nodes)
+	// pids := make([]*tss.PartyID, n)
+	// for i, node := range nodes {
+	// 	pids[i] = node.PartyID
+	// }
+
+	// request := types.NewKeygenRequest(workId, len(tPubKeys), pids, *helper.LoadPreparams(index), n-1)
 }
 
 // --- End of Server API  /

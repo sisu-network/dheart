@@ -29,3 +29,13 @@ func NewNode(pubKey tcrypto.PubKey) *Node {
 		peerId, pubKey, tss.NewPartyID(peerId.String(), "", new(big.Int).SetBytes(pubKey.Bytes())),
 	}
 }
+
+func NewNodes(tPubKeys []tcrypto.PubKey) []*Node {
+	nodes := make([]*Node, len(tPubKeys))
+	for i, pubKey := range tPubKeys {
+		node := NewNode(pubKey)
+		nodes[i] = node
+	}
+
+	return nodes
+}

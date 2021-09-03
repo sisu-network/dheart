@@ -125,6 +125,7 @@ func (d *SqlDatabase) Init() error {
 
 	err = d.DoMigration()
 	if err != nil {
+		utils.LogError("Cannot do migration. Err =", err)
 		return err
 	}
 

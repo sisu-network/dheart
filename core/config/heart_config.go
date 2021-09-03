@@ -15,5 +15,5 @@ type HeartConfig struct {
 	Db         DbConfig
 	Connection p2p.ConnectionsConfig
 	// Key to decrypt data sent over network.
-	AesKey string
+	AesKey []byte
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/sisu-network/dheart/worker/types"
 )
 
-func getWorkId(workType types.WorkType, block int64, chain string, index int, nodes []*Node) string {
+func GetWorkId(workType types.WorkType, block int64, chain string, index int, nodes []*Node) string {
 	var prefix string
 	switch workType {
 	case types.ECDSA_KEYGEN:

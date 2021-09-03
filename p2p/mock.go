@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 
@@ -37,20 +36,6 @@ var (
 		"610283d69092296926deef185d7a0d8866c1399b247883d68c54a26b4c15b53b",
 	}
 )
-
-func GetPriKey(priKeyString string) (tcrypto.PrivKey, error) {
-	priHexBytes, err := base64.StdEncoding.DecodeString(priKeyString)
-	if err != nil {
-		return nil, fmt.Errorf("fail to decode private key: %w", err)
-	}
-	rawBytes, err := hex.DecodeString(string(priHexBytes))
-	if err != nil {
-		return nil, fmt.Errorf("fail to hex decode private key: %w", err)
-	}
-	var priKey secp256k1.PrivKey
-	priKey = rawBytes[:32]
-	return priKey, nil
-}
 
 func GeneratePrivateKey() tcrypto.PrivKey {
 	secret := make([]byte, 32)

@@ -60,7 +60,6 @@ func getSortedPartyIds(n int) tss.SortedPartyIDs {
 	return tss.SortPartyIDs(partyIds, 0)
 }
 
-// TODO: This localhost e2e testing does not work since 2 nodes are writing to the same mysql database.
 func main() {
 	var index, n int
 	flag.IntVar(&index, "index", 0, "listening port")
