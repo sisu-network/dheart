@@ -5,13 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
+	"time"
 
 	tcrypto "github.com/tendermint/tendermint/crypto"
 
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/run"
+	"github.com/sisu-network/dheart/test/mock"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 )
@@ -61,9 +61,14 @@ func main() {
 	}
 	os.Setenv("USE_ON_MEMORY", "")
 
-	privKey := secp256k1.PrivKey(p2p.GetPrivateKeyBytes(index))
+	done := make(chan bool)
+	mockClient := mock.NewClient(nil, func(workId string) {
+		done <- true
+	})
+
+	conConfig, privKey := p2p.GetMockConnectionConfig(n, index)
 	encryptedKey := getEncrypted(privKey)
-	heart := run.GetHeart()
+	heart := run.GetHeart(conConfig, mockClient)
 
 	err := heart.SisuHandshake(hex.EncodeToString(encryptedKey), "secp256k1")
 	if err != nil {
@@ -72,7 +77,10 @@ func main() {
 
 	heart.Keygen("eth", 5, getPublicKeys(n))
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
+	select {
+	case <-time.After(time.Second * 30):
+		panic(fmt.Errorf("Time out"))
+	case <-done:
+		utils.LogVerbose("core-heart Test passed")
+	}
 }

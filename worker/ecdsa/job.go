@@ -45,7 +45,7 @@ type Job struct {
 	callback JobCallback
 }
 
-func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Parameters, localPreparams *keygen.LocalPreParams, callback JobCallback) *Job {
+func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, localPreparams *keygen.LocalPreParams, callback JobCallback) *Job {
 	errCh := make(chan *tss.Error, len(pIDs))
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan keygen.LocalPartySaveData, len(pIDs))
@@ -63,7 +63,7 @@ func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params
 	}
 }
 
-func NewPresignJob(index int, pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Parameters, savedData *keygen.LocalPartySaveData, callback JobCallback) *Job {
+func NewPresignJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, savedData *keygen.LocalPartySaveData, callback JobCallback) *Job {
 	errCh := make(chan *tss.Error, len(pIDs))
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan presign.LocalPresignData, len(pIDs))
@@ -81,7 +81,7 @@ func NewPresignJob(index int, pIDs tss.SortedPartyIDs, myPid *tss.PartyID, param
 	}
 }
 
-func NewSigningJob(index int, pIDs tss.SortedPartyIDs, myPid *tss.PartyID, params *tss.Parameters, msg string, signingInput *presign.LocalPresignData, callback JobCallback) *Job {
+func NewSigningJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, msg string, signingInput *presign.LocalPresignData, callback JobCallback) *Job {
 	errCh := make(chan *tss.Error, len(pIDs))
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan libCommon.SignatureData, len(pIDs))
@@ -121,7 +121,7 @@ func (job *Job) startListening() {
 	for {
 		select {
 		case err := <-errCh:
-			utils.LogError("Error on job index", job.index)
+			utils.LogError("Error on job", job.index)
 			job.onError(err)
 			return
 

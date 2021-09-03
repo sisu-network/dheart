@@ -87,7 +87,14 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte) error {
 	var err error
 
 	p2pPriKey, err = crypto.UnmarshalSecp256k1PrivateKey(privKeyBytes)
+	if err != nil {
+		return err
+	}
+
 	listenAddr, err := maddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cm.port))
+	if err != nil {
+		return err
+	}
 
 	host, err := libp2p.New(ctx,
 		libp2p.ListenAddrs([]maddr.Multiaddr{listenAddr}...),
@@ -165,13 +172,13 @@ func (cm *DefaultConnectionManager) handleStream(stream network.Stream) {
 					Data:       dataBuf,
 				})
 
-				// Update status manager
-				peerId, err := peer.Decode(peerIDString)
-				if err == nil {
-					cm.statusManager.UpdatePeerStatus(peerId, STATUS_CONNECTED)
-				} else {
-					utils.LogError(err)
-				}
+				// // Update status manager
+				// peerId, err := peer.Decode(peerIDString)
+				// if err == nil {
+				// 	cm.statusManager.UpdatePeerStatus(peerId, STATUS_CONNECTED)
+				// } else {
+				// 	utils.LogError(err)
+				// }
 			}(peerIDString, dataBuf)
 		}
 	}
@@ -255,6 +262,7 @@ func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protoc
 	} else {
 		cm.statusManager.UpdatePeerStatus(pID, STATUS_CONNECTED)
 	}
+
 	return err
 }
 

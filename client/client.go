@@ -20,6 +20,7 @@ var (
 
 type Client interface {
 	TryDial()
+	PostKeygenResult(workId string)
 }
 
 // A client that connects to Sisu server
@@ -63,6 +64,7 @@ func (c *DefaultClient) CheckHealth() error {
 	return nil
 }
 
+// @Deprecated
 func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKey []byte) error {
 	utils.LogDebug("c.connected = ", c.connected)
 
@@ -86,6 +88,10 @@ func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKey []byte) error
 	}
 
 	return nil
+}
+
+func (c *DefaultClient) PostKeygenResult(workId string) {
+	// TODO: implement this.
 }
 
 func (c *DefaultClient) BroadcastKeySignResult(result *types.KeysignResult) error {

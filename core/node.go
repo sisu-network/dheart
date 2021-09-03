@@ -2,6 +2,7 @@ package core
 
 import (
 	"math/big"
+	"sort"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -24,6 +25,10 @@ func NewNode(pubKey tcrypto.PubKey) *Node {
 	}
 
 	peerId, err := peer.IDFromPublicKey(p2pPubKey)
+	if err != nil {
+		utils.LogError("Cannot convert pubkey to peerId")
+		return nil
+	}
 
 	return &Node{
 		peerId, pubKey, tss.NewPartyID(peerId.String(), "", new(big.Int).SetBytes(pubKey.Bytes())),
@@ -32,10 +37,19 @@ func NewNode(pubKey tcrypto.PubKey) *Node {
 
 func NewNodes(tPubKeys []tcrypto.PubKey) []*Node {
 	nodes := make([]*Node, len(tPubKeys))
+	pids := make([]*tss.PartyID, len(tPubKeys))
+
 	for i, pubKey := range tPubKeys {
 		node := NewNode(pubKey)
 		nodes[i] = node
+		pids[i] = node.PartyId
 	}
+
+	// Sort nodes by partyId
+	tss.SortPartyIDs(pids)
+	sort.SliceStable(nodes, func(i, j int) bool {
+		return nodes[i].PartyId.Index < nodes[j].PartyId.Index
+	})
 
 	return nodes
 }

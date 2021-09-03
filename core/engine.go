@@ -138,16 +138,20 @@ func (engine *Engine) AddRequest(request *types.WorkRequest) error {
 func (engine *Engine) startWork(request *types.WorkRequest) {
 	var w worker.Worker
 	errCh := make(chan error)
+
+	// Make a copy of myPid since the index will be changed during the TSS work.
+	workPartyId := tss.NewPartyID(engine.myPid.Id, engine.myPid.Moniker, engine.myPid.KeyInt())
+
 	// Create a new worker.
 	switch request.WorkType {
 	case types.ECDSA_KEYGEN:
-		w = ecdsa.NewKeygenWorker(BATCH_SIZE, request, engine.myPid, engine, engine.db, errCh, engine)
+		w = ecdsa.NewKeygenWorker(BATCH_SIZE, request, workPartyId, engine, engine.db, errCh, engine)
 
 	case types.ECDSA_PRESIGN:
-		w = ecdsa.NewPresignWorker(BATCH_SIZE, request, engine.myPid, engine, engine.db, errCh, engine)
+		w = ecdsa.NewPresignWorker(BATCH_SIZE, request, workPartyId, engine, engine.db, errCh, engine)
 
 	case types.ECDSA_SIGNING:
-		w = ecdsa.NewSigningWorker(BATCH_SIZE, request, engine.myPid, engine, engine.db, errCh, engine)
+		w = ecdsa.NewSigningWorker(BATCH_SIZE, request, workPartyId, engine, engine.db, errCh, engine)
 	}
 
 	engine.workLock.Lock()

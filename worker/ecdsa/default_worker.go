@@ -141,6 +141,7 @@ func NewSigningWorker(
 	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
+	// TODO: The request.Pids
 	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_SIGNING
@@ -197,19 +198,27 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 // Start actual execution of the work.
 func (w *DefaultWorker) executeWork() error {
 	p2pCtx := tss.NewPeerContext(w.pIDs)
+
+	// Assign the correct
+	for _, p := range w.pIDs {
+		if w.myPid.Id == p.Id {
+			w.myPid.Index = p.Index
+		}
+	}
+
 	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.threshold)
 
 	// Creates all jobs
 	for i := range w.jobs {
 		switch w.jobType {
 		case wTypes.ECDSA_KEYGEN:
-			w.jobs[i] = NewKeygenJob(i, w.pIDs, w.myPid, params, w.keygenInput, w)
+			w.jobs[i] = NewKeygenJob(i, w.pIDs, params, w.keygenInput, w)
 
 		case wTypes.ECDSA_PRESIGN:
-			w.jobs[i] = NewPresignJob(i, w.pIDs, w.myPid, params, w.presignInput, w)
+			w.jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w)
 
 		case wTypes.ECDSA_SIGNING:
-			w.jobs[i] = NewSigningJob(i, w.pIDs, w.myPid, params, w.signingMessage, w.signingInput[i], w)
+			w.jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessage, w.signingInput[i], w)
 
 		default:
 			return errors.New(fmt.Sprint("Unknown job type", w.jobType))

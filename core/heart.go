@@ -3,7 +3,9 @@ package core
 import (
 	"encoding/hex"
 	"fmt"
+	"time"
 
+	"github.com/sisu-network/dheart/client"
 	tcrypto "github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
@@ -12,38 +14,54 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/dheart/worker/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	"github.com/sisu-network/tss-lib/tss"
 )
 
 // The dragon heart of this component.
 type Heart struct {
-	config     config.HeartConfig
-	db         db.Database
-	cm         p2p.ConnectionManager
-	engine     *Engine
+	config config.HeartConfig
+	db     db.Database
+	cm     p2p.ConnectionManager
+	engine *Engine
+	client client.Client
+
 	privateKey tcrypto.PrivKey
 	aesKey     []byte
 }
 
-func NewHeart(config config.HeartConfig) *Heart {
+func NewHeart(config config.HeartConfig, client client.Client) *Heart {
 	return &Heart{
 		config: config,
 		aesKey: []byte(config.AesKey),
+		client: client,
 	}
 }
 
 func (h *Heart) Start() {
-	utils.LogInfo("Starting heart...")
+	utils.LogInfo("Starting heart")
+	// Create db
+	h.createDb()
 
 	// Connection manager
 	h.cm = p2p.NewConnectionManager(h.config.Connection)
-	// Create db
-	h.createDb()
+
 	// Engine
 	myNode := NewNode(h.privateKey.PubKey())
+
 	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey)
+	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
+
+	// Start connection manager.
+	err := h.cm.Start(h.privateKey.Bytes())
+	if err != nil {
+		utils.LogError("Cannot start connection manager. err =", err)
+	} else {
+		utils.LogError("Connected manager started!")
+	}
 }
 
 func (h *Heart) createDb() {
@@ -58,6 +76,7 @@ func (h *Heart) createDb() {
 
 func (h *Heart) OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData) {
 	// TODO: implement
+	h.client.PostKeygenResult(workId)
 }
 
 func (h *Heart) OnWorkPresignFinished(workId string, data []*presign.LocalPresignData) {
@@ -102,16 +121,44 @@ func (h *Heart) SisuHandshake(encodedKey string, keyType string) error {
 }
 
 func (h *Heart) Keygen(chain string, block int64, tPubKeys []tcrypto.PubKey) {
-	// n := len(tPubKeys)
+	n := len(tPubKeys)
 
-	// nodes := core.NewNodes(tPubKeys)
-	// workId := core.GetWorkId(types.ECDSA_KEYGEN, block, chain, 0, nodes)
-	// pids := make([]*tss.PartyID, n)
-	// for i, node := range nodes {
-	// 	pids[i] = node.PartyID
-	// }
+	nodes := NewNodes(tPubKeys)
+	workId := GetWorkId(types.ECDSA_KEYGEN, block, chain, 0, nodes)
+	pids := make([]*tss.PartyID, n)
+	for i, node := range nodes {
+		pids[i] = node.PartyId
+	}
 
-	// request := types.NewKeygenRequest(workId, len(tPubKeys), pids, *helper.LoadPreparams(index), n-1)
+	preparams, err := h.db.LoadPreparams(chain)
+	if err != nil {
+		utils.LogError("Cannot load preparams. Err =", err)
+		preparams, err = h.generatePreparams(chain)
+		if err != nil {
+			// TODO Broadcast failure to Sisu using client.
+			return
+		}
+	}
+
+	h.engine.AddNodes(nodes)
+
+	request := types.NewKeygenRequest(workId, len(tPubKeys), pids, *preparams, n-1)
+	h.engine.AddRequest(request)
 }
 
 // --- End of Server API  /
+
+func (h *Heart) generatePreparams(chain string) (*keygen.LocalPreParams, error) {
+	preparams, err := keygen.GeneratePreParams(60 * time.Second)
+	if err != nil {
+		utils.LogError("Cannot generate preparams. err = ", err)
+		return nil, err
+	}
+
+	err = h.db.SavePreparams(chain, preparams)
+	if err != nil {
+		utils.LogError("Failed to save to db. err =", err)
+	}
+
+	return preparams, nil
+}

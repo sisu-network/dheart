@@ -11,6 +11,7 @@ import (
 	"github.com/sisu-network/dheart/client"
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/core/config"
+	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/server"
 )
 
@@ -27,7 +28,7 @@ func GetSisuClient() *client.DefaultClient {
 	return c
 }
 
-func GetHeart() *core.Heart {
+func GetHeart(conConfig p2p.ConnectionsConfig, client client.Client) *core.Heart {
 	// DB Config
 	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
 	if err != nil {
@@ -47,17 +48,21 @@ func GetHeart() *core.Heart {
 
 	// Heart Config
 	heartConfig := config.HeartConfig{
-		Db:     dbConfig,
-		AesKey: aesKey,
+		Db:         dbConfig,
+		AesKey:     aesKey,
+		Connection: conConfig,
 	}
 
-	return core.NewHeart(heartConfig)
+	return core.NewHeart(heartConfig, client)
 }
 
 func SetupApiServer() {
 	c := GetSisuClient()
 
-	heart := GetHeart()
+	// TODO: Setup connection config
+	heart := GetHeart(p2p.ConnectionsConfig{Port: 1000},
+		client.NewClient(os.Getenv("SISU_SERVER_URL")),
+	)
 
 	handler := rpc.NewServer()
 	if os.Getenv("USE_ON_MEMORY") == "true" {

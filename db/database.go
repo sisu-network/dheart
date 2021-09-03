@@ -26,13 +26,13 @@ const (
 type Database interface {
 	Init() error
 
-	SaveKeygenData(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
+	SavePreparams(chain string, preparams *keygen.LocalPreParams) error
+	LoadPreparams(chain string) (*keygen.LocalPreParams, error)
 
+	SaveKeygenData(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
 	LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error)
 
-	// SavePresignData saves presign output into this database
 	SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
-
 	GetAvailablePresignShortForm() ([]string, []string, []int, error)
 
 	LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error)
@@ -130,6 +130,45 @@ func (d *SqlDatabase) Init() error {
 	}
 
 	return nil
+}
+
+func (d *SqlDatabase) SavePreparams(chain string, preparams *keygen.LocalPreParams) error {
+	bz, err := json.Marshal(preparams)
+	if err != nil {
+		return err
+	}
+
+	query := "INSERT preparams(chain, preparams) VALUES (?, ?)"
+	_, err = d.db.Exec(query, chain, bz)
+
+	return err
+}
+
+func (d *SqlDatabase) LoadPreparams(chain string) (*keygen.LocalPreParams, error) {
+	query := "SELECT preparams FROM preparams where chain=?"
+
+	rows, err := d.db.Query(query, chain)
+	if err != nil {
+		return nil, err
+	}
+
+	if !rows.Next() {
+		return nil, fmt.Errorf("There is no preparams.")
+	}
+
+	var bz []byte
+	err = rows.Scan(&bz)
+	if err != nil {
+		return nil, err
+	}
+
+	preparams := &keygen.LocalPreParams{}
+	err = json.Unmarshal(bz, preparams)
+	if err != nil {
+		return nil, err
+	}
+
+	return preparams, nil
 }
 
 func (d *SqlDatabase) SaveKeygenData(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
