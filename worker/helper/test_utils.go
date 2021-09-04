@@ -283,6 +283,16 @@ func GetTestPartyIds(n int) tss.SortedPartyIDs {
 	return pids
 }
 
+func CopySortedPartyIds(pids tss.SortedPartyIDs) tss.SortedPartyIDs {
+	copy := make([]*tss.PartyID, len(pids))
+
+	for i, p := range pids {
+		copy[i] = tss.NewPartyID(p.Id, p.Moniker, p.KeyInt())
+	}
+
+	return tss.SortPartyIDs(copy)
+}
+
 func GetTestSavedFileName(dirFormat, fileFormat string, index int) string {
 	_, callerFileName, _, _ := runtime.Caller(0)
 	srcDirName := filepath.Dir(callerFileName)

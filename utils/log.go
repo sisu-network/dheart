@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -25,19 +26,33 @@ const (
 
 var globalLogger Logger
 var logLevel int
+var loggerLock = &sync.RWMutex{}
 
 func SetLogger(logger Logger) {
+	loggerLock.Lock()
+	defer loggerLock.Unlock()
+
 	globalLogger = logger
 }
 
 func SetLogLevel(level int) {
+	loggerLock.Lock()
+	defer loggerLock.Unlock()
+
 	logLevel = level
 }
 
 func getLogger() Logger {
+	loggerLock.RLock()
+
 	if globalLogger == nil {
+		// Release the lock so that it could be locked again in the set functions
+		loggerLock.RUnlock()
+
 		SetLogger(&DefaultLogger{})
 		SetLogLevel(LOG_LEVEL_INFO)
+	} else {
+		loggerLock.RUnlock()
 	}
 
 	return globalLogger

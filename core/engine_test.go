@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/big"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,10 +30,13 @@ func TestEngineDelayStart(t *testing.T) {
 	workId := "presign0"
 	done := make(chan bool)
 	finishedWorkerCount := 0
+	outputLock := &sync.Mutex{}
 
 	cb := func(workerIndex int, workerId string, data []*presign.LocalPresignData) {
-		finishedWorkerCount += 1
+		outputLock.Lock()
+		defer outputLock.Unlock()
 
+		finishedWorkerCount += 1
 		if finishedWorkerCount == n {
 			done <- true
 		}
@@ -46,7 +50,7 @@ func TestEngineDelayStart(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, n, pIDs, *savedData[i])
+		request := types.NewPresignRequest(workId, n, helper.CopySortedPartyIds(pIDs), *savedData[i])
 
 		go func(engine *Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simluate that different workers can start at different times.

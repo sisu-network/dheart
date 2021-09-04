@@ -53,7 +53,7 @@ func TestPresignEndToEnd(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := &types.WorkRequest{
 			WorkId:       "Presign0",
-			AllParties:   pIDs,
+			AllParties:   helper.CopySortedPartyIds(pIDs),
 			PresignInput: presignInputs[i],
 			Threshold:    len(pIDs) - 1,
 			N:            n,

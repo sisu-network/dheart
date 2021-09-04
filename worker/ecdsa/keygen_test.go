@@ -51,7 +51,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 
 		request := &types.WorkRequest{
 			WorkId:      "Keygen0",
-			AllParties:  pIDs,
+			AllParties:  helper.CopySortedPartyIds(pIDs),
 			KeygenInput: preparams,
 			Threshold:   threshold,
 			N:           totalParticipants,
