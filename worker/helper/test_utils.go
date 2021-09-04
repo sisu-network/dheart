@@ -270,7 +270,13 @@ func GetTestPartyIds(n int) tss.SortedPartyIDs {
 			utils.LogError(err)
 			return nil
 		}
+
 		peerId, err := peer.IDFromPublicKey(p2pPubKey)
+		if err != nil {
+			utils.LogError(err)
+			return nil
+		}
+
 		pMoniker := peerId.String()
 
 		bigIntKey := new(big.Int).SetBytes(pubKey.Bytes())

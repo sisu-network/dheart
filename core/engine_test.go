@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/json"
-	"errors"
 	"math/big"
 	"strconv"
 	"sync"
@@ -71,14 +70,16 @@ func runEngines(engines []*Engine, workId string, outCh chan *p2pDataWrapper, er
 			panic(err)
 		case <-done:
 			return
-		case <-time.After(time.Second * 30):
-			panic(errors.New("Test timeout"))
+		case <-time.After(time.Second * 60):
+			panic("Test timeout")
 
 		case p2pMsgWrapper := <-outCh:
 			for _, engine := range engines {
 				if engine.myNode.PeerId.String() == p2pMsgWrapper.To {
 					signedMessage := &common.SignedMessage{}
-					json.Unmarshal(p2pMsgWrapper.msg.Data, signedMessage)
+					if err := json.Unmarshal(p2pMsgWrapper.msg.Data, signedMessage); err != nil {
+						panic(err)
+					}
 
 					engine.ProcessNewMessage(signedMessage.TssMessage)
 					break

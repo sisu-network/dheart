@@ -7,7 +7,7 @@ import (
 	tcrypto "github.com/tendermint/tendermint/crypto"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	protocol "github.com/libp2p/go-libp2p-protocol"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
