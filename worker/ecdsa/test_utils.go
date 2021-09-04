@@ -1,7 +1,6 @@
 package ecdsa
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -35,7 +34,7 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh
 		case <-done:
 			return
 		case <-time.After(time.Second * 300):
-			panic(errors.New("Test timeout"))
+			panic("Test timeout")
 
 		case tssMsg := <-outCh:
 			if tssMsg.From == tssMsg.To {

@@ -309,7 +309,7 @@ func (d *SqlDatabase) DeleteKeygenWork(workId string) error {
 func (d *SqlDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
 	// 1. Constract the query
 	questions := ""
-	for i, _ := range workIds {
+	for i := range workIds {
 		questions = questions + "?"
 		if i < len(workIds)-1 {
 			questions = questions + ","

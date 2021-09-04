@@ -1,0 +1,26 @@
+linters:
+  disable-all: true
+  enable:
+    - gofmt
+    - goimports
+    - gosec
+    - staticcheck
+
+linters-settings:
+  gosec:
+    excludes:
+      - G306
+  staticcheck:
+    go: "1.16"
+    checks: ["all","-SA9003"]
+
+run:
+  timeout: 5m
+  skip-dirs:
+    - tool
+  skip-files:
+    # Don't lint generated code
+    - ".*.gen.go$"
+    - ".*.pb.go$"
+    # Don't lint test codes either
+    - ".*_test.go$"

@@ -45,6 +45,9 @@ func GetHeart(conConfig p2p.ConnectionsConfig, client client.Client) *core.Heart
 	}
 
 	aesKey, err := hex.DecodeString(os.Getenv("AES_KEY_HEX"))
+	if err != nil {
+		panic(err)
+	}
 
 	// Heart Config
 	heartConfig := config.HeartConfig{

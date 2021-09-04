@@ -17,6 +17,9 @@ func NewTssMessage(from, to, workId string, msgs []tss.Message, round string) (*
 		}
 
 		serialized, err := json.Marshal(routing)
+		if err != nil {
+			return nil, err
+		}
 
 		updateMessages[i] = &UpdateMessage{
 			Data:                     msgsBytes,
