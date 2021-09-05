@@ -31,7 +31,7 @@ type Database interface {
 	LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error)
 
 	SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
-	GetAvailablePresignShortForm() ([]string, []string, error)
+	GetAvailablePresignShortForm() ([]string, []string, error) // Returns presignIds, pids, error
 
 	LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error)
 	UpdatePresignStatus(presignIds []string) error
