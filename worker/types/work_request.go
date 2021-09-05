@@ -15,6 +15,7 @@ type WorkRequest struct {
 	WorkId        string
 	N             int // The number of avaiable participants required to do this task.
 	ForcedPresign bool
+	BatchSize     int
 
 	// Used only for keygen, presign & signing
 	KeygenInput *keygen.LocalPreParams
@@ -102,4 +103,16 @@ func (request *WorkRequest) GetPriority() int {
 	utils.LogCritical("Unknown work type", request.WorkType)
 
 	return -1
+}
+
+func (request *WorkRequest) IsKeygen() bool {
+	return request.WorkType == ECDSA_KEYGEN || request.WorkType == EDDSA_KEYGEN
+}
+
+func (request *WorkRequest) IsPresign() bool {
+	return request.WorkType == ECDSA_PRESIGN || request.WorkType == EDDSA_PRESIGN
+}
+
+func (request *WorkRequest) IsSigning() bool {
+	return request.WorkType == ECDSA_SIGNING || request.WorkType == EDDSA_SIGNING
 }

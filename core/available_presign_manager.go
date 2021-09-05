@@ -7,7 +7,6 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -34,7 +33,7 @@ func NewAvailPresignManager(db db.Database) *AvailPresignManager {
 }
 
 func (m *AvailPresignManager) Load() error {
-	pidStrings, workIds, indexes, err := m.db.GetAvailablePresignShortForm()
+	presignIds, pidStrings, err := m.db.GetAvailablePresignShortForm()
 	if err != nil {
 		return err
 	}
@@ -47,10 +46,9 @@ func (m *AvailPresignManager) Load() error {
 		}
 
 		ap := &common.AvailablePresign{
+			PresignId:  presignIds[i],
 			PidsString: pidString,
 			Pids:       strings.Split(pidString, ","),
-			WorkId:     workIds[i],
-			BatchIndex: indexes[i],
 		}
 		arr = append(arr, ap)
 		m.available[pidString] = arr
@@ -60,20 +58,20 @@ func (m *AvailPresignManager) Load() error {
 	return nil
 }
 
-func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]*presign.LocalPresignData, []*tss.PartyID) {
+func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
 	selectedPidstring := ""
-	var aps []*common.AvailablePresign
+	var selectedAps []*common.AvailablePresign
 
 	m.lock.Lock()
-	for pidString, arr := range m.available {
-		if len(arr) >= batchSize && len(arr[0].Pids) == n {
+	for pidString, apArr := range m.available {
+		if len(apArr) >= batchSize && len(apArr[0].Pids) == n {
 			// We found this available pid string.
 			selectedPidstring = pidString
-			aps = arr[:batchSize]
+			selectedAps = apArr[:batchSize]
 
 			// Remove this available presigns from the list.
-			if batchSize < len(arr)-1 {
-				m.available[pidString] = arr[batchSize+1:]
+			if batchSize < len(apArr)-1 {
+				m.available[pidString] = apArr[batchSize+1:]
 			} else {
 				m.available[pidString] = make([]*common.AvailablePresign, 0)
 			}
@@ -86,7 +84,7 @@ func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []
 			if inUse == nil {
 				m.inUse[selectedPidstring] = make([]*common.AvailablePresign, 0)
 			}
-			inUse = append(inUse, aps...)
+			inUse = append(inUse, selectedAps...)
 			m.inUse[selectedPidstring] = inUse
 			break
 		}
@@ -94,12 +92,15 @@ func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []
 	m.lock.Unlock()
 
 	if selectedPidstring == "" {
-		return make([]*presign.LocalPresignData, 0), make([]*tss.PartyID, 0)
+		return make([]string, 0), make([]*tss.PartyID, 0)
 	}
 
-	presigns := m.loadPresignData(aps)
-
 	// Get selected pids
+	presignIds := make([]string, len(selectedAps))
+	for i, ap := range selectedAps {
+		presignIds[i] = ap.PresignId
+	}
+
 	pidStrings := strings.Split(selectedPidstring, ",")
 	selectedPids := make([]*tss.PartyID, len(selectedPidstring))
 
@@ -112,43 +113,7 @@ func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []
 		}
 	}
 
-	return presigns, selectedPids
-}
-
-func (m *AvailPresignManager) loadPresignData(aps []*common.AvailablePresign) []*presign.LocalPresignData {
-	batchIndexMap := m.groupBatchIndexByWorkId(aps)
-
-	result := make([]*presign.LocalPresignData, 0)
-	for workId, batchIndexes := range batchIndexMap {
-		loaded, err := m.db.LoadPresign(workId, batchIndexes)
-		if err != nil {
-			utils.LogError("Cannot load presign for workId", workId)
-			continue
-		}
-
-		result = append(result, loaded...)
-	}
-	return result
-}
-
-// groupBatchIndexByWorkId iterates through a list of presigns and group them by workid.
-func (m *AvailPresignManager) groupBatchIndexByWorkId(aps []*common.AvailablePresign) map[string][]int {
-	batchIndexMap := make(map[string][]int)
-	for i, ap := range aps {
-		if batchIndexMap[ap.WorkId] != nil {
-			continue
-		}
-
-		arr := make([]int, 0)
-		for j := i; j < len(aps); j++ {
-			if aps[j].WorkId == ap.WorkId {
-				arr = append(arr, aps[j].BatchIndex)
-			}
-		}
-		batchIndexMap[ap.WorkId] = arr
-	}
-
-	return batchIndexMap
+	return presignIds, selectedPids
 }
 
 func (m *AvailPresignManager) updateUsage(pidsString string, aps []*common.AvailablePresign, used bool) {
@@ -166,11 +131,12 @@ func (m *AvailPresignManager) updateUsage(pidsString string, aps []*common.Avail
 	for _, inUse := range arr {
 		found := false
 		for _, ap := range aps {
-			if inUse.WorkId == ap.WorkId && inUse.BatchIndex == ap.BatchIndex {
+			if inUse.PresignId == ap.PresignId {
 				found = true
 				break
 			}
 		}
+
 		if !found {
 			newInUse = append(newInUse, inUse)
 		}
@@ -194,13 +160,14 @@ func (m *AvailPresignManager) updateUsage(pidsString string, aps []*common.Avail
 	m.lock.Unlock()
 
 	if used {
-		batchIndexMap := m.groupBatchIndexByWorkId(aps)
+		presignIds := make([]string, len(aps))
+		for i, ap := range aps {
+			presignIds[i] = ap.PresignId
+		}
 
-		for workId, batchIndexes := range batchIndexMap {
-			err := m.db.UpdatePresignStatus(workId, batchIndexes)
-			if err != nil {
-				utils.LogError("Failed to update presign staus with work id", workId)
-			}
+		err := m.db.UpdatePresignStatus(presignIds)
+		if err != nil {
+			utils.LogError("Failed to update presign staus, err =", err)
 		}
 	}
 }

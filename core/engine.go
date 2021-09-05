@@ -345,6 +345,16 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 	// TODO: implements this
 }
 
-func (engine *Engine) GetPresignData(batchSize int, n int, pids []*tss.PartyID) ([]*presign.LocalPresignData, []*tss.PartyID) {
+func (engine *Engine) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
 	return engine.presignsManager.GetAvailablePresigns(batchSize, n, pids)
+}
+
+func (engine *Engine) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {
+	loaded, err := engine.db.LoadPresign(presignIds)
+	if err != nil {
+		utils.LogError("Cannot load presign, err =", err)
+		return make([]*presign.LocalPresignData, 0)
+	}
+
+	return loaded
 }

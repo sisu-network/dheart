@@ -48,7 +48,7 @@ func NewAvailabilityResponseMessage(from, to, workId string, answer Availability
 	return msg
 }
 
-func NewPreExecOutputMessage(from, to, workId string, success bool, pids []*tss.PartyID) *TssMessage {
+func NewPreExecOutputMessage(from, to, workId string, success bool, presignIds []string, pids []*tss.PartyID) *TssMessage {
 	msg := baseMessage(TssMessage_PRE_EXEC_OUTPUT, from, to, workId)
 
 	// get all pid strings
@@ -58,8 +58,9 @@ func NewPreExecOutputMessage(from, to, workId string, success bool, pids []*tss.
 	}
 
 	msg.PreExecOutputMessage = &PreExecOutputMessage{
-		Success: success,
-		Pids:    s,
+		Success:    success,
+		Pids:       s,
+		PresignIds: presignIds,
 	}
 
 	return msg

@@ -10,7 +10,6 @@ import (
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -39,7 +38,6 @@ func (w *DefaultWorker) preExecution() {
 // Do preExecution as a leader for the tss work.
 func (w *DefaultWorker) doPreExecutionAsLeader() {
 	preWorkCache := w.preExecutionCache.GetAllMessages(w.workId)
-
 	// Update availability from cache first.
 	for _, tssMsg := range preWorkCache {
 		if tssMsg.Type == common.TssMessage_AVAILABILITY_RESPONSE && tssMsg.AvailabilityResponseMessage.Answer == common.AvailabilityResponseMessage_YES {
@@ -66,17 +64,22 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 	}
 
 	// Waits for all members to respond.
-	output, selectedPids, err := w.waitForMemberResponse()
+	presignIds, selectedPids, err := w.waitForMemberResponse()
 	if err != nil {
 		utils.LogError("Leader: error while waiting for member response", err)
 		// TODO: make callback that this preExecution fails.
 		w.leaderFinalized(false, nil, nil)
 	} else {
-		w.leaderFinalized(true, output, selectedPids)
+		w.leaderFinalized(true, presignIds, selectedPids)
 	}
 }
 
-func (w *DefaultWorker) waitForMemberResponse() ([]*presign.LocalPresignData, []*tss.PartyID, error) {
+func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error) {
+	if ok, presignIds, selectedPids := w.checkEnoughParticipants(); ok {
+		// We have enough participants from cached message. No need to wait.
+		return presignIds, selectedPids, nil
+	}
+
 	// Wait for everyone to reply or timeout.
 	end := time.Now().Add(PRE_EXECUTION_REQUEST_WAIT_TIME)
 	for {
@@ -103,42 +106,59 @@ func (w *DefaultWorker) waitForMemberResponse() ([]*presign.LocalPresignData, []
 
 			if party != nil {
 				w.availableParties.add(party)
-
-				// TODO: Do check with database in case of signing a message. We only want to do pick up
-				// participants who are in a presign set.
 			} else {
 				utils.LogError("Cannot find party from", tssMsg.From)
 			}
 		}
 
-		if w.availableParties.getLength() >= w.request.N {
-			// Check if we can find a presign list that match this of nodes.
-			presignArr, selectedPids := w.callback.GetPresignData(w.batchSize, w.request.N, w.availableParties.getPartyList())
-			if len(presignArr) == w.batchSize {
-				// Announce this as success and return
-				return presignArr, selectedPids, nil
-			}
+		if ok, presignIds, selectedPids := w.checkEnoughParticipants(); ok {
+			return presignIds, selectedPids, nil
 		}
 	}
 
 	return nil, nil, errors.New("Cannot find enough members for this work")
 }
 
+func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyID) {
+	if w.availableParties.getLength() < w.request.N {
+		return false, nil, nil
+	}
+
+	if w.request.IsSigning() {
+		// Check if we can find a presign list that match this of nodes.
+		presignIds, selectedPids := w.callback.GetAvailablePresigns(w.batchSize, w.request.N, w.availableParties.getPartyList(w.request.N))
+
+		if len(presignIds) == w.batchSize {
+			// Announce this as success and return
+			return true, presignIds, selectedPids
+		}
+	} else {
+		// Keygen or presign works.
+		return true, nil, w.availableParties.getPartyList(w.request.N)
+	}
+
+	return false, nil, nil
+}
+
 // Finalize work as a leader and start execution.
-func (w *DefaultWorker) leaderFinalized(success bool, output []*presign.LocalPresignData, selectedPids []*tss.PartyID) {
+func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selectedPids []*tss.PartyID) {
 	if !success {
-		msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, false, w.pIDs)
+		msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, false, presignIds, w.pIDs)
 		go w.dispatcher.BroadcastMessage(w.pIDs, msg)
 		return
 	}
 
 	// Get list of parties
-	pIDs := w.availableParties.getPartyList()
+	pIDs := w.availableParties.getPartyList(w.request.N)
 	w.pIDs = tss.SortPartyIDs(pIDs)
 
 	// Broadcast success to everyone
-	msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, true, w.pIDs)
+	msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, true, presignIds, w.pIDs)
 	go w.dispatcher.BroadcastMessage(w.pIDs, msg)
+
+	if w.request.IsSigning() {
+		w.signingInput = w.callback.GetPresignOutputs(presignIds)
+	}
 
 	w.executeWork()
 }
@@ -206,13 +226,17 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 		w.pIDs = tss.SortPartyIDs(pIDs)
 
 		if join {
+			if w.request.IsSigning() {
+				w.signingInput = w.callback.GetPresignOutputs(msg.PresignIds)
+			}
+
 			// We are one of the participants, execute the work
 			w.executeWork()
 		} else {
 			// We are not in the participant list. Terminate this work. No thing else to do.
 			w.callback.OnPreExecutionFinished(w.request)
 		}
-	} else {
+	} else { // msg.Success == false
 		// This work fails because leader cannot find enough participants.
 		w.callback.OnWorkFailed(w.request)
 	}

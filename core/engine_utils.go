@@ -10,7 +10,7 @@ import (
 	"github.com/sisu-network/dheart/worker/types"
 )
 
-func GetPresignWorkId(workType types.WorkType, index int, nodes []*Node) string {
+func GetPresignWorkId(workType types.WorkType, nodes []*Node) string {
 	var prefix string
 	switch workType {
 	case types.ECDSA_PRESIGN:
@@ -29,7 +29,7 @@ func GetPresignWorkId(workType types.WorkType, index int, nodes []*Node) string 
 	}
 	hash := hex.EncodeToString(digester.Sum(nil))
 
-	return prefix + "-" + strconv.FormatInt(int64(index), 10) + "-" + hash
+	return prefix + "-" + hash
 }
 
 func GetKeysignWorkId(workType types.WorkType, txs [][]byte, block int64, chain string) string {

@@ -39,25 +39,17 @@ func TestPresignEndToEnd(t *testing.T) {
 	presignOutputs := make([][]*presign.LocalPresignData, len(pIDs)) // n * batchSize
 	outputLock := &sync.Mutex{}
 
-	cb := func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
-		outputLock.Lock()
-		defer outputLock.Unlock()
-
-		presignOutputs[workerIndex] = data
-		finishedWorkerCount += 1
-		if finishedWorkerCount == n {
-			done <- true
-		}
-	}
-
 	for i := 0; i < n; i++ {
 		request := &types.WorkRequest{
 			WorkId:       "Presign0",
+			WorkType:     types.ECDSA_PRESIGN,
 			AllParties:   helper.CopySortedPartyIds(pIDs),
 			PresignInput: presignInputs[i],
 			Threshold:    len(pIDs) - 1,
 			N:            n,
 		}
+
+		workerIndex := i
 
 		worker := NewPresignWorker(
 			batchSize,
@@ -66,7 +58,18 @@ func TestPresignEndToEnd(t *testing.T) {
 			helper.NewTestDispatcher(outCh),
 			helper.NewMockDatabase(),
 			errCh,
-			helper.NewTestPresignCallback(i, cb),
+			&helper.MockWorkerCallback{
+				OnWorkPresignFinishedFunc: func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+					outputLock.Lock()
+					defer outputLock.Unlock()
+
+					presignOutputs[workerIndex] = data
+					finishedWorkerCount += 1
+					if finishedWorkerCount == n {
+						done <- true
+					}
+				},
+			},
 		)
 
 		workers[i] = worker

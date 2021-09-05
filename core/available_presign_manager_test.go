@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/sisu-network/dheart/db"
@@ -10,72 +11,63 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getMokDbForAvailManager(presignPids, workIds []string, batchIndes []int) db.Database {
+func getMokDbForAvailManager(presignPids, pids []string) db.Database {
 	return &helper.MockDatabase{
-		GetAvailablePresignShortFormFunc: func() ([]string, []string, []int, error) {
-			return presignPids, workIds, batchIndes, nil
+		GetAvailablePresignShortFormFunc: func() ([]string, []string, error) {
+			return presignPids, pids, nil
 		},
 
-		LoadPresignFunc: func(workId string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
-			count := 0
-			for _, w := range workIds {
-				if w == workId {
-					count++
-				}
-			}
-
-			ret := make([]*presign.LocalPresignData, count)
-			return ret, nil
+		LoadPresignFunc: func(presignIds []string) ([]*presign.LocalPresignData, error) {
+			return make([]*presign.LocalPresignData, len(presignIds)), nil
 		},
 	}
 }
 
 func TestAvailManagerHappyCase(t *testing.T) {
-	expectedWorkId := "work1"
 	selectedPids := "2,3,5"
 
-	workIds := []string{"work0", "work0", "work1", "work1", "work1", "work2"}
-	presignPids := []string{"1,2,4", "1,2,4", "2,3,5", "2,3,5", "2,3,5", "3,4,5"}
-	batchIndexes := []int{0, 1, 0, 1, 2, 0}
+	presignPids := []string{"work0-0", "work0-1", "work1-0", "work1-1", "work1-2", "work2-0"}
+	pids := []string{"1,2,4", "1,2,4", "2,3,5", "2,3,5", "2,3,5", "3,4,5"}
 
-	mockDb := getMokDbForAvailManager(presignPids, workIds, batchIndexes)
+	mockDb := getMokDbForAvailManager(presignPids, pids)
 
-	pids := []string{"2", "3", "4", "5", "6", "7"}
-	partyIds := getPartyIdsFromStrings(pids)
+	allPids := []string{"2", "3", "4", "5", "6", "7"}
+	partyIds := getPartyIdsFromStrings(allPids)
 
 	availManager := NewAvailPresignManager(mockDb)
 	availManager.Load()
 	assert.Equal(t, 3, len(availManager.available))
 
+	// Get and consumes 3 presigns
 	presignIds, _ := availManager.GetAvailablePresigns(3, 3, partyIds)
 	assert.Equal(t, 3, len(presignIds))
 
+	// We should have 1 pid string in use (2,3,5) and 2 available pid string: (1,2,3) and (3,4,5)
 	assert.Equal(t, 1, len(availManager.inUse))
 	assert.Equal(t, 2, len(availManager.available))
 
 	// Update status
-	aps := make([]*common.AvailablePresign, 3)
-	for i := 0; i < len(aps); i++ {
-		aps[i] = &common.AvailablePresign{
-			WorkId:     expectedWorkId,
-			BatchIndex: i,
+	selectedAps := make([]*common.AvailablePresign, 3)
+	for i := 0; i < len(selectedAps); i++ {
+		selectedAps[i] = &common.AvailablePresign{
+			PresignId:  fmt.Sprintf("%s-%d", "work1", i),
+			PidsString: selectedPids,
 		}
 	}
 
-	availManager.updateUsage(selectedPids, aps, true)
+	availManager.updateUsage(selectedPids, selectedAps, true)
 	assert.Equal(t, 0, len(availManager.inUse))
 	assert.Equal(t, 2, len(availManager.available))
 }
 
 func TestAvailManagerNotFound(t *testing.T) {
-	workIds := []string{"work0", "work0", "work1", "work1", "work2"}
-	presignPids := []string{"1,2,4", "1,2,4", "2,3,5", "2,3,5", "3,4,5"}
-	batchIndexes := []int{0, 1, 0, 1, 2, 0}
+	presignPids := []string{"work0-0", "work0-1", "work1-0", "work1-1", "work2-0"}
+	pids := []string{"1,2,4", "1,2,4", "2,3,5", "2,3,5", "3,4,5"}
 
-	mockDb := getMokDbForAvailManager(presignPids, workIds, batchIndexes)
+	mockDb := getMokDbForAvailManager(presignPids, pids)
 
-	pids := []string{"2", "3", "4", "5", "6", "7"}
-	partyIds := getPartyIdsFromStrings(pids)
+	appPids := []string{"2", "3", "4", "5", "6", "7"}
+	partyIds := getPartyIdsFromStrings(appPids)
 
 	availManager := NewAvailPresignManager(mockDb)
 	availManager.Load()
@@ -89,17 +81,12 @@ func TestAvailManagerNotFound(t *testing.T) {
 }
 
 func TestAvailManagerPresignNotUsed(t *testing.T) {
-	expectedWorkId := "work1"
 	selectedPids := "2,3,5"
 
-	workIds := []string{"work0", "work0", "work1", "work1", "work1", "work2"}
-	presignPids := []string{"1,2,4", "1,2,4", "2,3,5", "2,3,5", "2,3,5", "3,4,5"}
-	batchIndexes := []int{0, 1, 0, 1, 2, 0}
-
-	mockDb := getMokDbForAvailManager(presignPids, workIds, batchIndexes)
-
-	pids := []string{"2", "3", "4", "5", "6", "7"}
-	partyIds := getPartyIdsFromStrings(pids)
+	presignPids := []string{"work0-0", "work0-1", "work1-0", "work1-1", "work1-2", "work2-0"}
+	pids := []string{"1,2,4", "1,2,4", "2,3,5", "2,3,5", "2,3,5", "3,4,5"}
+	mockDb := getMokDbForAvailManager(presignPids, pids)
+	partyIds := getPartyIdsFromStrings([]string{"2", "3", "4", "5", "6", "7"})
 
 	availManager := NewAvailPresignManager(mockDb)
 	availManager.Load()
@@ -108,15 +95,15 @@ func TestAvailManagerPresignNotUsed(t *testing.T) {
 	assert.Equal(t, 3, len(presignIds))
 
 	// Update status
-	aps := make([]*common.AvailablePresign, 3)
-	for i := 0; i < len(aps); i++ {
-		aps[i] = &common.AvailablePresign{
-			WorkId:     expectedWorkId,
-			BatchIndex: i,
+	selectedAps := make([]*common.AvailablePresign, 3)
+	for i := 0; i < len(selectedAps); i++ {
+		selectedAps[i] = &common.AvailablePresign{
+			PresignId:  fmt.Sprintf("%s-%d", "work1", i),
+			PidsString: selectedPids,
 		}
 	}
 
-	availManager.updateUsage(selectedPids, aps, false)
+	availManager.updateUsage(selectedPids, selectedAps, false)
 	assert.Equal(t, 0, len(availManager.inUse))
 	assert.Equal(t, 3, len(availManager.available))
 }

@@ -150,8 +150,6 @@ func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []tcrypto.PubKey)
 }
 
 func (h *Heart) Keysign(txs [][]byte, block int64, chain string, tPubKeys []tcrypto.PubKey) {
-	workId := GetKeysignWorkId(types.ECDSA_SIGNING, txs, block, chain)
-	fmt.Println("Workid = ", workId)
 	n := len(tPubKeys)
 
 	nodes := NewNodes(tPubKeys)

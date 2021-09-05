@@ -60,4 +60,7 @@ message PreExecOutputMessage {
 
   // List of participants that will join this tss work.
   repeated string pids = 2;
+
+  // List of presign ids that will be used (only for signing)
+  repeated string presign_ids = 3;
 }

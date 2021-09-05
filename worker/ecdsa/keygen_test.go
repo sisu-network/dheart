@@ -33,29 +33,20 @@ func TestKeygenEndToEnd(t *testing.T) {
 	finalOutput := make([][]*keygen.LocalPartySaveData, len(pIDs)) // n * batchSize
 	outputLock := &sync.Mutex{}
 
-	cb := func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
-		outputLock.Lock()
-		defer outputLock.Unlock()
-
-		finalOutput[workerIndex] = data
-		finishedWorkerCount += 1
-
-		if finishedWorkerCount == totalParticipants {
-			done <- true
-		}
-	}
-
 	// Generates n workers
 	for i := 0; i < totalParticipants; i++ {
 		preparams := helper.LoadPreparams(i)
 
 		request := &types.WorkRequest{
 			WorkId:      "Keygen0",
+			WorkType:    types.ECDSA_KEYGEN,
 			AllParties:  helper.CopySortedPartyIds(pIDs),
 			KeygenInput: preparams,
 			Threshold:   threshold,
 			N:           totalParticipants,
 		}
+
+		workerIndex := i
 
 		workers[i] = NewKeygenWorker(
 			batchSize,
@@ -64,7 +55,19 @@ func TestKeygenEndToEnd(t *testing.T) {
 			helper.NewTestDispatcher(outCh),
 			helper.NewMockDatabase(),
 			errCh,
-			helper.NewTestKeygenCallback(i, cb),
+			&helper.MockWorkerCallback{
+				OnWorkKeygenFinishedFunc: func(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
+					outputLock.Lock()
+					defer outputLock.Unlock()
+
+					finalOutput[workerIndex] = data
+					finishedWorkerCount += 1
+
+					if finishedWorkerCount == totalParticipants {
+						done <- true
+					}
+				},
+			},
 		)
 	}
 

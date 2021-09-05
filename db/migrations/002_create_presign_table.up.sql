@@ -1,4 +1,5 @@
 CREATE TABLE presign(
+  presign_id VARCHAR(256),
   chain VARCHAR(256),
   work_id VARCHAR(256),
   batch_index INTEGER,

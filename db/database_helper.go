@@ -18,6 +18,7 @@ func getPidString(pids []*tss.PartyID) string {
 	return strings.Join(idArr, ",")
 }
 
+// getQueryQuestionMark returns a string in a form (?, ?, ?), (?, ?, ?)
 func getQueryQuestionMark(rowCount, fieldCount int) string {
 	s := ""
 

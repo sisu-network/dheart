@@ -2,18 +2,48 @@ package ecdsa
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"sync"
 	"testing"
 
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
+	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
 )
+
+func mockDbForSigning(pids []*tss.PartyID, WorkId string, batchSize int) db.Database {
+	pidString := ""
+	for i, pid := range pids {
+		pidString = pidString + pid.Id
+		if i < len(pids)-1 {
+			pidString = pidString + ","
+		}
+	}
+
+	pidStrings := make([]string, batchSize)
+	presignIds := make([]string, batchSize)
+	for i, _ := range presignIds {
+		presignIds[i] = fmt.Sprintf("%s-%d", WorkId, i)
+		pidStrings[i] = pidString
+	}
+
+	return &helper.MockDatabase{
+		GetAvailablePresignShortFormFunc: func() ([]string, []string, error) {
+			return presignIds, pidStrings, nil
+		},
+
+		LoadPresignFunc: func(presignIds []string) ([]*presign.LocalPresignData, error) {
+			return make([]*presign.LocalPresignData, len(presignIds)), nil
+		},
+	}
+}
 
 func TestSigningEndToEnd(t *testing.T) {
 	wrapper := helper.LoadPresignSavedData(0)
@@ -31,35 +61,48 @@ func TestSigningEndToEnd(t *testing.T) {
 
 	outputs := make([][]*libCommon.SignatureData, len(pIDs)) // n * batchSize
 	outputLock := &sync.Mutex{}
-	cb := func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData) {
-		outputLock.Lock()
-		defer outputLock.Unlock()
-
-		outputs[workerIndex] = data
-		finishedWorkerCount += 1
-		if finishedWorkerCount == n {
-			done <- true
-		}
-	}
 
 	for i := 0; i < n; i++ {
 		request := &types.WorkRequest{
 			WorkId:     "Signing0",
+			WorkType:   types.ECDSA_SIGNING,
+			BatchSize:  batchSize,
 			AllParties: helper.CopySortedPartyIds(pIDs),
-			// SigningInput: wrapper.Outputs[i],
-			Threshold: len(pIDs) - 1,
-			Message:   signingMsg,
-			N:         n,
+			Threshold:  len(pIDs) - 1,
+			Message:    signingMsg,
+			N:          n,
 		}
+
+		workerIndex := i
 
 		worker := NewSigningWorker(
 			batchSize,
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh),
-			helper.NewMockDatabase(),
+			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
 			errCh,
-			helper.NewTestSigningCallback(i, cb),
+
+			&helper.MockWorkerCallback{
+				OnWorkSigningFinishedFunc: func(request *types.WorkRequest, data []*libCommon.SignatureData) {
+					outputLock.Lock()
+					defer outputLock.Unlock()
+
+					outputs[workerIndex] = data
+					finishedWorkerCount += 1
+					if finishedWorkerCount == n {
+						done <- true
+					}
+				},
+
+				GetAvailablePresignsFunc: func(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
+					return make([]string, batchSize), pids
+				},
+
+				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
+					return wrapper.Outputs[workerIndex]
+				},
+			},
 		)
 
 		workers[i] = worker

@@ -32,9 +32,11 @@ var (
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
 // channel to avoid creating too many channels.
 type WorkerCallback interface {
-	// GetPresignData returns a list of presign output that will be used for signing. The presign's
+	// GetAvailablePresigns returns a list of presign output that will be used for signing. The presign's
 	// party ids should match the pids params passed into the function.
-	GetPresignData(batchSize int, n int, pids []*tss.PartyID) ([]*presign.LocalPresignData, []*tss.PartyID)
+	GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID)
+
+	GetPresignOutputs(presignIds []string) []*presign.LocalPresignData
 
 	OnPreExecutionFinished(request *types.WorkRequest)
 
@@ -188,7 +190,14 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 	}
 
 	// Do leader election and participants selection first.
-	go w.preExecution()
+	if w.request.IsKeygen() {
+		// For keygen, we skip the leader selection part since all parties need to be involed in the
+		// signing process.
+		w.pIDs = w.request.AllParties
+		go w.executeWork()
+	} else {
+		go w.preExecution()
+	}
 
 	return nil
 }
