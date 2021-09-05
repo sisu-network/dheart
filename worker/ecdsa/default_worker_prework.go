@@ -1,6 +1,7 @@
 package ecdsa
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -24,7 +26,7 @@ func (w *DefaultWorker) preExecution() {
 	request := w.request
 
 	leader := worker.ChooseLeader(request.WorkId, request.AllParties)
-	w.setAvailableParty(w.myPid)
+	w.availableParties.add(w.myPid)
 
 	// Step2: If this node is the leader, sends check availability to everyone.
 	if w.myPid.Id == leader.Id {
@@ -44,7 +46,7 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 			// update the availability.
 			for _, p := range w.allParties {
 				if p.Id == tssMsg.From {
-					w.setAvailableParty(p)
+					w.availableParties.add(p)
 					break
 				}
 			}
@@ -57,25 +59,24 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 		}
 
 		// Only send request message to parties that has not sent a message to us.
-		if w.getAvailableParty(p.Id) == nil {
+		if w.availableParties.getParty(p.Id) == nil {
 			tssMsg := common.NewAvailabilityRequestMessage(w.myPid.Id, p.Id, w.request.WorkId)
 			go w.dispatcher.UnicastMessage(p, tssMsg)
 		}
 	}
 
-	if w.getAvailablePartyLength() < w.request.N {
-		// Waits for all members to respond.
-		w.waitForMemberResponse()
-	}
-
-	if w.getAvailablePartyLength() >= w.request.N {
-		w.leaderFinalized()
-	} else {
+	// Waits for all members to respond.
+	output, selectedPids, err := w.waitForMemberResponse()
+	if err != nil {
+		utils.LogError("Leader: error while waiting for member response", err)
 		// TODO: make callback that this preExecution fails.
+		w.leaderFinalized(false, nil, nil)
+	} else {
+		w.leaderFinalized(true, output, selectedPids)
 	}
 }
 
-func (w *DefaultWorker) waitForMemberResponse() {
+func (w *DefaultWorker) waitForMemberResponse() ([]*presign.LocalPresignData, []*tss.PartyID, error) {
 	// Wait for everyone to reply or timeout.
 	end := time.Now().Add(PRE_EXECUTION_REQUEST_WAIT_TIME)
 	for {
@@ -88,8 +89,7 @@ func (w *DefaultWorker) waitForMemberResponse() {
 		select {
 		case <-time.After(timeDiff):
 			// Timeout
-			utils.LogVerbose("leader wait timeout")
-			break
+			return nil, nil, errors.New("Timeout")
 
 		case tssMsg := <-w.memberResponseCh:
 			// Check if this member is one of the parties we know
@@ -102,7 +102,7 @@ func (w *DefaultWorker) waitForMemberResponse() {
 			}
 
 			if party != nil {
-				w.setAvailableParty(party)
+				w.availableParties.add(party)
 
 				// TODO: Do check with database in case of signing a message. We only want to do pick up
 				// participants who are in a presign set.
@@ -111,50 +111,36 @@ func (w *DefaultWorker) waitForMemberResponse() {
 			}
 		}
 
-		if w.getAvailablePartyLength() >= w.request.N {
-			return
+		if w.availableParties.getLength() >= w.request.N {
+			// Check if we can find a presign list that match this of nodes.
+			presignArr, selectedPids := w.callback.GetPresignData(w.batchSize, w.request.N, w.availableParties.getPartyList())
+			if len(presignArr) == w.batchSize {
+				// Announce this as success and return
+				return presignArr, selectedPids, nil
+			}
 		}
 	}
+
+	return nil, nil, errors.New("Cannot find enough members for this work")
 }
 
 // Finalize work as a leader and start execution.
-func (w *DefaultWorker) leaderFinalized() {
-	// Get list of parties
-	pIDs := make([]*tss.PartyID, 0)
-
-	w.preExecutionLock.Lock()
-	for _, p := range w.availableParties {
-		pIDs = append(pIDs, p)
+func (w *DefaultWorker) leaderFinalized(success bool, output []*presign.LocalPresignData, selectedPids []*tss.PartyID) {
+	if !success {
+		msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, false, w.pIDs)
+		go w.dispatcher.BroadcastMessage(w.pIDs, msg)
+		return
 	}
+
+	// Get list of parties
+	pIDs := w.availableParties.getPartyList()
 	w.pIDs = tss.SortPartyIDs(pIDs)
-	w.preExecutionLock.Unlock()
 
 	// Broadcast success to everyone
-	msg := common.NewWorkParticipantsMessage(w.myPid.Id, "", w.workId, true, w.pIDs)
+	msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, true, w.pIDs)
 	go w.dispatcher.BroadcastMessage(w.pIDs, msg)
 
 	w.executeWork()
-}
-
-func (w *DefaultWorker) setAvailableParty(p *tss.PartyID) {
-	w.preExecutionLock.Lock()
-	defer w.preExecutionLock.Unlock()
-
-	w.availableParties[p.Id] = p
-}
-
-func (w *DefaultWorker) getAvailableParty(pid string) *tss.PartyID {
-	w.preExecutionLock.RLock()
-	defer w.preExecutionLock.RUnlock()
-
-	return w.availableParties[pid]
-}
-
-func (w *DefaultWorker) getAvailablePartyLength() int {
-	w.preExecutionLock.RLock()
-	defer w.preExecutionLock.RUnlock()
-
-	return len(w.availableParties)
 }
 
 func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
@@ -162,9 +148,9 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 
 	// Check in the cache to see if the leader has sent a message to this node regarding the participants.
 	for _, msg := range cachedMsgs {
-		if msg.Type == common.TssMessage_WORK_PARTICIPANTS {
+		if msg.Type == common.TssMessage_PRE_EXEC_OUTPUT {
 			utils.LogVerbose("We have received participant list of work", w.workId)
-			w.memberFinalized(msg.WorkParticipantsMessage)
+			w.memberFinalized(msg.PreExecOutputMessage)
 			return
 		}
 	}
@@ -179,7 +165,7 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 		// TODO: Report as failure here.
 		utils.LogError("member: leader wait timed out.")
 
-	case msg := <-w.workParticipantCh:
+	case msg := <-w.preExecMsgCh:
 		w.memberFinalized(msg)
 	}
 }
@@ -205,7 +191,7 @@ func (w *DefaultWorker) onPreExecutionResponse(tssMsg *commonTypes.TssMessage) e
 
 // memberFinalized is called when all the partcipants have been finalized by the leader.
 // We either start execution or finish this work.
-func (w *DefaultWorker) memberFinalized(msg *common.WorkParticipantsMessage) {
+func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 	if msg.Success {
 		// Check if we are in the list of participants or not
 		join := false

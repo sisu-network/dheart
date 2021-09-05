@@ -32,8 +32,9 @@ var (
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
 // channel to avoid creating too many channels.
 type WorkerCallback interface {
-	// GetPresignData returns a list of presign output that will be used for signing.
-	GetPresignData(count int, n int, pids []*tss.PartyID) []*presign.LocalPresignData
+	// GetPresignData returns a list of presign output that will be used for signing. The presign's
+	// party ids should match the pids params passed into the function.
+	GetPresignData(batchSize int, n int, pids []*tss.PartyID) ([]*presign.LocalPresignData, []*tss.PartyID)
 
 	OnPreExecutionFinished(request *types.WorkRequest)
 
@@ -60,11 +61,10 @@ type DefaultWorker struct {
 	db         db.Database
 
 	// PreExecution
-	workParticipantCh chan *common.WorkParticipantsMessage
-	memberResponseCh  chan *common.TssMessage
+	preExecMsgCh     chan *common.PreExecOutputMessage
+	memberResponseCh chan *common.TssMessage
 	// List of parties who indicate that they are available for current tss work.
-	availableParties map[string]*tss.PartyID
-	preExecutionLock *sync.RWMutex
+	availableParties *AvailableParties
 	// Cache all tss update messages when some parties start executing while this node has not.
 	preExecutionCache *worker.MessageCache
 
@@ -145,7 +145,6 @@ func NewSigningWorker(
 	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, errCh, callback)
 
 	w.jobType = wTypes.ECDSA_SIGNING
-	w.signingInput = request.SigningInput
 	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
 	w.signingMessage = request.Message
 
@@ -176,10 +175,9 @@ func baseWorker(
 		jobOutput:         make(map[string][]tss.Message),
 		jobOutputLock:     &sync.RWMutex{},
 		finalOutputLock:   &sync.RWMutex{},
-		workParticipantCh: make(chan *commonTypes.WorkParticipantsMessage),
+		preExecMsgCh:      make(chan *commonTypes.PreExecOutputMessage),
 		memberResponseCh:  make(chan *commonTypes.TssMessage),
-		availableParties:  make(map[string]*tss.PartyID),
-		preExecutionLock:  &sync.RWMutex{},
+		availableParties:  NewAvailableParties(),
 		preExecutionCache: worker.NewMessageCache(),
 	}
 }
@@ -317,11 +315,11 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 	case common.TssMessage_AVAILABILITY_RESPONSE:
 		return w.onPreExecutionResponse(tssMsg)
 
-	case common.TssMessage_WORK_PARTICIPANTS:
+	case common.TssMessage_PRE_EXEC_OUTPUT:
 		if len(w.pIDs) == 0 {
 			// This output of workParticipantCh is called only once. We do checking for pids length to
 			// make sure we only send message to this channel once.
-			w.workParticipantCh <- tssMsg.WorkParticipantsMessage
+			w.preExecMsgCh <- tssMsg.PreExecOutputMessage
 		}
 
 		return nil

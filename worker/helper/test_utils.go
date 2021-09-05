@@ -104,8 +104,8 @@ func (cb *MockWorkerCallback) OnWorkFailed(request *types.WorkRequest) {
 	// Do nothing.
 }
 
-func (cb *MockWorkerCallback) GetPresignData(count int, n int, pids []*tss.PartyID) []*presign.LocalPresignData {
-	return nil
+func (cb *MockWorkerCallback) GetPresignData(count int, n int, pids []*tss.PartyID) ([]*presign.LocalPresignData, []*tss.PartyID) {
+	return nil, nil
 }
 
 //---/
@@ -161,7 +161,7 @@ type MockDatabase struct {
 	signingInput []*presign.LocalPresignData
 
 	GetAvailablePresignShortFormFunc func() ([]string, []string, []int, error)
-	LoadPresignFunc                  func(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error)
+	LoadPresignFunc                  func(workId string, batchIndexes []int) ([]*presign.LocalPresignData, error)
 }
 
 func NewMockDatabase() db.Database {
@@ -196,9 +196,9 @@ func (m *MockDatabase) GetAvailablePresignShortForm() ([]string, []string, []int
 	return []string{}, []string{}, []int{}, nil
 }
 
-func (m *MockDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
+func (m *MockDatabase) LoadPresign(workId string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
 	if m.LoadPresignFunc != nil {
-		return m.LoadPresignFunc(workIds, batchIndexes)
+		return m.LoadPresignFunc(workId, batchIndexes)
 	}
 
 	return nil, nil
@@ -206,6 +206,10 @@ func (m *MockDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*pre
 
 func (m *MockDatabase) LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error) {
 	return nil, nil
+}
+
+func (m *MockDatabase) UpdatePresignStatus(workId string, batchIndexes []int) error {
+	return nil
 }
 
 //---/

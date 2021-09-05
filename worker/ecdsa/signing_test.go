@@ -44,12 +44,12 @@ func TestSigningEndToEnd(t *testing.T) {
 
 	for i := 0; i < n; i++ {
 		request := &types.WorkRequest{
-			WorkId:       "Signing0",
-			AllParties:   helper.CopySortedPartyIds(pIDs),
-			SigningInput: wrapper.Outputs[i],
-			Threshold:    len(pIDs) - 1,
-			Message:      signingMsg,
-			N:            n,
+			WorkId:     "Signing0",
+			AllParties: helper.CopySortedPartyIds(pIDs),
+			// SigningInput: wrapper.Outputs[i],
+			Threshold: len(pIDs) - 1,
+			Message:   signingMsg,
+			N:         n,
 		}
 
 		worker := NewSigningWorker(

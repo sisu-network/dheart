@@ -6,24 +6,20 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
 )
 
-func GetWorkId(workType types.WorkType, block int64, chain string, index int, nodes []*Node) string {
+func GetPresignWorkId(workType types.WorkType, index int, nodes []*Node) string {
 	var prefix string
 	switch workType {
-	case types.ECDSA_KEYGEN:
-		prefix = "ecdsa_keygen"
 	case types.ECDSA_PRESIGN:
 		prefix = "ecdsa_presign"
-	case types.ECDSA_SIGNING:
-		prefix = "ecdsa_signing"
-	case types.EDDSA_KEYGEN:
-		prefix = "eddsa_keygen"
 	case types.EDDSA_PRESIGN:
 		prefix = "eddsa_presign"
-	case types.EDDSA_SIGNING:
-		prefix = "eddsa_signing"
+	default:
+		utils.LogCritical("Invalid presign work type")
+		return ""
 	}
 
 	digester := crypto.MD5.New()
@@ -33,5 +29,26 @@ func GetWorkId(workType types.WorkType, block int64, chain string, index int, no
 	}
 	hash := hex.EncodeToString(digester.Sum(nil))
 
-	return prefix + "-" + strconv.FormatInt(block, 10) + "-" + chain + "-" + strconv.FormatInt(int64(index), 10) + "-" + hash
+	return prefix + "-" + strconv.FormatInt(int64(index), 10) + "-" + hash
+}
+
+func GetKeysignWorkId(workType types.WorkType, txs [][]byte, block int64, chain string) string {
+	var prefix string
+	switch workType {
+	case types.ECDSA_SIGNING:
+		prefix = "ecdsa_signing"
+	case types.EDDSA_SIGNING:
+		prefix = "eddsa_signing"
+	default:
+		utils.LogCritical("Invalid keygen work type, workType =", workType)
+		return ""
+	}
+
+	digester := crypto.MD5.New()
+	for _, tx := range txs {
+		fmt.Fprint(digester, tx)
+	}
+	hash := hex.EncodeToString(digester.Sum(nil))
+
+	return prefix + "-" + strconv.FormatInt(block, 10) + "-" + chain + "-" + hash
 }

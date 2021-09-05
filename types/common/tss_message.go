@@ -48,8 +48,8 @@ func NewAvailabilityResponseMessage(from, to, workId string, answer Availability
 	return msg
 }
 
-func NewWorkParticipantsMessage(from, to, workId string, success bool, pids []*tss.PartyID) *TssMessage {
-	msg := baseMessage(TssMessage_WORK_PARTICIPANTS, from, to, workId)
+func NewPreExecOutputMessage(from, to, workId string, success bool, pids []*tss.PartyID) *TssMessage {
+	msg := baseMessage(TssMessage_PRE_EXEC_OUTPUT, from, to, workId)
 
 	// get all pid strings
 	s := make([]string, len(pids))
@@ -57,7 +57,7 @@ func NewWorkParticipantsMessage(from, to, workId string, success bool, pids []*t
 		s[i] = p.Id
 	}
 
-	msg.WorkParticipantsMessage = &WorkParticipantsMessage{
+	msg.PreExecOutputMessage = &PreExecOutputMessage{
 		Success: success,
 		Pids:    s,
 	}

@@ -3,7 +3,6 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -61,47 +60,32 @@ type Engine struct {
 	nodeLock *sync.RWMutex
 
 	// TODO: Remove used presigns after getting a match to avoid using duplicated presigns.
-	availablePresigns []*common.AvailablePresign
-	apLock            *sync.RWMutex
+	presignsManager *AvailPresignManager
 }
 
 func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback, privateKey tcrypto.PrivKey) *Engine {
 	return &Engine{
-		myNode:            myNode,
-		myPid:             myNode.PartyId,
-		db:                db,
-		cm:                cm,
-		workers:           make(map[string]worker.Worker),
-		requestQueue:      NewRequestQueue(),
-		workLock:          &sync.RWMutex{},
-		preworkCache:      worker.NewMessageCache(),
-		callback:          callback,
-		nodes:             make(map[string]*Node),
-		signer:            signer.NewDefaultSigner(privateKey),
-		nodeLock:          &sync.RWMutex{},
-		availablePresigns: make([]*common.AvailablePresign, 0),
-		apLock:            &sync.RWMutex{},
+		myNode:          myNode,
+		myPid:           myNode.PartyId,
+		db:              db,
+		cm:              cm,
+		workers:         make(map[string]worker.Worker),
+		requestQueue:    NewRequestQueue(),
+		workLock:        &sync.RWMutex{},
+		preworkCache:    worker.NewMessageCache(),
+		callback:        callback,
+		nodes:           make(map[string]*Node),
+		signer:          signer.NewDefaultSigner(privateKey),
+		nodeLock:        &sync.RWMutex{},
+		presignsManager: NewAvailPresignManager(db),
 	}
 }
 
 func (engine *Engine) Init() {
-	// Initialize available presigns.
-	pidStrings, workIds, indexes, err := engine.db.GetAvailablePresignShortForm()
+	err := engine.presignsManager.Load()
 	if err != nil {
-		panic("Cannot load presigns")
+		panic("Cannot load presign")
 	}
-
-	engine.apLock.Lock()
-	for i, pidString := range pidStrings {
-		ap := &common.AvailablePresign{
-			Pids:       strings.Split(pidString, ","),
-			WorkId:     workIds[i],
-			BatchIndex: indexes[i],
-		}
-
-		engine.availablePresigns = append(engine.availablePresigns, ap)
-	}
-	engine.apLock.Unlock()
 }
 
 func (engine *Engine) AddNodes(nodes []*Node) {
@@ -361,70 +345,6 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 	// TODO: implements this
 }
 
-func (engine *Engine) GetPresignData(batchSize int, n int, pids []*tss.PartyID) []*presign.LocalPresignData {
-	pidMap := make(map[string]bool)
-	for _, pid := range pids {
-		pidMap[pid.Id] = true
-	}
-
-	selected := make([]*common.AvailablePresign, 0)
-
-	engine.apLock.RLock()
-	remaining := make([]*common.AvailablePresign, 0, len(engine.availablePresigns))
-	// Loop through all available presigns set and choose a set that is also a subset of pids.
-	for i, ap := range engine.availablePresigns {
-		if len(ap.Pids) != n {
-			continue
-		}
-
-		ok := true
-		for _, pid := range ap.Pids {
-			if pidMap[pid] != true {
-				ok = false
-				break
-			}
-		}
-
-		if ok {
-			selected = append(selected, ap)
-			if len(selected) == batchSize {
-				// Add the rest of available presign to remaining array and set this to be the new
-				// availablePresigns
-				for j := i + 1; j < len(engine.availablePresigns); j++ {
-					remaining = append(remaining, engine.availablePresigns[j])
-				}
-				engine.availablePresigns = remaining
-				break
-			}
-		} else {
-			remaining = append(remaining, ap)
-		}
-	}
-	engine.apLock.RUnlock()
-
-	if len(selected) == 0 {
-		return make([]*presign.LocalPresignData, 0)
-	}
-
-	return engine.loadPresignData(selected)
-}
-
-// loadPresignData loads full available data from a list of work ids and batch indexes. For
-// convenient, these 2 values are stored inside AvailablePresign struct.
-func (engine *Engine) loadPresignData(aps []*common.AvailablePresign) []*presign.LocalPresignData {
-	workIds := make([]string, len(aps))
-	batchIndexes := make([]int, len(aps))
-
-	for i, ap := range aps {
-		workIds[i] = ap.WorkId
-		batchIndexes[i] = ap.BatchIndex
-	}
-
-	loaded, err := engine.db.LoadPresign(workIds, batchIndexes)
-	if err != nil {
-		utils.LogError("Cannot load presign. err =", err)
-		return make([]*presign.LocalPresignData, 0)
-	}
-
-	return loaded
+func (engine *Engine) GetPresignData(batchSize int, n int, pids []*tss.PartyID) ([]*presign.LocalPresignData, []*tss.PartyID) {
+	return engine.presignsManager.GetAvailablePresigns(batchSize, n, pids)
 }

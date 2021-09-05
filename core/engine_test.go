@@ -49,7 +49,7 @@ func TestEngineDelayStart(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, n, helper.CopySortedPartyIds(pIDs), *savedData[i])
+		request := types.NewPresignRequest(workId, n, helper.CopySortedPartyIds(pIDs), *savedData[i], true)
 
 		go func(engine *Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simluate that different workers can start at different times.
@@ -94,7 +94,7 @@ func runEngines(engines []*Engine, workId string, outCh chan *p2pDataWrapper, er
 func TestGetPresignData(t *testing.T) {
 	expectedWorkId := []string{"testwork2", "testwork3"}
 
-	presignPids := []string{"1,2,4", "1,2,5", "2,3,5", "3,4,6"}
+	presignPids := []string{"1,2,4", "2,3,5", "2,3,5", "3,4,6"}
 	workIds := make([]string, len(presignPids))
 	batchIndexes := make([]int, len(presignPids))
 
@@ -109,17 +109,15 @@ func TestGetPresignData(t *testing.T) {
 			return presignPids, workIds, batchIndexes, nil
 		},
 
-		LoadPresignFunc: func(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
-			assert.Equal(t, len(workIds), len(expectedWorkId))
-			assert.Equal(t, expectedWorkId, expectedWorkId)
-
-			ret := make([]*presign.LocalPresignData, len(workIds))
-			for i := range ret {
-				ret[i] = &presign.LocalPresignData{
-					W: big.NewInt(0),
+		LoadPresignFunc: func(workId string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
+			count := 0
+			for _, w := range workIds {
+				if w == workId {
+					count++
 				}
 			}
 
+			ret := make([]*presign.LocalPresignData, count)
 			return ret, nil
 		},
 	}
@@ -138,10 +136,10 @@ func TestGetPresignData(t *testing.T) {
 	}
 
 	// Runs presign selection.
-	data := engine.GetPresignData(len(expectedWorkId), 3, partyIds)
+	data, _ := engine.GetPresignData(len(expectedWorkId), 3, partyIds)
 	assert.Equal(t, len(expectedWorkId), len(data))
 
 	// After consuming some presign data, the selected presigns are removed from the available presign
 	// pool.
-	assert.Equal(t, len(presignPids)-len(expectedWorkId), len(engine.availablePresigns))
+	assert.Equal(t, len(presignPids)-len(expectedWorkId), len(engine.presignsManager.available))
 }

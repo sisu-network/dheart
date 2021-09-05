@@ -4,14 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/mysql"
 	_ "github.com/golang-migrate/migrate/source/file"
 	"github.com/sisu-network/dheart/core/config"
-	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -35,7 +33,8 @@ type Database interface {
 	SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
 	GetAvailablePresignShortForm() ([]string, []string, []int, error)
 
-	LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error)
+	LoadPresign(workId string, batchIndexes []int) ([]*presign.LocalPresignData, error)
+	UpdatePresignStatus(workId string, batchIndexes []int) error
 }
 
 type dbLogger struct {
@@ -266,7 +265,7 @@ func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.P
 // GetAllPresignIndexes returns all available presign data sets in short form (pids, workId, index)
 // We don't want to load full data of presign sets since it might take too much memmory.
 func (d *SqlDatabase) GetAvailablePresignShortForm() ([]string, []string, []int, error) {
-	query := "SELECT work_id, batch_index, pids_string FROM presign where status='not_used'"
+	query := "SELECT work_id, batch_index, pids_string FROM presign WHERE status='not_used'"
 
 	pids := make([]string, 0)
 	workIds := make([]string, 0)
@@ -297,36 +296,41 @@ func (d *SqlDatabase) GetAvailablePresignShortForm() ([]string, []string, []int,
 // This is not part of Database interface. Should ony be used in testing since we don't want to delete
 // presign rows.
 func (d *SqlDatabase) DeletePresignWork(workId string) error {
-	_, err := d.db.Exec("DELETE FROM presign where work_id = ?", workId)
+	_, err := d.db.Exec("DELETE FROM presign WHERE work_id = ?", workId)
 	return err
 }
 
 func (d *SqlDatabase) DeleteKeygenWork(workId string) error {
-	_, err := d.db.Exec("DELETE FROM keygen where work_id = ?", workId)
+	_, err := d.db.Exec("DELETE FROM keygen WHERE work_id = ?", workId)
 	return err
 }
 
-func (d *SqlDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
+func (d *SqlDatabase) LoadPresign(workId string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
 	// 1. Constract the query
 	questions := ""
-	for i := range workIds {
+	for i := range batchIndexes {
 		questions = questions + "?"
-		if i < len(workIds)-1 {
+		if i < len(batchIndexes)-1 {
 			questions = questions + ","
 		}
 	}
 
-	query := "SELECT work_id, batch_index, pids_string, presign_output FROM presign WHERE status='not_used' AND work_id IN (" + questions + ") ORDER BY created_time DESC"
+	query := "SELECT work_id, batch_index, pids_string, presign_output FROM presign WHERE status='not_used' AND work_id IN = ? AND batch_index IN (" + questions + ") ORDER BY created_time DESC"
 
 	// Execute the query
-	loaded := make([]*common.AvailablePresign, 0)
-	rows, err := d.db.Query(query, workIds)
+	interfaceArr := make([]interface{}, len(batchIndexes))
+	for i, s := range batchIndexes {
+		interfaceArr[i] = s
+	}
+
+	rows, err := d.db.Query(query, interfaceArr...)
 
 	if err != nil {
 		return nil, err
 	}
 
 	// 2. Scan every rows and save it to loaded array
+	results := make([]*presign.LocalPresignData, 0)
 	for {
 		if rows.Next() {
 			var pid, workId string
@@ -339,28 +343,34 @@ func (d *SqlDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*pres
 			if err != nil {
 				utils.LogError("Cannot unmarshall data")
 			} else {
-				loaded = append(loaded, &common.AvailablePresign{
-					WorkId:     workId,
-					Pids:       strings.Split(pid, ","),
-					BatchIndex: batchIndex,
-					Output:     data,
-				})
+				results = append(results, data)
 			}
 		} else {
 			break
 		}
 	}
 
-	// 3. Extract the data from what we loaded and compare with the function params
-	results := make([]*presign.LocalPresignData, 0)
-	for _, row := range loaded {
-		for i, workId := range workIds {
-			if row.WorkId == workId && row.BatchIndex == batchIndexes[i] {
-				results = append(results, row.Output)
-				break
-			}
+	return results, nil
+}
+
+func (d *SqlDatabase) UpdatePresignStatus(workId string, batchIndexes []int) error {
+	batchIndexString := ""
+
+	for i := range batchIndexes {
+		batchIndexString = batchIndexString + "?"
+		if i < len(batchIndexes)-1 {
+			batchIndexString = batchIndexString + ","
 		}
 	}
 
-	return results, nil
+	query := "UPDATE status FROM presign WHERE work_id = ? AND batch_index IN (" + batchIndexString + ")"
+
+	interfaceArr := make([]interface{}, 0)
+	interfaceArr = append(interfaceArr, workId)
+	for _, index := range batchIndexes {
+		interfaceArr = append(interfaceArr, index)
+	}
+
+	_, err := d.db.Exec(query, interfaceArr...)
+	return err
 }
