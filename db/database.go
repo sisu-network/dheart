@@ -309,10 +309,7 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 	// 1. Constract the query
 	questions := getQueryQuestionMark(1, len(presignIds))
 
-	query := fmt.Sprintf(
-		"SELECT presign_output FROM presign WHERE presign_id IN = %s ORDER BY created_time DESC",
-		questions,
-	)
+	query := "SELECT presign_output FROM presign WHERE presign_id IN = " + questions + " ORDER BY created_time DESC"
 
 	// Execute the query
 	interfaceArr := make([]interface{}, len(presignIds))

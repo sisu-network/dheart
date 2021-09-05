@@ -329,7 +329,7 @@ func GetTestSavedFileName(dirFormat, fileFormat string, index int) string {
 
 func SaveTestPreparams(index int, bz []byte) error {
 	fileName := GetTestSavedFileName(TestPreparamsFixtureDirFormat, TestPreparamsFixtureFileFormat, index)
-	return ioutil.WriteFile(fileName, bz, 0644)
+	return ioutil.WriteFile(fileName, bz, 0600)
 }
 
 func LoadPreparams(index int) *keygen.LocalPreParams {
@@ -363,7 +363,7 @@ func SaveKeygenOutput(data [][]*keygen.LocalPartySaveData) error {
 			panic(err)
 		}
 
-		if err := ioutil.WriteFile(fileName, bz, 0644); err != nil {
+		if err := ioutil.WriteFile(fileName, bz, 0600); err != nil {
 			return err
 		}
 	}
@@ -414,7 +414,7 @@ func SavePresignData(n int, data [][]*presign.LocalPresignData, testIndex int) e
 		panic(err)
 	}
 
-	if err := ioutil.WriteFile(fileName, bz, 0644); err != nil {
+	if err := ioutil.WriteFile(fileName, bz, 0600); err != nil {
 		return err
 	}
 
