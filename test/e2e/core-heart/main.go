@@ -75,7 +75,7 @@ func main() {
 		panic(err)
 	}
 
-	heart.Keygen("eth", 5, getPublicKeys(n))
+	heart.Keygen("keygenId", "eth", getPublicKeys(n))
 
 	select {
 	case <-time.After(time.Second * 30):

@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/hex"
+	"math/big"
 	"sort"
 
 	tcrypto "github.com/tendermint/tendermint/crypto"
@@ -109,4 +110,13 @@ func getEngineTestData(n int) ([]tcrypto.PrivKey, []*Node, tss.SortedPartyIDs, [
 	}
 
 	return keys, nodes, sorted, helper.LoadKeygenSavedData(sorted)
+}
+
+func getPartyIdsFromStrings(pids []string) []*tss.PartyID {
+	partyIds := make([]*tss.PartyID, len(pids))
+	for i := 0; i < len(pids); i++ {
+		partyIds[i] = tss.NewPartyID(pids[i], "", big.NewInt(int64(i+1)))
+	}
+
+	return partyIds
 }

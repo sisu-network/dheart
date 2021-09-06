@@ -3,17 +3,19 @@ package types
 import (
 	"errors"
 
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
 type WorkRequest struct {
-	Chain      string
-	WorkType   WorkType
-	AllParties []*tss.PartyID
-	WorkId     string
-	N          int // The number of avaiable participants required to do this task.
+	Chain         string
+	WorkType      WorkType
+	AllParties    []*tss.PartyID
+	WorkId        string
+	N             int // The number of avaiable participants required to do this task.
+	ForcedPresign bool
+	BatchSize     int
 
 	// Used only for keygen, presign & signing
 	KeygenInput *keygen.LocalPreParams
@@ -23,8 +25,7 @@ type WorkRequest struct {
 	PresignInput *keygen.LocalPartySaveData
 
 	// Used for signing
-	SigningInput []*presign.LocalPresignData
-	Message      string
+	Message string
 }
 
 func NewKeygenRequest(workId string, n int, PIDs tss.SortedPartyIDs, keygenInput keygen.LocalPreParams, threshold int) *WorkRequest {
@@ -35,16 +36,16 @@ func NewKeygenRequest(workId string, n int, PIDs tss.SortedPartyIDs, keygenInput
 	return request
 }
 
-func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInput keygen.LocalPartySaveData) *WorkRequest {
+func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInput keygen.LocalPartySaveData, forcedPresign bool) *WorkRequest {
 	request := baseRequest(ECDSA_PRESIGN, workId, n, PIDs)
 	request.PresignInput = &presignInput
+	request.ForcedPresign = forcedPresign
 
 	return request
 }
 
-func NewSigningRequets(workId string, n int, PIDs tss.SortedPartyIDs, signingInput []*presign.LocalPresignData, message string) *WorkRequest {
+func NewSigningRequets(workId string, n int, PIDs tss.SortedPartyIDs, message string) *WorkRequest {
 	request := baseRequest(ECDSA_SIGNING, workId, n, PIDs)
-	request.SigningInput = signingInput
 	request.Message = message
 
 	return request
@@ -69,10 +70,6 @@ func (request *WorkRequest) Validate() error {
 		if request.PresignInput == nil {
 			return errors.New("Presign input could not be nil for presign task")
 		}
-	case ECDSA_SIGNING:
-		if request.SigningInput == nil || len(request.SigningInput) == 0 {
-			return errors.New("Signing input could not be nil or empty for signing task")
-		}
 	case EDDSA_KEYGEN:
 	case EDDSA_PRESIGN:
 	case EDDSA_SIGNING:
@@ -80,4 +77,42 @@ func (request *WorkRequest) Validate() error {
 		return errors.New("Invalid request type")
 	}
 	return nil
+}
+
+func (request *WorkRequest) GetPriority() int {
+	// Keygen
+	if request.WorkType == ECDSA_KEYGEN || request.WorkType == EDDSA_KEYGEN {
+		return 100
+	}
+
+	if request.WorkType == ECDSA_PRESIGN || request.WorkType == EDDSA_PRESIGN {
+		if request.ForcedPresign {
+			// Force presign
+			return 90
+		}
+
+		// Presign
+		return 70
+	}
+
+	// Signing
+	if request.WorkType == ECDSA_SIGNING || request.WorkType == EDDSA_SIGNING {
+		return 60
+	}
+
+	utils.LogCritical("Unknown work type", request.WorkType)
+
+	return -1
+}
+
+func (request *WorkRequest) IsKeygen() bool {
+	return request.WorkType == ECDSA_KEYGEN || request.WorkType == EDDSA_KEYGEN
+}
+
+func (request *WorkRequest) IsPresign() bool {
+	return request.WorkType == ECDSA_PRESIGN || request.WorkType == EDDSA_PRESIGN
+}
+
+func (request *WorkRequest) IsSigning() bool {
+	return request.WorkType == ECDSA_SIGNING || request.WorkType == EDDSA_SIGNING
 }

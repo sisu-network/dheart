@@ -4,14 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/mysql"
 	_ "github.com/golang-migrate/migrate/source/file"
 	"github.com/sisu-network/dheart/core/config"
-	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -33,9 +31,10 @@ type Database interface {
 	LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error)
 
 	SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
-	GetAvailablePresignShortForm() ([]string, []string, []int, error)
+	GetAvailablePresignShortForm() ([]string, []string, error) // Returns presignIds, pids, error
 
-	LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error)
+	LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error)
+	UpdatePresignStatus(presignIds []string) error
 }
 
 type dbLogger struct {
@@ -238,8 +237,8 @@ func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.P
 	pidString := getPidString(pids)
 
 	// Constructs multi-insert query to do all insertion in 1 query.
-	query := "INSERT INTO presign (chain, work_id, pids_string, batch_index, status, presign_output) VALUES "
-	query = query + getQueryQuestionMark(len(presignOutputs), 6)
+	query := "INSERT INTO presign (presign_id, chain, work_id, pids_string, batch_index, status, presign_output) VALUES "
+	query = query + getQueryQuestionMark(len(presignOutputs), 7)
 
 	params := make([]interface{}, 0)
 	for i, output := range presignOutputs {
@@ -248,6 +247,9 @@ func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.P
 			return err
 		}
 
+		presignId := fmt.Sprintf("%s-%d", workId, i)
+
+		params = append(params, presignId)
 		params = append(params, chain)
 		params = append(params, workId)
 		params = append(params, pidString)
@@ -265,102 +267,98 @@ func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.P
 
 // GetAllPresignIndexes returns all available presign data sets in short form (pids, workId, index)
 // We don't want to load full data of presign sets since it might take too much memmory.
-func (d *SqlDatabase) GetAvailablePresignShortForm() ([]string, []string, []int, error) {
-	query := "SELECT work_id, batch_index, pids_string FROM presign where status='not_used'"
+func (d *SqlDatabase) GetAvailablePresignShortForm() ([]string, []string, error) {
+	query := fmt.Sprintf("SELECT presign_id, pids_string FROM presign WHERE status='%s'", PRESIGN_STATUS_NOT_USED)
 
 	pids := make([]string, 0)
-	workIds := make([]string, 0)
-	indexes := make([]int, 0)
+	presignIds := make([]string, 0)
 
 	rows, err := d.db.Query(query)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	for {
 		if rows.Next() {
-			var id, workId string
-			var index int
+			var presignId, pid string
 
-			rows.Scan(&id, &workId, &index)
-			pids = append(pids, id)
-			workIds = append(workIds, workId)
-			indexes = append(indexes, index)
+			rows.Scan(&presignId, &pid)
+			presignIds = append(presignIds, presignId)
+			pids = append(pids, pid)
 		} else {
 			break
 		}
 	}
 
-	return pids, workIds, indexes, nil
+	return presignIds, pids, nil
 }
 
 // This is not part of Database interface. Should ony be used in testing since we don't want to delete
 // presign rows.
 func (d *SqlDatabase) DeletePresignWork(workId string) error {
-	_, err := d.db.Exec("DELETE FROM presign where work_id = ?", workId)
+	_, err := d.db.Exec("DELETE FROM presign WHERE work_id = ?", workId)
 	return err
 }
 
 func (d *SqlDatabase) DeleteKeygenWork(workId string) error {
-	_, err := d.db.Exec("DELETE FROM keygen where work_id = ?", workId)
+	_, err := d.db.Exec("DELETE FROM keygen WHERE work_id = ?", workId)
 	return err
 }
 
-func (d *SqlDatabase) LoadPresign(workIds []string, batchIndexes []int) ([]*presign.LocalPresignData, error) {
+func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error) {
 	// 1. Constract the query
-	questions := ""
-	for i := range workIds {
-		questions = questions + "?"
-		if i < len(workIds)-1 {
-			questions = questions + ","
-		}
-	}
+	questions := getQueryQuestionMark(1, len(presignIds))
 
-	query := "SELECT work_id, batch_index, pids_string, presign_output FROM presign WHERE status='not_used' AND work_id IN (" + questions + ") ORDER BY created_time DESC"
+	query := "SELECT presign_output FROM presign WHERE presign_id IN = " + questions + " ORDER BY created_time DESC"
 
 	// Execute the query
-	loaded := make([]*common.AvailablePresign, 0)
-	rows, err := d.db.Query(query, workIds)
+	interfaceArr := make([]interface{}, len(presignIds))
+	for i, s := range presignIds {
+		interfaceArr[i] = s
+	}
+
+	rows, err := d.db.Query(query, interfaceArr...)
 
 	if err != nil {
 		return nil, err
 	}
 
 	// 2. Scan every rows and save it to loaded array
+	results := make([]*presign.LocalPresignData, 0)
 	for {
 		if rows.Next() {
-			var pid, workId string
-			var batchIndex int
 			var bz []byte
-			rows.Scan(&workId, &batchIndex, &pid, &bz)
+			rows.Scan(&bz)
 
 			var data *presign.LocalPresignData
 			err := json.Unmarshal(bz, data)
 			if err != nil {
 				utils.LogError("Cannot unmarshall data")
 			} else {
-				loaded = append(loaded, &common.AvailablePresign{
-					WorkId:     workId,
-					Pids:       strings.Split(pid, ","),
-					BatchIndex: batchIndex,
-					Output:     data,
-				})
+				results = append(results, data)
 			}
 		} else {
 			break
 		}
 	}
 
-	// 3. Extract the data from what we loaded and compare with the function params
-	results := make([]*presign.LocalPresignData, 0)
-	for _, row := range loaded {
-		for i, workId := range workIds {
-			if row.WorkId == workId && row.BatchIndex == batchIndexes[i] {
-				results = append(results, row.Output)
-				break
-			}
-		}
+	return results, nil
+}
+
+func (d *SqlDatabase) UpdatePresignStatus(presignIds []string) error {
+	presignString := getQueryQuestionMark(1, len(presignIds))
+
+	query := fmt.Sprintf(
+		"UPDATE status FROM presign SET status = %s WHERE presign_id IN (%s)",
+		PRESIGN_STATUS_USED,
+		presignString,
+	)
+
+	interfaceArr := make([]interface{}, len(presignIds))
+	for i, presignId := range presignIds {
+		interfaceArr[i] = presignId
 	}
 
-	return results, nil
+	_, err := d.db.Exec(query, interfaceArr...)
+	return err
 }

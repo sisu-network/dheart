@@ -23,7 +23,7 @@ message TssMessage {
     AVAILABILITY_RESPONSE = 2;
 
     // A message sent from leader to everyone else with a list of participants to a tss work.
-    WORK_PARTICIPANTS = 3;
+    PRE_EXEC_OUTPUT = 3;
   }
 
   Type type = 1;
@@ -34,7 +34,7 @@ message TssMessage {
   repeated UpdateMessage updateMessages = 5;
 
   AvailabilityResponseMessage availabilityResponseMessage = 6;
-  WorkParticipantsMessage workParticipantsMessage = 7;
+  PreExecOutputMessage preExecOutputMessage = 7;
 }
 
 message UpdateMessage {
@@ -54,10 +54,13 @@ message AvailabilityResponseMessage {
 }
 
 // A message from a leader to send to everyone with a list of participants for a particular work
-message WorkParticipantsMessage {
+message PreExecOutputMessage {
   // This value is true if there are enough participants for the tss work and false otherwise.
   bool success = 1;
 
   // List of participants that will join this tss work.
   repeated string pids = 2;
+
+  // List of presign ids that will be used (only for signing)
+  repeated string presign_ids = 3;
 }

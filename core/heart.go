@@ -54,6 +54,7 @@ func (h *Heart) Start() {
 
 	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey)
 	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
+	h.engine.Init()
 
 	// Start connection manager.
 	err := h.cm.Start(h.privateKey.Bytes())
@@ -120,13 +121,14 @@ func (h *Heart) SisuHandshake(encodedKey string, keyType string) error {
 	return nil
 }
 
-func (h *Heart) Keygen(chain string, block int64, tPubKeys []tcrypto.PubKey) {
+func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []tcrypto.PubKey) {
 	// TODO: Check if our pubkey is one of the pubkeys.
 
 	n := len(tPubKeys)
 
 	nodes := NewNodes(tPubKeys)
-	workId := GetWorkId(types.ECDSA_KEYGEN, block, chain, 0, nodes)
+	// For keygen, workId is the same as keygenId
+	workId := keygenId
 	pids := make([]*tss.PartyID, n)
 	for i, node := range nodes {
 		pids[i] = node.PartyId
@@ -135,6 +137,7 @@ func (h *Heart) Keygen(chain string, block int64, tPubKeys []tcrypto.PubKey) {
 	preparams, err := h.db.LoadPreparams(chain)
 	if err != nil {
 		utils.LogError("Cannot load preparams. Err =", err)
+		utils.LogInfo("Generating preparams...")
 		preparams, err = h.generatePreparams(chain)
 		if err != nil {
 			// TODO Broadcast failure to Sisu using client.
@@ -146,6 +149,23 @@ func (h *Heart) Keygen(chain string, block int64, tPubKeys []tcrypto.PubKey) {
 
 	request := types.NewKeygenRequest(workId, len(tPubKeys), pids, *preparams, n-1)
 	h.engine.AddRequest(request)
+}
+
+func (h *Heart) Keysign(txs [][]byte, block int64, chain string, tPubKeys []tcrypto.PubKey) {
+	n := len(tPubKeys)
+
+	nodes := NewNodes(tPubKeys)
+	pids := make([]*tss.PartyID, n)
+	for i, node := range nodes {
+		pids[i] = node.PartyId
+	}
+
+	// sorted := tss.SortPartyIDs(pids)
+	h.engine.AddNodes(nodes)
+
+	// Divide the txs array into multiple batches.
+
+	// request := types.NewSigningRequets(workId, n, sorted)
 }
 
 // --- End of Server API  /

@@ -80,13 +80,13 @@ func testInsertingPresignData(database db.Database) {
 	}
 
 	// Data data
-	ids, _, _, err := database.GetAvailablePresignShortForm()
+	presignIds, _, err := database.GetAvailablePresignShortForm()
 	if err != nil {
 		panic(err)
 	}
 
-	if len(ids) != 2 {
-		panic(fmt.Errorf("Length of rows should be 2. Actual: %d", len(ids)))
+	if len(presignIds) != 2 {
+		panic(fmt.Errorf("Length of rows should be 2. Actual: %d", len(presignIds)))
 	}
 
 	// Remove the row from database.
