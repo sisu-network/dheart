@@ -25,8 +25,8 @@ import (
 )
 
 var (
-	LEADER_WAIT_TIME                = 10 * time.Second
-	PRE_EXECUTION_REQUEST_WAIT_TIME = 3 * time.Second
+	LeaderWaitTime              = 10 * time.Second
+	PreExecutionRequestWaitTime = 3 * time.Second
 )
 
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
@@ -59,7 +59,6 @@ type DefaultWorker struct {
 	jobType    wTypes.WorkType
 	callback   WorkerCallback
 	workId     string
-	errCh      chan error // TODO: Do this in the callback.
 	db         db.Database
 
 	// PreExecution
@@ -103,10 +102,9 @@ func NewKeygenWorker(
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
-	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, errCh, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
 
 	w.jobType = wTypes.ECDSA_KEYGEN
 	w.keygenInput = request.KeygenInput
@@ -122,10 +120,9 @@ func NewPresignWorker(
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
-	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, errCh, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
 
 	w.jobType = wTypes.ECDSA_PRESIGN
 	w.presignInput = request.PresignInput
@@ -140,11 +137,10 @@ func NewSigningWorker(
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
-	errCh chan error,
 	callback WorkerCallback,
 ) worker.Worker {
 	// TODO: The request.Pids
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, errCh, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
 
 	w.jobType = wTypes.ECDSA_SIGNING
 	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
@@ -160,7 +156,6 @@ func baseWorker(
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
-	errCh chan error,
 	callback WorkerCallback,
 ) *DefaultWorker {
 	return &DefaultWorker{
@@ -171,14 +166,13 @@ func baseWorker(
 		myPid:             myPid,
 		allParties:        allParties,
 		dispatcher:        dispatcher,
-		errCh:             errCh,
 		callback:          callback,
 		jobs:              make([]*Job, batchSize),
 		jobOutput:         make(map[string][]tss.Message),
 		jobOutputLock:     &sync.RWMutex{},
 		finalOutputLock:   &sync.RWMutex{},
-		preExecMsgCh:      make(chan *commonTypes.PreExecOutputMessage),
-		memberResponseCh:  make(chan *commonTypes.TssMessage),
+		preExecMsgCh:      make(chan *commonTypes.PreExecOutputMessage, 1),
+		memberResponseCh:  make(chan *commonTypes.TssMessage, len(allParties)),
 		availableParties:  NewAvailableParties(),
 		preExecutionCache: worker.NewMessageCache(),
 	}
@@ -191,10 +185,15 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 
 	// Do leader election and participants selection first.
 	if w.request.IsKeygen() {
-		// For keygen, we skip the leader selection part since all parties need to be involed in the
+		// For keygen, we skip the leader selection part since all parties need to be involved in the
 		// signing process.
 		w.pIDs = w.request.AllParties
-		go w.executeWork()
+		go func() {
+			if err := w.executeWork(); err != nil {
+				utils.LogError("Error when executing work", err)
+				return
+			}
+		}()
 	} else {
 		go w.preExecution()
 	}
@@ -228,17 +227,19 @@ func (w *DefaultWorker) executeWork() error {
 			w.jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessage, w.signingInput[i], w)
 
 		default:
-			return errors.New(fmt.Sprint("Unknown job type", w.jobType))
+			err := fmt.Errorf("unknown job type %d", w.jobType)
+			w.callback.OnWorkFailed(w.request)
+			return err
 		}
 	}
 
-	// Start all job
-	wg := &sync.WaitGroup{}
-	wg.Add(len(w.jobs))
 	for _, job := range w.jobs {
-		job.Start(wg)
+		if err := job.Start(); err != nil {
+			err := fmt.Errorf("error when starting job %w", err)
+			w.callback.OnWorkFailed(w.request)
+			return err
+		}
 	}
-	wg.Wait()
 
 	// Mark execution started.
 	w.isExecutionStarted.Store(true)
@@ -246,16 +247,14 @@ func (w *DefaultWorker) executeWork() error {
 	msgCache := w.preExecutionCache.PopAllMessages(w.workId)
 	for _, msg := range msgCache {
 		if msg.Type == common.TssMessage_UPDATE_MESSAGES {
-			w.ProcessNewMessage(msg)
+			if err := w.ProcessNewMessage(msg); err != nil {
+				err := fmt.Errorf("error when process new message %w", err)
+				return err
+			}
 		}
 	}
 
 	return nil
-}
-
-func (w *DefaultWorker) onError(job *Job, err error) {
-	// TODO: handle error here.
-	w.errCh <- err
 }
 
 // Called when there is a new message from tss-lib
@@ -289,6 +288,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 		tssMsg, err := common.NewTssMessage(w.myPid.Id, to, w.workId, list, msg.Type())
 		if err != nil {
 			utils.LogCritical("Cannot build TSS message, err =", err)
+			w.callback.OnWorkFailed(w.request)
 			return
 		}
 
@@ -316,25 +316,32 @@ func (w *DefaultWorker) getCompletedJobCount(list []tss.Message) int {
 func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
 	switch tssMsg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
-		return w.processUpdateMessages(tssMsg)
-
+		if err := w.processUpdateMessages(tssMsg); err != nil {
+			w.callback.OnWorkFailed(w.request)
+			return fmt.Errorf("error when processing update message %w", err)
+		}
 	case common.TssMessage_AVAILABILITY_REQUEST:
-		return w.onPreExecutionRequest(tssMsg)
-
+		if err := w.onPreExecutionRequest(tssMsg); err != nil {
+			w.callback.OnWorkFailed(w.request)
+			return fmt.Errorf("error when processing execution request %w", err)
+		}
 	case common.TssMessage_AVAILABILITY_RESPONSE:
-		return w.onPreExecutionResponse(tssMsg)
-
+		if err := w.onPreExecutionResponse(tssMsg); err != nil {
+			w.callback.OnWorkFailed(w.request)
+			return fmt.Errorf("error when processing execution response %w", err)
+		}
 	case common.TssMessage_PRE_EXEC_OUTPUT:
 		if len(w.pIDs) == 0 {
 			// This output of workParticipantCh is called only once. We do checking for pids length to
 			// make sure we only send message to this channel once.
 			w.preExecMsgCh <- tssMsg.PreExecOutputMessage
 		}
-
-		return nil
+	default:
+		w.callback.OnWorkFailed(w.request)
+		return errors.New("invalid message " + tssMsg.Type.String())
 	}
 
-	return errors.New("Invalid message" + tssMsg.Type.String())
+	return nil
 }
 
 func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) error {
@@ -345,7 +352,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	}
 
 	if w.batchSize != len(tssMsg.UpdateMessages) {
-		return errors.New("Batch size does not match")
+		return errors.New("batch size does not match")
 	}
 
 	// Do all message validation first before processing.
@@ -354,29 +361,34 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		fromString := tssMsg.From
 		from := helper.GetPidFromString(fromString, w.pIDs)
 		if from == nil {
-			return errors.New("Sender is nil")
+			return errors.New("sender is nil")
 		}
 
 		updateMessage := tssMsg.UpdateMessages[i]
 		msg, err := tss.ParseWireMessage(updateMessage.Data, from, tssMsg.IsBroadcast())
 		if err != nil {
-			utils.LogError(err)
+			err := fmt.Errorf("error when parsing wire message %w", err)
 			return err
 		}
 
 		msgRouting := tss.MessageRouting{}
 		err = json.Unmarshal(updateMessage.SerializedMessageRouting, &msgRouting)
 		if err != nil {
-			utils.LogError(err)
+			err := fmt.Errorf("error when unmarshal message routing %w", err)
 			return err
 		}
 
 		msgs[i] = msg
 	}
 
-	// Now udpate all messages
-	for i, job := range w.jobs {
-		go job.processMessage(msgs[i])
+	// Now update all messages
+	for i := range w.jobs {
+		go func(id int) {
+			if err := w.jobs[id].processMessage(msgs[id]); err != nil {
+				w.callback.OnWorkFailed(w.request)
+				return
+			}
+		}(i)
 	}
 
 	return nil

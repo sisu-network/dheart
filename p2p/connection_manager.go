@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -83,10 +82,7 @@ func NewConnectionManager(config ConnectionsConfig) ConnectionManager {
 
 func (cm *DefaultConnectionManager) Start(privKeyBytes []byte) error {
 	ctx := context.Background()
-	var p2pPriKey crypto.PrivKey
-	var err error
-
-	p2pPriKey, err = crypto.UnmarshalSecp256k1PrivateKey(privKeyBytes)
+	p2pPriKey, err := crypto.UnmarshalSecp256k1PrivateKey(privKeyBytes)
 	if err != nil {
 		return err
 	}
@@ -111,7 +107,10 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte) error {
 	host.SetStreamHandler(PingProtocolID, cm.handleStream)
 
 	// Advertise this node and discover other nodes
-	cm.discover(ctx, host)
+	if err := cm.discover(ctx, host); err != nil {
+		utils.LogCritical("Failed to advertise and discover other nodes. err = ", err)
+		return err
+	}
 
 	// Connect to predefined peers.
 	cm.createConnections(ctx)
@@ -221,10 +220,10 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 			// Retry 5 times at max.
 			for i := 0; i < 5; i++ {
 				if err := cm.host.Connect(ctx, *peerinfo); err != nil {
-					log.Printf("Error while connecting to node %q: %-v", peerinfo, err)
+					utils.LogWarn("Error while connecting to node %q: %-v", peerinfo, err)
 					time.Sleep(time.Second * 3)
 				} else {
-					log.Printf("Connection established with bootstrap node: %q", *peerinfo)
+					utils.LogInfo("Connection established with bootstrap node: %q", *peerinfo)
 					break
 				}
 			}
@@ -267,7 +266,7 @@ func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protoc
 }
 
 func (cm *DefaultConnectionManager) initializeStatusManager() {
-	peerIds := make([]peer.ID, 0)
+	peerIds := make([]peer.ID, 0, len(cm.bootstrapPeers))
 	for _, peerAddr := range cm.bootstrapPeers {
 		addrInfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
 		peerIds = append(peerIds, addrInfo.ID)

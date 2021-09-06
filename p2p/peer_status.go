@@ -51,7 +51,7 @@ func (p *PeerData) NeedPing() bool {
 	p.statusLock.Lock()
 	defer p.statusLock.Unlock()
 
-	tmp := p.lastPingTime.Add(PING_FREQUENCY)
+	tmp := p.lastPingTime.Add(PingFrequency)
 	if tmp.Before(time.Now()) {
 		return true
 	}

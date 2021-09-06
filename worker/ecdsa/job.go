@@ -1,8 +1,8 @@
 package ecdsa
 
 import (
+	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
@@ -16,8 +16,6 @@ import (
 )
 
 type JobCallback interface {
-	onError(job *Job, err error)
-
 	// Called when there is a tss message output.
 	OnJobMessage(job *Job, msg tss.Message)
 
@@ -39,16 +37,16 @@ type Job struct {
 	endKeygenCh  chan keygen.LocalPartySaveData
 	endPresignCh chan presign.LocalPresignData
 	endSigningCh chan libCommon.SignatureData
-	errCh        chan *tss.Error
+	closeCh      chan struct{}
 
 	party    tss.Party
 	callback JobCallback
 }
 
 func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, localPreparams *keygen.LocalPreParams, callback JobCallback) *Job {
-	errCh := make(chan *tss.Error, len(pIDs))
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan keygen.LocalPartySaveData, len(pIDs))
+	closeCh := make(chan struct{}, 1)
 
 	party := keygen.NewLocalParty(params, outCh, endCh, *localPreparams).(*keygen.LocalParty)
 
@@ -56,15 +54,14 @@ func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, lo
 		index:       index,
 		jobType:     wTypes.ECDSA_KEYGEN,
 		party:       party,
-		errCh:       errCh,
 		outCh:       outCh,
 		endKeygenCh: endCh,
 		callback:    callback,
+		closeCh:     closeCh,
 	}
 }
 
 func NewPresignJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, savedData *keygen.LocalPartySaveData, callback JobCallback) *Job {
-	errCh := make(chan *tss.Error, len(pIDs))
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan presign.LocalPresignData, len(pIDs))
 
@@ -74,7 +71,6 @@ func NewPresignJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, s
 		index:        index,
 		jobType:      wTypes.ECDSA_PRESIGN,
 		party:        party,
-		errCh:        errCh,
 		outCh:        outCh,
 		endPresignCh: endCh,
 		callback:     callback,
@@ -82,7 +78,6 @@ func NewPresignJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, s
 }
 
 func NewSigningJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, msg string, signingInput *presign.LocalPresignData, callback JobCallback) *Job {
-	errCh := make(chan *tss.Error, len(pIDs))
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan libCommon.SignatureData, len(pIDs))
 
@@ -93,36 +88,34 @@ func NewSigningJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, m
 		index:        index,
 		jobType:      wTypes.ECDSA_SIGNING,
 		party:        party,
-		errCh:        errCh,
 		outCh:        outCh,
 		endSigningCh: endCh,
 		callback:     callback,
 	}
 }
 
-func (job *Job) Start(wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (job *Job) Start() error {
 	if err := job.party.Start(); err != nil {
-		utils.LogError("Cannot start a keygen job, err =", err)
-
-		job.errCh <- err
-		return
+		err := fmt.Errorf("error when starting party %w", err)
+		return err
 	}
 
 	go job.startListening()
+	return nil
+}
+
+func (job *Job) Stop() {
+	job.closeCh <- struct{}{}
 }
 
 func (job *Job) startListening() {
-	errCh := job.errCh
 	outCh := job.outCh
 
 	// TODO: Add timeout and missing messages.
 	for {
 		select {
-		case err := <-errCh:
-			utils.LogError("Error on job", job.index)
-			job.onError(err)
+		case <-job.closeCh:
+			utils.LogWarn("job closed")
 			return
 
 		case msg := <-outCh:
@@ -142,10 +135,6 @@ func (job *Job) startListening() {
 	}
 }
 
-func (job *Job) processMessage(msg tss.Message) {
-	helper.SharedPartyUpdater(job.party, msg, job.errCh)
-}
-
-func (job *Job) onError(err error) {
-	utils.LogError(err)
+func (job *Job) processMessage(msg tss.Message) error {
+	return helper.SharedPartyUpdater(job.party, msg)
 }

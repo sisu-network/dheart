@@ -81,7 +81,7 @@ func main() {
 
 	select {
 	case <-time.After(time.Second * 30):
-		panic(fmt.Errorf("Time out"))
+		panic("Time out")
 	case <-done:
 		utils.LogVerbose("core-heart Test passed")
 	}

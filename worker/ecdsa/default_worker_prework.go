@@ -67,8 +67,8 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 	presignIds, selectedPids, err := w.waitForMemberResponse()
 	if err != nil {
 		utils.LogError("Leader: error while waiting for member response", err)
-		// TODO: make callback that this preExecution fails.
 		w.leaderFinalized(false, nil, nil)
+		w.callback.OnWorkFailed(w.request)
 	} else {
 		w.leaderFinalized(true, presignIds, selectedPids)
 	}
@@ -81,7 +81,7 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 	}
 
 	// Wait for everyone to reply or timeout.
-	end := time.Now().Add(PRE_EXECUTION_REQUEST_WAIT_TIME)
+	end := time.Now().Add(PreExecutionRequestWaitTime)
 	for {
 		now := time.Now()
 		if now.After(end) {
@@ -92,7 +92,7 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 		select {
 		case <-time.After(timeDiff):
 			// Timeout
-			return nil, nil, errors.New("Timeout")
+			return nil, nil, errors.New("timeout")
 
 		case tssMsg := <-w.memberResponseCh:
 			// Check if this member is one of the parties we know
@@ -104,11 +104,11 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 				}
 			}
 
-			if party != nil {
-				w.availableParties.add(party)
-			} else {
-				utils.LogError("Cannot find party from", tssMsg.From)
+			if party == nil {
+				return nil, nil, fmt.Errorf("cannot find party from %s", tssMsg.From)
 			}
+
+			w.availableParties.add(party)
 		}
 
 		if ok, presignIds, selectedPids := w.checkEnoughParticipants(); ok {
@@ -116,7 +116,7 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 		}
 	}
 
-	return nil, nil, errors.New("Cannot find enough members for this work")
+	return nil, nil, errors.New("cannot find enough members for this work")
 }
 
 func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyID) {
@@ -160,7 +160,9 @@ func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selec
 		w.signingInput = w.callback.GetPresignOutputs(presignIds)
 	}
 
-	w.executeWork()
+	if err := w.executeWork(); err != nil {
+		utils.LogError("Error when executing work", err)
+	}
 }
 
 func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
@@ -181,9 +183,10 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 
 	// Waits for response from the leader.
 	select {
-	case <-time.After(LEADER_WAIT_TIME):
+	case <-time.After(LeaderWaitTime):
 		// TODO: Report as failure here.
 		utils.LogError("member: leader wait timed out.")
+		w.callback.OnWorkFailed(w.request)
 
 	case msg := <-w.preExecMsgCh:
 		w.memberFinalized(msg)
@@ -198,7 +201,7 @@ func (w *DefaultWorker) onPreExecutionRequest(tssMsg *commonTypes.TssMessage) er
 		go w.dispatcher.UnicastMessage(sender, responseMsg)
 	} else {
 		utils.LogError("Cannot find party with id", tssMsg.From)
-		return fmt.Errorf("Cannot find party with id %s", tssMsg.From)
+		return fmt.Errorf("cannot find party with id %s", tssMsg.From)
 	}
 
 	return nil
@@ -209,13 +212,13 @@ func (w *DefaultWorker) onPreExecutionResponse(tssMsg *commonTypes.TssMessage) e
 	return nil
 }
 
-// memberFinalized is called when all the partcipants have been finalized by the leader.
+// memberFinalized is called when all the participants have been finalized by the leader.
 // We either start execution or finish this work.
 func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 	if msg.Success {
 		// Check if we are in the list of participants or not
 		join := false
-		pIDs := make([]*tss.PartyID, 0)
+		pIDs := make([]*tss.PartyID, 0, len(msg.Pids))
 		for _, participant := range msg.Pids {
 			if w.myPid.Id == participant {
 				join = true
@@ -231,13 +234,23 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 			}
 
 			// We are one of the participants, execute the work
-			w.executeWork()
+			if err := w.executeWork(); err != nil {
+				utils.LogError("Error when executing work", err)
+			}
 		} else {
-			// We are not in the participant list. Terminate this work. No thing else to do.
+			// We are not in the participant list. Terminate this work. Nothing else to do.
 			w.callback.OnPreExecutionFinished(w.request)
 		}
 	} else { // msg.Success == false
 		// This work fails because leader cannot find enough participants.
 		w.callback.OnWorkFailed(w.request)
+	}
+}
+
+func (w *DefaultWorker) Stop() {
+	for _, job := range w.jobs {
+		if job != nil {
+			job.Stop()
+		}
 	}
 }

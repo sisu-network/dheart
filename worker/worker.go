@@ -17,4 +17,7 @@ type Worker interface {
 
 	// ProcessNewMessage receives new message from network and update current tss round.
 	ProcessNewMessage(tssMsg *commonTypes.TssMessage) error
+
+	// Stop stops the worker and cleans all the resources
+	Stop()
 }

@@ -37,7 +37,7 @@ type Heart struct {
 func NewHeart(config config.HeartConfig, client client.Client) *Heart {
 	return &Heart{
 		config: config,
-		aesKey: []byte(config.AesKey),
+		aesKey: config.AesKey,
 		client: client,
 	}
 }
@@ -89,7 +89,7 @@ func (h *Heart) OnWorkSigningFinished(workId string, data []*libCommon.Signature
 	// TODO: implement
 }
 
-// --- End fo Engien callback /
+// --- End fo Engine callback /
 
 // --- Implements Server API  /
 

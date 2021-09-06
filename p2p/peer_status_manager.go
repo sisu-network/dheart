@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	PING_FREQUENCY = time.Second * 5
-	PING_MESSAGE   = "ping"
+	PingFrequency = time.Second * 5
+	PingMessage   = "ping"
 )
 
 type StatusManager interface {
@@ -44,11 +44,7 @@ func NewStatusManager(peerIds []peer.ID, cm ConnectionManager) StatusManager {
 func (m *DefaultStatusManager) Start() {
 	go func() {
 		// Periodically ping other nodes.
-		for {
-			if m.isStopped {
-				return
-			}
-
+		for !m.isStopped {
 			m.peerIds.Range(func(key, value interface{}) bool {
 				peerId := key.(peer.ID)
 				peer := value.(*PeerData)
@@ -57,7 +53,7 @@ func (m *DefaultStatusManager) Start() {
 					return true
 				}
 
-				err := m.cm.WriteToStream(peerId, PingProtocolID, []byte(PING_MESSAGE))
+				err := m.cm.WriteToStream(peerId, PingProtocolID, []byte(PingMessage))
 				if err != nil {
 					peer.SetStatus(STATUS_DISCONNECTED)
 				} else {
@@ -67,7 +63,7 @@ func (m *DefaultStatusManager) Start() {
 				return true
 			})
 
-			time.Sleep(PING_FREQUENCY)
+			time.Sleep(PingFrequency)
 		}
 	}()
 }

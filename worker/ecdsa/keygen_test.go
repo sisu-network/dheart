@@ -23,7 +23,6 @@ func TestKeygenEndToEnd(t *testing.T) {
 
 	pIDs := helper.GetTestPartyIds(totalParticipants)
 
-	errCh := make(chan error)
 	outCh := make(chan *common.TssMessage)
 
 	done := make(chan bool)
@@ -52,9 +51,8 @@ func TestKeygenEndToEnd(t *testing.T) {
 			batchSize,
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh),
+			helper.NewTestDispatcher(outCh, 0),
 			helper.NewMockDatabase(),
-			errCh,
 			&helper.MockWorkerCallback{
 				OnWorkKeygenFinishedFunc: func(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
 					outputLock.Lock()
@@ -75,7 +73,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	startAllWorkers(workers)
 
 	// Run all workers
-	runAllWorkers(workers, outCh, errCh, done)
+	runAllWorkers(workers, outCh, done)
 
 	// All outputs should have the same batch size.
 	for i := 0; i < totalParticipants; i++ {
