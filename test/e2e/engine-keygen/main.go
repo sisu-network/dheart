@@ -86,6 +86,7 @@ func main() {
 		nodes[i] = node
 		pids[i] = node.PartyId
 	}
+	pids = tss.SortPartyIDs(pids)
 
 	// Create new engine
 	outCh := make(chan []*keygen.LocalPartySaveData)

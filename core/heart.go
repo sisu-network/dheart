@@ -54,6 +54,7 @@ func (h *Heart) Start() {
 
 	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey)
 	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
+	h.engine.Init()
 
 	// Start connection manager.
 	err := h.cm.Start(h.privateKey.Bytes())
@@ -136,6 +137,7 @@ func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []tcrypto.PubKey)
 	preparams, err := h.db.LoadPreparams(chain)
 	if err != nil {
 		utils.LogError("Cannot load preparams. Err =", err)
+		utils.LogInfo("Generating preparams...")
 		preparams, err = h.generatePreparams(chain)
 		if err != nil {
 			// TODO Broadcast failure to Sisu using client.
