@@ -7,20 +7,22 @@ import (
 	"os"
 	"time"
 
-	tcrypto "github.com/tendermint/tendermint/crypto"
+	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/run"
 	"github.com/sisu-network/dheart/test/mock"
 	"github.com/sisu-network/dheart/utils"
-	"github.com/tendermint/tendermint/crypto/secp256k1"
+
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 )
 
 func getPublicKeys(n int) []tcrypto.PubKey {
 	pubKeys := make([]tcrypto.PubKey, n)
 
 	for i := 0; i < n; i++ {
-		pubKeys[i] = secp256k1.PrivKey(p2p.GetPrivateKeyBytes(i)).PubKey()
+		privKey := &secp256k1.PrivKey{Key: p2p.GetPrivateKeyBytes(i)}
+		pubKeys[i] = privKey.PubKey()
 	}
 
 	return pubKeys

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sync"
 
+	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/peer"
 	libCommon "github.com/sisu-network/tss-lib/common"
-	tcrypto "github.com/tendermint/tendermint/crypto"
 
 	"github.com/sisu-network/dheart/core/signer"
 	"github.com/sisu-network/dheart/db"

@@ -1,7 +1,6 @@
 package helper
 
 import (
-	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -10,11 +9,12 @@ import (
 	"path/filepath"
 	"runtime"
 
+	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	libCommon "github.com/sisu-network/tss-lib/common"
-	tcrypto "github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/crypto/secp256k1"
+
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
@@ -258,12 +258,7 @@ func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.Ts
 //---/
 
 func GeneratePrivateKey() tcrypto.PrivKey {
-	secret := make([]byte, 32)
-	rand.Read(secret)
-
-	var priKey secp256k1.PrivKey
-	priKey = secret[:32]
-	return priKey
+	return secp256k1.GenPrivKey()
 }
 
 func GetTestPartyIds(n int) tss.SortedPartyIDs {
@@ -274,12 +269,12 @@ func GetTestPartyIds(n int) tss.SortedPartyIDs {
 	partyIDs := make(tss.UnSortedPartyIDs, len(PRIVATE_KEY_HEX))
 
 	for i := 0; i < len(PRIVATE_KEY_HEX); i++ {
-		secret, err := hex.DecodeString(PRIVATE_KEY_HEX[i])
+		bz, err := hex.DecodeString(PRIVATE_KEY_HEX[i])
 		if err != nil {
 			panic(err)
 		}
-		var key secp256k1.PrivKey
-		key = secret[:32]
+
+		key := &secp256k1.PrivKey{Key: bz}
 		pubKey := key.PubKey()
 
 		// Convert to p2p pubkey to get peer id.

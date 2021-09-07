@@ -4,11 +4,11 @@ import (
 	"math/big"
 	"sort"
 
+	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/tss-lib/tss"
-	tcrypto "github.com/tendermint/tendermint/crypto"
 )
 
 type Node struct {

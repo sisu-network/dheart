@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
-	tcrypto "github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/crypto/ed25519"
-	"github.com/tendermint/tendermint/crypto/secp256k1"
+
+	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
@@ -108,9 +109,9 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 	if h.privateKey == nil {
 		switch keyType {
 		case "ed25519":
-			h.privateKey = ed25519.PrivKey(decrypted)
+			h.privateKey = &ed25519.PrivKey{Key: decrypted}
 		case "secp256k1":
-			h.privateKey = secp256k1.PrivKey(decrypted)
+			h.privateKey = &secp256k1.PrivKey{Key: decrypted}
 		default:
 			return fmt.Errorf("Unsupported key type: %s", keyType)
 		}

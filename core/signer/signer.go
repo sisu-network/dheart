@@ -1,7 +1,7 @@
 package signer
 
 import (
-	tcrypto "github.com/tendermint/tendermint/crypto"
+	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 )
 
 type Signer interface {
