@@ -92,9 +92,9 @@ func (h *Heart) OnWorkSigningFinished(workId string, data []*libCommon.Signature
 
 // --- Implements Server API  /
 
-// SisuHandshake receives encrypted private key from Sisu, decrypts it and start the engine,
+// SetPrivKey receives encrypted private key from Sisu, decrypts it and start the engine,
 // network communication, etc.
-func (h *Heart) SisuHandshake(encodedKey string, keyType string) error {
+func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 	encrypted, err := hex.DecodeString(encodedKey)
 	if err != nil {
 		return err

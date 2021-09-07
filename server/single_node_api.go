@@ -205,6 +205,6 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 	return err
 }
 
-func (api *SingleNodeApi) SisuHandshake(encodedKey string, keyType string) error {
+func (api *SingleNodeApi) SetPrivKey(encodedKey string, keyType string) error {
 	return nil
 }

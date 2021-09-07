@@ -70,7 +70,7 @@ func main() {
 	encryptedKey := getEncrypted(privKey)
 	heart := run.GetHeart(conConfig, mockClient)
 
-	err := heart.SisuHandshake(hex.EncodeToString(encryptedKey), "secp256k1")
+	err := heart.SetPrivKey(hex.EncodeToString(encryptedKey), "secp256k1")
 	if err != nil {
 		panic(err)
 	}

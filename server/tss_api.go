@@ -40,6 +40,6 @@ func (api *TssApi) Setup(configs []common.ChainConfig) error {
 	return nil
 }
 
-func (api *TssApi) SisuHandshake(encodedKey string, keyType string) error {
-	return api.heart.SisuHandshake(encodedKey, keyType)
+func (api *TssApi) SetPrivKey(encodedKey string, keyType string) error {
+	return api.heart.SetPrivKey(encodedKey, keyType)
 }
