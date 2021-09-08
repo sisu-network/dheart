@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
+	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/peer"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
@@ -63,7 +63,7 @@ type Engine struct {
 	presignsManager *AvailPresignManager
 }
 
-func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback, privateKey tcrypto.PrivKey) *Engine {
+func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback, privateKey ctypes.PrivKey) *Engine {
 	return &Engine{
 		myNode:          myNode,
 		myPid:           myNode.PartyId,

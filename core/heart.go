@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
+	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -30,7 +30,7 @@ type Heart struct {
 	engine *Engine
 	client client.Client
 
-	privateKey tcrypto.PrivKey
+	privateKey ctypes.PrivKey
 	aesKey     []byte
 }
 
@@ -122,7 +122,7 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 	return nil
 }
 
-func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []tcrypto.PubKey) {
+func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) {
 	// TODO: Check if our pubkey is one of the pubkeys.
 
 	n := len(tPubKeys)
@@ -152,7 +152,7 @@ func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []tcrypto.PubKey)
 	h.engine.AddRequest(request)
 }
 
-func (h *Heart) Keysign(txs [][]byte, block int64, chain string, tPubKeys []tcrypto.PubKey) {
+func (h *Heart) Keysign(txs [][]byte, block int64, chain string, tPubKeys []ctypes.PubKey) {
 	n := len(tPubKeys)
 
 	nodes := NewNodes(tPubKeys)

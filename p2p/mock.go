@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
+	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
@@ -36,7 +36,7 @@ var (
 	}
 )
 
-func GeneratePrivateKey() tcrypto.PrivKey {
+func GeneratePrivateKey() ctypes.PrivKey {
 	// secret := make([]byte, 32)
 	// rand.Read(secret)
 
@@ -45,8 +45,8 @@ func GeneratePrivateKey() tcrypto.PrivKey {
 	return secp256k1.GenPrivKey()
 }
 
-func GetAllPrivateKeys(n int) []tcrypto.PrivKey {
-	keys := make([]tcrypto.PrivKey, 0)
+func GetAllPrivateKeys(n int) []ctypes.PrivKey {
+	keys := make([]ctypes.PrivKey, 0)
 	for i := 0; i < n; i++ {
 		bz := GetPrivateKeyBytes(i)
 		keys = append(keys, &secp256k1.PrivKey{Key: bz})
@@ -84,7 +84,7 @@ func GetBootstrapPeers(nodeSize int, myIndex int, peerIds []string) []maddr.Mult
 	return peers
 }
 
-func P2PIDFromKey(prvKey tcrypto.PrivKey) peer.ID {
+func P2PIDFromKey(prvKey ctypes.PrivKey) peer.ID {
 	p2pPriKey, err := crypto.UnmarshalSecp256k1PrivateKey(prvKey.Bytes())
 	if err != nil {
 		return ""

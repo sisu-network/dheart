@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"sort"
 
-	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
+	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -57,10 +57,10 @@ func (mock *MockConnectionManager) AddListener(protocol protocol.ID, listener p2
 }
 
 // ---- /
-func getEngineTestData(n int) ([]tcrypto.PrivKey, []*Node, tss.SortedPartyIDs, []*keygen.LocalPartySaveData) {
+func getEngineTestData(n int) ([]ctypes.PrivKey, []*Node, tss.SortedPartyIDs, []*keygen.LocalPartySaveData) {
 	type dataWrapper struct {
 		key    *secp256k1.PrivKey
-		pubKey tcrypto.PubKey
+		pubKey ctypes.PubKey
 		node   *Node
 	}
 
@@ -91,7 +91,7 @@ func getEngineTestData(n int) ([]tcrypto.PrivKey, []*Node, tss.SortedPartyIDs, [
 	})
 
 	nodes := make([]*Node, n)
-	keys := make([]tcrypto.PrivKey, n)
+	keys := make([]ctypes.PrivKey, n)
 	partyIds := make([]*tss.PartyID, n)
 
 	for i := range data {

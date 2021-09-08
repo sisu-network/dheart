@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"sort"
 
-	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
+	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/sisu-network/dheart/utils"
@@ -13,11 +13,11 @@ import (
 
 type Node struct {
 	PeerId  peer.ID
-	PubKey  tcrypto.PubKey
+	PubKey  ctypes.PubKey
 	PartyId *tss.PartyID
 }
 
-func NewNode(pubKey tcrypto.PubKey) *Node {
+func NewNode(pubKey ctypes.PubKey) *Node {
 	p2pPubKey, err := crypto.UnmarshalSecp256k1PublicKey(pubKey.Bytes())
 	if err != nil {
 		utils.LogError(err)
@@ -35,7 +35,7 @@ func NewNode(pubKey tcrypto.PubKey) *Node {
 	}
 }
 
-func NewNodes(tPubKeys []tcrypto.PubKey) []*Node {
+func NewNodes(tPubKeys []ctypes.PubKey) []*Node {
 	nodes := make([]*Node, len(tPubKeys))
 	pids := make([]*tss.PartyID, len(tPubKeys))
 

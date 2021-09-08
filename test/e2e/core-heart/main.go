@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
+	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/run"
@@ -17,8 +17,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 )
 
-func getPublicKeys(n int) []tcrypto.PubKey {
-	pubKeys := make([]tcrypto.PubKey, n)
+func getPublicKeys(n int) []ctypes.PubKey {
+	pubKeys := make([]ctypes.PubKey, n)
 
 	for i := 0; i < n; i++ {
 		privKey := &secp256k1.PrivKey{Key: p2p.GetPrivateKeyBytes(i)}

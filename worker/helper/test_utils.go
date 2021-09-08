@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
+	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	libCommon "github.com/sisu-network/tss-lib/common"
@@ -257,7 +257,7 @@ func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.Ts
 
 //---/
 
-func GeneratePrivateKey() tcrypto.PrivKey {
+func GeneratePrivateKey() ctypes.PrivKey {
 	return secp256k1.GenPrivKey()
 }
 
