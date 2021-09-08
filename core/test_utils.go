@@ -5,15 +5,15 @@ import (
 	"math/big"
 	"sort"
 
-	tcrypto "github.com/tendermint/tendermint/crypto"
+	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
-	"github.com/tendermint/tendermint/crypto/secp256k1"
 )
 
 type p2pDataWrapper struct {
@@ -59,7 +59,7 @@ func (mock *MockConnectionManager) AddListener(protocol protocol.ID, listener p2
 // ---- /
 func getEngineTestData(n int) ([]tcrypto.PrivKey, []*Node, tss.SortedPartyIDs, []*keygen.LocalPartySaveData) {
 	type dataWrapper struct {
-		key    secp256k1.PrivKey
+		key    *secp256k1.PrivKey
 		pubKey tcrypto.PubKey
 		node   *Node
 	}
@@ -73,8 +73,8 @@ func getEngineTestData(n int) ([]tcrypto.PrivKey, []*Node, tss.SortedPartyIDs, [
 			panic(err)
 		}
 
-		var key secp256k1.PrivKey
-		key = secret[:32]
+		var key *secp256k1.PrivKey
+		key = &secp256k1.PrivKey{Key: secret}
 		pubKey := key.PubKey()
 
 		node := NewNode(pubKey)

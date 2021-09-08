@@ -1,16 +1,15 @@
 package p2p
 
 import (
-	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	tcrypto "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	maddr "github.com/multiformats/go-multiaddr"
-	tcrypto "github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/crypto/secp256k1"
 )
 
 const (
@@ -38,23 +37,19 @@ var (
 )
 
 func GeneratePrivateKey() tcrypto.PrivKey {
-	secret := make([]byte, 32)
-	rand.Read(secret)
+	// secret := make([]byte, 32)
+	// rand.Read(secret)
 
-	var priKey secp256k1.PrivKey
-	priKey = secret[:32]
-	return priKey
+	// var priKey secp256k1.PrivKey
+	// priKey = secret[:32]
+	return secp256k1.GenPrivKey()
 }
 
 func GetAllPrivateKeys(n int) []tcrypto.PrivKey {
 	keys := make([]tcrypto.PrivKey, 0)
 	for i := 0; i < n; i++ {
 		bz := GetPrivateKeyBytes(i)
-
-		var priKey secp256k1.PrivKey
-		priKey = bz[:32]
-
-		keys = append(keys, priKey)
+		keys = append(keys, &secp256k1.PrivKey{Key: bz})
 	}
 
 	return keys
@@ -107,12 +102,12 @@ func GetMockPeers(n int) []peer.ID {
 	peerIds := make([]peer.ID, 0)
 	for i := 0; i < n; i++ {
 		keyString := KEYS[i]
-		key, err := hex.DecodeString(keyString)
+		bz, err := hex.DecodeString(keyString)
 		if err != nil {
 			panic(err)
 		}
 
-		prvKey := secp256k1.PrivKey(key)
+		prvKey := &secp256k1.PrivKey{Key: bz}
 		peerId := P2PIDFromKey(prvKey)
 
 		peerIds = append(peerIds, peerId)
