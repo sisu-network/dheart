@@ -356,7 +356,7 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 
 	engine.startNextWork()
 	if worker == nil {
-		utils.LogError("Worker does not exist.")
+		utils.LogError("Worker " + request.WorkId + " does not exist.")
 		return
 	}
 
