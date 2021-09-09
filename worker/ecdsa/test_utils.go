@@ -8,8 +8,6 @@ import (
 	"github.com/sisu-network/dheart/worker"
 )
 
-//---/
-
 func startAllWorkers(workers []worker.Worker) {
 	// Start all workers
 	wg := sync.WaitGroup{}
@@ -26,11 +24,9 @@ func startAllWorkers(workers []worker.Worker) {
 	wg.Wait()
 }
 
-func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh chan error, done chan bool) {
+func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, done chan bool) {
 	for {
 		select {
-		case err := <-errCh:
-			panic(err)
 		case <-done:
 			return
 		case <-time.After(time.Second * 300):
@@ -68,8 +64,7 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, errCh
 
 func processMsgWithPanicOnFail(w worker.Worker, tssMsg *common.TssMessage) {
 	go func(w worker.Worker, tssMsg *common.TssMessage) {
-		err := w.ProcessNewMessage(tssMsg)
-		if err != nil {
+		if err := w.ProcessNewMessage(tssMsg); err != nil {
 			panic(err)
 		}
 	}(w, tssMsg)

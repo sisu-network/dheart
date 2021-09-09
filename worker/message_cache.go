@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MAX_MESSAGE_PER_NODE = 64
+	MaxMessagePerNode = 64
 )
 
 type CacheValue struct {
@@ -38,7 +38,7 @@ func (c *MessageCache) AddMessage(msg *commonTypes.TssMessage) {
 		value = &CacheValue{}
 	}
 
-	if len(value.msgs) >= MAX_MESSAGE_PER_NODE {
+	if len(value.msgs) >= MaxMessagePerNode {
 		// Remove the first element
 		value.msgs = value.msgs[1:]
 	}

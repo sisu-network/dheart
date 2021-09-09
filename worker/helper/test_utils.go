@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
@@ -236,22 +237,26 @@ type PresignDataWrapper struct {
 
 type TestDispatcher struct {
 	msgCh chan *common.TssMessage
+	delay time.Duration
 }
 
-func NewTestDispatcher(msgCh chan *common.TssMessage) *TestDispatcher {
+func NewTestDispatcher(msgCh chan *common.TssMessage, delay time.Duration) *TestDispatcher {
 	return &TestDispatcher{
 		msgCh: msgCh,
+		delay: delay,
 	}
 }
 
 //---/
 
 func (d *TestDispatcher) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
+	time.Sleep(d.delay)
 	d.msgCh <- tssMessage
 }
 
 // Send a message to a single destination.
 func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
+	time.Sleep(d.delay)
 	d.msgCh <- tssMessage
 }
 

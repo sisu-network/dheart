@@ -83,7 +83,7 @@ func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKey []byte) error
 	err := c.client.CallContext(context.Background(), &r, "tss_keygenResult", keygenResult)
 	if err != nil {
 		// TODO: Retry on failure.
-		utils.LogError("Cannot post keygen resutl, err = ", err)
+		utils.LogError("Cannot post keygen result, err = ", err)
 		return err
 	}
 
@@ -99,7 +99,7 @@ func (c *DefaultClient) BroadcastKeySignResult(result *types.KeysignResult) erro
 	err := c.client.CallContext(context.Background(), &r, "tss_keySignResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
-		utils.LogError("Cannot post keygen resutl, err = ", err)
+		utils.LogError("Cannot post keygen result, err = ", err)
 		return err
 	}
 

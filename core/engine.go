@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	MAX_WORKER = 2
-	BATCH_SIZE = 4
+	MaxWorker = 2
+	BatchSize = 4
 )
 
 type EngineCallback interface {
@@ -121,21 +121,19 @@ func (engine *Engine) AddRequest(request *types.WorkRequest) error {
 // startWork creates a new worker to execute a new task.
 func (engine *Engine) startWork(request *types.WorkRequest) {
 	var w worker.Worker
-	errCh := make(chan error)
-
 	// Make a copy of myPid since the index will be changed during the TSS work.
 	workPartyId := tss.NewPartyID(engine.myPid.Id, engine.myPid.Moniker, engine.myPid.KeyInt())
 
 	// Create a new worker.
 	switch request.WorkType {
 	case types.ECDSA_KEYGEN:
-		w = ecdsa.NewKeygenWorker(BATCH_SIZE, request, workPartyId, engine, engine.db, errCh, engine)
+		w = ecdsa.NewKeygenWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
 
 	case types.ECDSA_PRESIGN:
-		w = ecdsa.NewPresignWorker(BATCH_SIZE, request, workPartyId, engine, engine.db, errCh, engine)
+		w = ecdsa.NewPresignWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
 
 	case types.ECDSA_SIGNING:
-		w = ecdsa.NewSigningWorker(BATCH_SIZE, request, workPartyId, engine, engine.db, errCh, engine)
+		w = ecdsa.NewSigningWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
 	}
 
 	engine.workLock.Lock()
@@ -145,15 +143,21 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId)
 	utils.LogInfo("Starting a work with id", request.WorkId, "with cache size", len(cachedMsgs))
 
-	w.Start(cachedMsgs)
+	if err := w.Start(cachedMsgs); err != nil {
+		utils.LogError("Cannot start work error", err)
+	}
 }
 
 // ProcessNewMessage processes new incoming tss message from network.
-func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) {
+func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
+	engine.workLock.RLock()
 	worker := engine.getWorker(tssMsg.WorkId)
+	engine.workLock.RUnlock()
 
 	if worker != nil {
-		worker.ProcessNewMessage(tssMsg)
+		if err := worker.ProcessNewMessage(tssMsg); err != nil {
+			return fmt.Errorf("error when worker processing new message %w", err)
+		}
 	} else {
 		if tssMsg.Type == common.TssMessage_AVAILABILITY_REQUEST {
 			// TODO: Check if we still have some available workers, create a worker and respond to the
@@ -163,6 +167,8 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) {
 			engine.preworkCache.AddMessage(tssMsg)
 		}
 	}
+
+	return nil
 }
 
 func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
@@ -203,7 +209,7 @@ func (engine *Engine) finishWorker(workId string) {
 // available worker, wait for one of the current worker to finish before running.
 func (engine *Engine) startNextWork() {
 	engine.workLock.Lock()
-	if len(engine.workers) >= MAX_WORKER {
+	if len(engine.workers) >= MaxWorker {
 		engine.workLock.Unlock()
 		return
 	}
@@ -293,12 +299,12 @@ func (engine *Engine) sendData(data []byte, pIDs []*tss.PartyID) {
 func (engine *Engine) getSignedMessageBytes(tssMessage *common.TssMessage) ([]byte, error) {
 	serialized, err := json.Marshal(tssMessage)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error when marshalling message %w", err)
 	}
 
 	signature, err := engine.signer.Sign(serialized)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error when signing %w", err)
 	}
 
 	signedMessage := &common.SignedMessage{
@@ -308,8 +314,7 @@ func (engine *Engine) getSignedMessageBytes(tssMessage *common.TssMessage) ([]by
 
 	bz, err := json.Marshal(signedMessage)
 	if err != nil {
-		utils.LogError("Cannot marhsal signed message", err)
-		return nil, err
+		return nil, fmt.Errorf("error when marshalling message %w", err)
 	}
 
 	return bz, nil
@@ -323,9 +328,8 @@ func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
 	}
 
 	signedMessage := &common.SignedMessage{}
-	err := json.Unmarshal(message.Data, signedMessage)
-	if err != nil {
-		utils.LogError("Cannot unmarshal p2p message.")
+	if err := json.Unmarshal(message.Data, signedMessage); err != nil {
+		utils.LogError("Error when unmarshal p2p message", err)
 		return
 	}
 
@@ -334,7 +338,9 @@ func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
 		return
 	}
 
-	engine.ProcessNewMessage(tssMessage)
+	if err := engine.ProcessNewMessage(tssMessage); err != nil {
+		utils.LogError("Error when process new message", err)
+	}
 }
 
 func (engine *Engine) OnPreExecutionFinished(request *types.WorkRequest) {
@@ -342,7 +348,19 @@ func (engine *Engine) OnPreExecutionFinished(request *types.WorkRequest) {
 }
 
 func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
-	// TODO: implements this
+	// Clear all the worker's resources
+	engine.workLock.Lock()
+	worker := engine.workers[request.WorkId]
+	delete(engine.workers, request.WorkId)
+	engine.workLock.Unlock()
+
+	engine.startNextWork()
+	if worker == nil {
+		utils.LogError("Worker " + request.WorkId + " does not exist.")
+		return
+	}
+
+	worker.Stop()
 }
 
 func (engine *Engine) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
