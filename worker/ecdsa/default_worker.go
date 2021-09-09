@@ -227,17 +227,17 @@ func (w *DefaultWorker) executeWork() error {
 			w.jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessage, w.signingInput[i], w)
 
 		default:
-			err := fmt.Errorf("unknown job type %d", w.jobType)
+			// If job type is not correct, kill the whole worker.
 			w.callback.OnWorkFailed(w.request)
-			return err
+			return fmt.Errorf("unknown job type %d", w.jobType)
 		}
 	}
 
 	for _, job := range w.jobs {
 		if err := job.Start(); err != nil {
-			err := fmt.Errorf("error when starting job %w", err)
+			// If job cannot start, kill the whole worker.
 			w.callback.OnWorkFailed(w.request)
-			return err
+			return fmt.Errorf("error when starting job %w", err)
 		}
 	}
 
@@ -248,8 +248,8 @@ func (w *DefaultWorker) executeWork() error {
 	for _, msg := range msgCache {
 		if msg.Type == common.TssMessage_UPDATE_MESSAGES {
 			if err := w.ProcessNewMessage(msg); err != nil {
-				err := fmt.Errorf("error when process new message %w", err)
-				return err
+				// Message can be corrupted or from bad actor, continue to execute.
+				utils.LogError("Error when processing new message", err)
 			}
 		}
 	}
@@ -287,8 +287,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 
 		tssMsg, err := common.NewTssMessage(w.myPid.Id, to, w.workId, list, msg.Type())
 		if err != nil {
-			utils.LogCritical("Cannot build TSS message, err =", err)
-			w.callback.OnWorkFailed(w.request)
+			utils.LogCritical("Cannot build TSS message, err", err)
 			return
 		}
 
@@ -317,17 +316,14 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 	switch tssMsg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
 		if err := w.processUpdateMessages(tssMsg); err != nil {
-			w.callback.OnWorkFailed(w.request)
 			return fmt.Errorf("error when processing update message %w", err)
 		}
 	case common.TssMessage_AVAILABILITY_REQUEST:
 		if err := w.onPreExecutionRequest(tssMsg); err != nil {
-			w.callback.OnWorkFailed(w.request)
 			return fmt.Errorf("error when processing execution request %w", err)
 		}
 	case common.TssMessage_AVAILABILITY_RESPONSE:
 		if err := w.onPreExecutionResponse(tssMsg); err != nil {
-			w.callback.OnWorkFailed(w.request)
 			return fmt.Errorf("error when processing execution response %w", err)
 		}
 	case common.TssMessage_PRE_EXEC_OUTPUT:
@@ -337,7 +333,7 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 			w.preExecMsgCh <- tssMsg.PreExecOutputMessage
 		}
 	default:
-		w.callback.OnWorkFailed(w.request)
+		// Don't call callback here because this can be from bad actor/corrupted.
 		return errors.New("invalid message " + tssMsg.Type.String())
 	}
 
@@ -371,8 +367,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		}
 
 		msgRouting := tss.MessageRouting{}
-		err = json.Unmarshal(updateMessage.SerializedMessageRouting, &msgRouting)
-		if err != nil {
+		if err := json.Unmarshal(updateMessage.SerializedMessageRouting, &msgRouting); err != nil {
 			return fmt.Errorf("error when unmarshal message routing %w", err)
 		}
 
@@ -383,8 +378,8 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	for i := range w.jobs {
 		go func(id int) {
 			if err := w.jobs[id].processMessage(msgs[id]); err != nil {
-				w.callback.OnWorkFailed(w.request)
-				return
+				// Message can be from bad actor/corrupted. Log and ignore.
+				utils.LogError("cannot process message error", err)
 			}
 		}(i)
 	}

@@ -105,7 +105,9 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 			}
 
 			if party == nil {
-				return nil, nil, fmt.Errorf("cannot find party from %s", tssMsg.From)
+				// Message can be from bad actor, continue to execute.
+				utils.LogError("Cannot find party from", tssMsg.From)
+				continue
 			}
 
 			w.availableParties.add(party)
@@ -200,7 +202,6 @@ func (w *DefaultWorker) onPreExecutionRequest(tssMsg *commonTypes.TssMessage) er
 		responseMsg := common.NewAvailabilityResponseMessage(w.myPid.Id, tssMsg.From, w.workId, common.AvailabilityResponseMessage_YES)
 		go w.dispatcher.UnicastMessage(sender, responseMsg)
 	} else {
-		utils.LogError("Cannot find party with id", tssMsg.From)
 		return fmt.Errorf("cannot find party with id %s", tssMsg.From)
 	}
 

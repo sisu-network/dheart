@@ -96,8 +96,7 @@ func NewSigningJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, m
 
 func (job *Job) Start() error {
 	if err := job.party.Start(); err != nil {
-		err := fmt.Errorf("error when starting party %w", err)
-		return err
+		return fmt.Errorf("error when starting party %w", err)
 	}
 
 	go job.startListening()

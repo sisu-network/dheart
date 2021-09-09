@@ -144,7 +144,7 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 	utils.LogInfo("Starting a work with id", request.WorkId, "with cache size", len(cachedMsgs))
 
 	if err := w.Start(cachedMsgs); err != nil {
-		utils.LogError("cannot start work error", err)
+		utils.LogError("Cannot start work error", err)
 	}
 }
 
@@ -354,12 +354,13 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 	delete(engine.workers, request.WorkId)
 	engine.workLock.Unlock()
 
+	engine.startNextWork()
 	if worker == nil {
+		utils.LogError("Worker does not exist.")
 		return
 	}
 
 	worker.Stop()
-	engine.startNextWork()
 }
 
 func (engine *Engine) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
