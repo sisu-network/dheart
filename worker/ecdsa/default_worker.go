@@ -367,15 +367,13 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		updateMessage := tssMsg.UpdateMessages[i]
 		msg, err := tss.ParseWireMessage(updateMessage.Data, from, tssMsg.IsBroadcast())
 		if err != nil {
-			err := fmt.Errorf("error when parsing wire message %w", err)
-			return err
+			return fmt.Errorf("error when parsing wire message %w", err)
 		}
 
 		msgRouting := tss.MessageRouting{}
 		err = json.Unmarshal(updateMessage.SerializedMessageRouting, &msgRouting)
 		if err != nil {
-			err := fmt.Errorf("error when unmarshal message routing %w", err)
-			return err
+			return fmt.Errorf("error when unmarshal message routing %w", err)
 		}
 
 		msgs[i] = msg

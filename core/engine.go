@@ -143,7 +143,9 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId)
 	utils.LogInfo("Starting a work with id", request.WorkId, "with cache size", len(cachedMsgs))
 
-	w.Start(cachedMsgs)
+	if err := w.Start(cachedMsgs); err != nil {
+		utils.LogError("cannot start work error", err)
+	}
 }
 
 // ProcessNewMessage processes new incoming tss message from network.
@@ -297,12 +299,12 @@ func (engine *Engine) sendData(data []byte, pIDs []*tss.PartyID) {
 func (engine *Engine) getSignedMessageBytes(tssMessage *common.TssMessage) ([]byte, error) {
 	serialized, err := json.Marshal(tssMessage)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error when marshalling message %w", err)
 	}
 
 	signature, err := engine.signer.Sign(serialized)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error when signing %w", err)
 	}
 
 	signedMessage := &common.SignedMessage{
@@ -312,8 +314,7 @@ func (engine *Engine) getSignedMessageBytes(tssMessage *common.TssMessage) ([]by
 
 	bz, err := json.Marshal(signedMessage)
 	if err != nil {
-		utils.LogError("Cannot marhsal signed message", err)
-		return nil, err
+		return nil, fmt.Errorf("error when marshalling message %w", err)
 	}
 
 	return bz, nil
@@ -358,6 +359,7 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 	}
 
 	worker.Stop()
+	engine.startNextWork()
 }
 
 func (engine *Engine) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {

@@ -13,18 +13,18 @@ func SharedPartyUpdater(party tss.Party, msg tss.Message) error {
 
 	bz, _, err := msg.WireBytes()
 	if err != nil {
-		utils.LogError("error when start party updater %w", err)
+		utils.LogError("error when start party updater", err)
 		return party.WrapError(err)
 	}
 
 	pMsg, err := tss.ParseWireMessage(bz, msg.GetFrom(), msg.IsBroadcast())
 	if err != nil {
-		utils.LogError("error when start party updater %w", err)
+		utils.LogError("error when start party updater", err)
 		return party.WrapError(err)
 	}
 
 	if _, err := party.Update(pMsg); err != nil {
-		utils.LogError("error when start party updater %w", err)
+		utils.LogError("error when start party updater", err)
 		return party.WrapError(err)
 	}
 
