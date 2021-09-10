@@ -2,10 +2,13 @@ package run
 
 import (
 	"encoding/hex"
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/joho/godotenv"
 	"github.com/sisu-network/dheart/client"
@@ -59,21 +62,50 @@ func GetHeart(conConfig p2p.ConnectionsConfig, client client.Client) *core.Heart
 	return core.NewHeart(heartConfig, client)
 }
 
+func getConnectionConfig() p2p.ConnectionsConfig {
+	var connectionConfig p2p.ConnectionsConfig
+	connectionConfig.HostId = "localhost"
+	port, err := strconv.Atoi(os.Getenv("DHEART_PORT"))
+	if err != nil {
+		panic(err)
+	}
+	connectionConfig.Port = port
+
+	// Bootstrapped peers.
+	connectionConfig.BootstrapPeers = make([]multiaddr.Multiaddr, 0)
+	peerString := os.Getenv("BOOTSTRAP_PEERS")
+	peers := strings.Split(peerString, ",")
+	for _, peerInfo := range peers {
+		arr := strings.Split(peerInfo, "@")
+		if len(arr) != 2 {
+			panic(fmt.Errorf("invalid peer info: %s", peerInfo))
+		}
+		peerId := arr[0]
+		ip := arr[1]
+
+		mulAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", ip, port, peerId))
+		if err != nil {
+			panic(err)
+		}
+		connectionConfig.BootstrapPeers = append(connectionConfig.BootstrapPeers, mulAddr)
+	}
+
+	return connectionConfig
+}
+
 func SetupApiServer() {
 	c := GetSisuClient()
 
-	// TODO: Setup connection config
-	heart := GetHeart(p2p.ConnectionsConfig{Port: 1000},
-		client.NewClient(os.Getenv("SISU_SERVER_URL")),
-	)
-
 	handler := rpc.NewServer()
 	if os.Getenv("USE_ON_MEMORY") == "true" {
-		api := server.NewSingleNodeApi(heart, c)
+		api := server.NewSingleNodeApi(c)
 		api.Init()
 
 		handler.RegisterName("tss", api)
 	} else {
+		// Use Heart
+		connectionConfig := getConnectionConfig()
+		heart := GetHeart(connectionConfig, client.NewClient(os.Getenv("SISU_SERVER_URL")))
 		handler.RegisterName("tss", server.NewTssApi(heart))
 	}
 

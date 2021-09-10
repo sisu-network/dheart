@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/ecdsa"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sisu-network/dheart/client"
 	"github.com/sisu-network/dheart/common"
-	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/store"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
@@ -25,7 +25,6 @@ const (
 // This is a mock API to use for single localhost node. It does not have TSS signing round and
 // generates a private key instead.
 type SingleNodeApi struct {
-	dheart   *core.Heart
 	keyMap   map[string]interface{}
 	store    *store.Store
 	ethKeys  map[string]*ecdsa.PrivateKey
@@ -33,9 +32,8 @@ type SingleNodeApi struct {
 	c        *client.DefaultClient
 }
 
-func NewSingleNodeApi(dheart *core.Heart, c *client.DefaultClient) *SingleNodeApi {
+func NewSingleNodeApi(c *client.DefaultClient) *SingleNodeApi {
 	return &SingleNodeApi{
-		dheart:  dheart,
 		keyMap:  make(map[string]interface{}),
 		ethKeys: make(map[string]*ecdsa.PrivateKey),
 		c:       c,
@@ -52,7 +50,7 @@ func (api *SingleNodeApi) Init() {
 
 	path := os.Getenv("HOME_DIR")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err := os.Mkdir(path, os.ModePerm)
+		err := os.MkdirAll(path, os.ModePerm)
 		if err != nil {
 			panic(err)
 		}
@@ -206,5 +204,17 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 }
 
 func (api *SingleNodeApi) SetPrivKey(encodedKey string, keyType string) error {
-	return nil
+	encrypted, err := hex.DecodeString(encodedKey)
+	if err != nil {
+		return err
+	}
+
+	aesKey, err := hex.DecodeString(os.Getenv("AES_KEY_HEX"))
+	if err != nil {
+		return err
+	}
+
+	_, err = utils.AESDecrypt(encrypted, aesKey)
+
+	return err
 }
