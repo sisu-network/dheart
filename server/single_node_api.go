@@ -9,7 +9,6 @@ import (
 	"os"
 	"time"
 
-	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	eTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sisu-network/dheart/client"
@@ -89,7 +88,7 @@ func (api *SingleNodeApi) Version() string {
 	return "1"
 }
 
-func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []ctypes.PubKey) error {
+func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types.PubKeyWrapper) error {
 	utils.LogInfo("keygen: chain = ", chain)
 	var err error
 	switch chain {
