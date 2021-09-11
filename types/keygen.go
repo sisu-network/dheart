@@ -17,5 +17,5 @@ type PubKeyWrapper struct {
 	KeyType   string
 	Key       []byte
 	Ed25519   *ed25519.PubKey
-	Secp256k1 secp256k1.PubKey
+	Secp256k1 *secp256k1.PubKey
 }
