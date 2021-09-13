@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
@@ -65,7 +66,7 @@ func (c *DefaultClient) CheckHealth() error {
 }
 
 // @Deprecated
-func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKey []byte) error {
+func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKeyBytes []byte) error {
 	utils.LogDebug("c.connected = ", c.connected)
 
 	if !c.connected {
@@ -73,10 +74,18 @@ func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKey []byte) error
 	}
 
 	utils.LogDebug("Sending keygen result to sisu server")
+	var address string
+	if pubKey, err := crypto.DecompressPubkey(pubKeyBytes); err == nil {
+		address = crypto.PubkeyToAddress(*pubKey).Hex()
+	} else {
+		return err
+	}
+
 	keygenResult := types.KeygenResult{
 		Chain:       chain,
 		Success:     true,
-		PubKeyBytes: pubKey,
+		PubKeyBytes: pubKeyBytes,
+		Address:     address,
 	}
 
 	var r interface{}

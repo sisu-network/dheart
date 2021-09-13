@@ -185,6 +185,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 				OutChain:       req.OutChain,
 				OutBlockHeight: req.OutBlockHeight,
 				OutHash:        req.OutHash,
+				OutBytes:       req.OutBytes,
 				Signature:      signature,
 			})
 		}()
@@ -196,6 +197,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 			OutChain:       req.OutChain,
 			OutBlockHeight: req.OutBlockHeight,
 			OutHash:        req.OutHash,
+			OutBytes:       req.OutBytes,
 			Signature:      signature,
 		})
 	}

@@ -15,5 +15,6 @@ type KeysignResult struct {
 	OutHash        string
 	OutBlockHeight int64
 
+	OutBytes  []byte
 	Signature []byte
 }
