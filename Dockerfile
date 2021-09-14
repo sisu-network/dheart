@@ -34,8 +34,7 @@ WORKDIR /app
 
 #Workaround: We shouldn't make .env mandatory, and the environment variables can be loaded from multiple places.
 RUN apk add ca-certificates \
-    && touch /app/.env && echo "#SAMPLE_KEY:SAMPLE_VALUE" > /app/.env \
-    && mkdir -p ~/.sisu/dheart
+    && touch /app/.env && echo "#SAMPLE_KEY:SAMPLE_VALUE" > /app/.env
 
 COPY --from=builder /tmp/go-app/out/dheart /app/dheart
 
