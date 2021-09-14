@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
@@ -22,6 +21,8 @@ var (
 type Client interface {
 	TryDial()
 	PostKeygenResult(workId string)
+	BroadcastKeygenResult(chain string, pubKeyBytes []byte, address string) error
+	BroadcastKeySignResult(result *types.KeysignResult) error
 }
 
 // A client that connects to Sisu server
@@ -31,7 +32,7 @@ type DefaultClient struct {
 	connected bool
 }
 
-func NewClient(url string) *DefaultClient {
+func NewClient(url string) Client {
 	return &DefaultClient{
 		url: url,
 	}
@@ -66,7 +67,7 @@ func (c *DefaultClient) CheckHealth() error {
 }
 
 // @Deprecated
-func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKeyBytes []byte) error {
+func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKeyBytes []byte, address string) error {
 	utils.LogDebug("c.connected = ", c.connected)
 
 	if !c.connected {
@@ -74,12 +75,6 @@ func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKeyBytes []byte) 
 	}
 
 	utils.LogDebug("Sending keygen result to sisu server")
-	var address string
-	if pubKey, err := crypto.DecompressPubkey(pubKeyBytes); err == nil {
-		address = crypto.PubkeyToAddress(*pubKey).Hex()
-	} else {
-		return err
-	}
 
 	keygenResult := types.KeygenResult{
 		Chain:       chain,

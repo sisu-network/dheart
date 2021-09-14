@@ -16,6 +16,7 @@ import (
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/server"
+	"github.com/sisu-network/dheart/store"
 )
 
 func LoadConfigEnv(filenames ...string) {
@@ -25,7 +26,7 @@ func LoadConfigEnv(filenames ...string) {
 	}
 }
 
-func GetSisuClient() *client.DefaultClient {
+func GetSisuClient() client.Client {
 	url := os.Getenv("SISU_SERVER_URL")
 	c := client.NewClient(url)
 	return c
@@ -96,9 +97,27 @@ func getConnectionConfig() p2p.ConnectionsConfig {
 func SetupApiServer() {
 	c := GetSisuClient()
 
+	path := os.Getenv("HOME_DIR")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		err := os.MkdirAll(path, os.ModePerm)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	aesKey, err := hex.DecodeString(os.Getenv("AES_KEY_HEX"))
+	if err != nil {
+		panic(err)
+	}
+
+	store, err := store.NewStore(path+"/apidb", aesKey)
+	if err != nil {
+		panic(err)
+	}
+
 	handler := rpc.NewServer()
 	if os.Getenv("USE_ON_MEMORY") == "true" {
-		api := server.NewSingleNodeApi(c)
+		api := server.NewSingleNodeApi(c, store)
 		api.Init()
 
 		handler.RegisterName("tss", api)

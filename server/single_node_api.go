@@ -2,11 +2,8 @@ package server
 
 import (
 	"crypto/ecdsa"
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"math/big"
-	"os"
 	"time"
 
 	eTypes "github.com/ethereum/go-ethereum/core/types"
@@ -26,42 +23,24 @@ const (
 // generates a private key instead.
 type SingleNodeApi struct {
 	keyMap   map[string]interface{}
-	store    *store.Store
+	store    store.Store
 	ethKeys  map[string]*ecdsa.PrivateKey
 	chainIds map[string]*big.Int
-	c        *client.DefaultClient
+	c        client.Client
 }
 
-func NewSingleNodeApi(c *client.DefaultClient) *SingleNodeApi {
+func NewSingleNodeApi(c client.Client, store store.Store) *SingleNodeApi {
 	return &SingleNodeApi{
-		keyMap:  make(map[string]interface{}),
-		ethKeys: make(map[string]*ecdsa.PrivateKey),
-		c:       c,
+		keyMap:   make(map[string]interface{}),
+		ethKeys:  make(map[string]*ecdsa.PrivateKey),
+		c:        c,
+		store:    store,
+		chainIds: make(map[string]*big.Int),
 	}
 }
 
 // Initializes private keys used for dheart
 func (api *SingleNodeApi) Init() {
-	// Store
-	aesKey, err := base64.RawStdEncoding.DecodeString(encodedAESKey)
-	if err != nil {
-		panic(err)
-	}
-
-	path := os.Getenv("HOME_DIR")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err := os.MkdirAll(path, os.ModePerm)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	store, err := store.NewStore(path+"/apidb", aesKey)
-	if err != nil {
-		panic(err)
-	}
-	api.store = store
-
 	// Initialized keygens
 	for _, chain := range common.SUPPORTED_CHAINS {
 		bz, err := api.store.GetEncrypted([]byte(api.getKeygenKey(chain)))
@@ -78,6 +57,9 @@ func (api *SingleNodeApi) Init() {
 			api.ethKeys[chain] = privKey
 		}
 	}
+
+	// TODO: Add more chain ids here.
+	api.chainIds["eth"] = big.NewInt(1)
 }
 
 // Empty function for checking health only.
@@ -102,6 +84,7 @@ func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types
 	pubKey := api.ethKeys[chain].Public()
 	publicKeyECDSA, _ := pubKey.(*ecdsa.PublicKey)
 	publicKeyBytes := crypto.CompressPubkey(publicKeyECDSA)
+	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
 
 	if err == nil {
 		// Add some delay to mock TSS gen delay before sending back to Sisu server
@@ -109,7 +92,9 @@ func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types
 			time.Sleep(time.Second * 3)
 			utils.LogInfo("Sending keygen to Sisu")
 
-			api.c.BroadcastKeygenResult(chain, publicKeyBytes)
+			if err := api.c.BroadcastKeygenResult(chain, publicKeyBytes, address); err != nil {
+				utils.LogError("Error while broadcasting KeygenResult", err)
+			}
 		}()
 	} else {
 		utils.LogError(err)
@@ -149,16 +134,11 @@ func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, e
 		return nil, err
 	}
 
-	signedTx, err := eTypes.SignTx(tx, eTypes.NewEIP155Signer(api.chainIds[chain]), privateKey)
-	if err != nil {
-		utils.LogError("cannot sign eth tx. err = ", err)
-	}
+	signer := eTypes.NewEIP2930Signer(api.chainIds[chain])
+	h := signer.Hash(tx)
+	sig, err := crypto.Sign(h[:], privateKey)
 
-	utils.LogInfo("Signing completed")
-
-	serializedSigned, err := signedTx.MarshalBinary()
-
-	return serializedSigned, err
+	return sig, err
 }
 
 // Signing any transaction
@@ -178,7 +158,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 		// Add some delay to mock TSS gen delay before sending back to Sisu server
 		go func() {
 			time.Sleep(time.Second * 3)
-			utils.LogInfo("Sending keygen to Sisu")
+			utils.LogInfo("Sending Keysign to Sisu")
 
 			api.c.BroadcastKeySignResult(&types.KeysignResult{
 				Success:        true,
@@ -206,17 +186,5 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 }
 
 func (api *SingleNodeApi) SetPrivKey(encodedKey string, keyType string) error {
-	encrypted, err := hex.DecodeString(encodedKey)
-	if err != nil {
-		return err
-	}
-
-	aesKey, err := hex.DecodeString(os.Getenv("AES_KEY_HEX"))
-	if err != nil {
-		return err
-	}
-
-	_, err = utils.AESDecrypt(encrypted, aesKey)
-
-	return err
+	return nil
 }

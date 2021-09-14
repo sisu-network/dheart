@@ -9,29 +9,34 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
 
-type Store struct {
+type Store interface {
+	GetEncrypted(key []byte) (value []byte, err error)
+	PutEncrypted(key, value []byte) error
+}
+
+type DefaultStore struct {
 	db           *leveldb.DB
 	encryptedKey []byte
 	aesKey       []byte
 }
 
-func NewStore(path string, aesKey []byte) (*Store, error) {
+func NewStore(path string, aesKey []byte) (Store, error) {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Store{
+	return &DefaultStore{
 		db:     db,
 		aesKey: aesKey,
 	}, err
 }
 
-func (s *Store) Put(key, value []byte) error {
+func (s *DefaultStore) Put(key, value []byte) error {
 	return s.db.Put(key, value, nil)
 }
 
-func (s *Store) PutEncrypted(key, value []byte) error {
+func (s *DefaultStore) PutEncrypted(key, value []byte) error {
 	blockCipher, err := aes.NewCipher(s.aesKey)
 	if err != nil {
 		return err
@@ -51,11 +56,11 @@ func (s *Store) PutEncrypted(key, value []byte) error {
 	return s.Put(key, encrypted)
 }
 
-func (s *Store) Get(key []byte) (value []byte, err error) {
+func (s *DefaultStore) Get(key []byte) (value []byte, err error) {
 	return s.db.Get(key, nil)
 }
 
-func (s *Store) GetEncrypted(key []byte) (value []byte, err error) {
+func (s *DefaultStore) GetEncrypted(key []byte) (value []byte, err error) {
 	encryptedValue, err := s.Get(key)
 	if err != nil {
 		return nil, err
@@ -77,6 +82,6 @@ func (s *Store) GetEncrypted(key []byte) (value []byte, err error) {
 	return data, err
 }
 
-func (s *Store) Iterator() iterator.Iterator {
+func (s *DefaultStore) Iterator() iterator.Iterator {
 	return s.db.NewIterator(nil, nil)
 }
