@@ -27,6 +27,9 @@ func main() {
 	}
 
 	client, err := ethclient.Dial("http://localhost:7545")
+	if err != nil {
+		panic(err)
+	}
 
 	fromAddress := common.HexToAddress("0xbeF23B2AC7857748fEA1f499BE8227c5fD07E70c")
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
@@ -113,6 +116,10 @@ func main() {
 	}
 
 	balance, err := client.BalanceAt(context.Background(), toAddress, nil)
+	if err != nil {
+		panic(err)
+	}
+
 	utils.LogInfo("balance = ", balance)
 
 	utils.LogInfo("Test passed")
