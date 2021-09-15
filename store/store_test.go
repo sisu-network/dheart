@@ -8,13 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createStoreForTest(t *testing.T, path string) *Store {
+func createStoreForTest(t *testing.T, path string) *DefaultStore {
 	aesKey := make([]byte, 16)
 	rand.Read(aesKey)
 	store, err := NewStore(path, aesKey)
 	assert.Nil(t, err)
 
-	return store
+	return store.(*DefaultStore)
 }
 
 func TestPutGet(t *testing.T) {

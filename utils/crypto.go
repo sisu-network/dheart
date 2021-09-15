@@ -1,11 +1,14 @@
 package utils
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/hex"
 	"io"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sisu-network/dheart/common"
 )
 
@@ -61,4 +64,27 @@ func AESDEncrypt(message []byte, key []byte) ([]byte, error) {
 	// slice. The nonce must be NonceSize() bytes long and unique for all
 	// time, for a given key.
 	return gcm.Seal(nonce, nonce, message, nil), nil
+}
+
+func GetSigWithRecoveryId(hash []byte, sig []byte, publicKey []byte) []byte {
+	temp := make([]byte, 65)
+
+	for v := 0; v < 3; v++ {
+		copy(temp, sig)
+		temp[64] = byte(v)
+
+		recoveredPublicKey, err := crypto.Ecrecover(hash, temp)
+		if err != nil {
+			continue
+		}
+
+		matches := bytes.Equal(recoveredPublicKey, publicKey)
+		if matches {
+			return temp
+		}
+	}
+
+	LogCritical("cannot find recovery id value", hex.EncodeToString(hash), hex.EncodeToString(sig), hex.EncodeToString(publicKey))
+
+	return nil
 }

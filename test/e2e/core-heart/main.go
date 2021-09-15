@@ -64,9 +64,11 @@ func main() {
 	os.Setenv("USE_ON_MEMORY", "")
 
 	done := make(chan bool)
-	mockClient := mock.NewClient(nil, func(workId string) {
-		done <- true
-	})
+	mockClient := &mock.MockClient{
+		PostKeygenResultFunc: func(workId string) {
+			done <- true
+		},
+	}
 
 	conConfig, privKey := p2p.GetMockConnectionConfig(n, index)
 	encryptedKey := getEncrypted(privKey)

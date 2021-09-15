@@ -1,30 +1,40 @@
 package mock
 
-import "github.com/sisu-network/dheart/client"
+import (
+	"github.com/sisu-network/dheart/types"
+)
 
 type MockClient struct {
-	tryDialFunc          func()
-	postKeygenResultFunc func(workId string)
-}
-
-func NewClient(
-	tryDialFunc func(),
-	postKeygenResultFunc func(workId string),
-) client.Client {
-	return &MockClient{
-		tryDialFunc,
-		postKeygenResultFunc,
-	}
+	TryDialFunc                func()
+	PostKeygenResultFunc       func(workId string)
+	BroadcastKeygenResultFunc  func(chain string, pubKeyBytes []byte, address string) error
+	BroadcastKeySignResultFunc func(result *types.KeysignResult) error
 }
 
 func (m *MockClient) TryDial() {
-	if m.tryDialFunc != nil {
-		m.tryDialFunc()
+	if m.TryDialFunc != nil {
+		m.TryDialFunc()
 	}
 }
 
 func (m *MockClient) PostKeygenResult(workId string) {
-	if m.postKeygenResultFunc != nil {
-		m.postKeygenResultFunc(workId)
+	if m.PostKeygenResultFunc != nil {
+		m.PostKeygenResultFunc(workId)
 	}
+}
+
+func (m *MockClient) BroadcastKeygenResult(chain string, pubKeyBytes []byte, address string) error {
+	if m.BroadcastKeygenResultFunc != nil {
+		return m.BroadcastKeygenResultFunc(chain, pubKeyBytes, address)
+	}
+
+	return nil
+}
+
+func (m *MockClient) BroadcastKeySignResult(result *types.KeysignResult) error {
+	if m.BroadcastKeySignResultFunc != nil {
+		return m.BroadcastKeySignResultFunc(result)
+	}
+
+	return nil
 }

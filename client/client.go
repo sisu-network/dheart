@@ -21,6 +21,8 @@ var (
 type Client interface {
 	TryDial()
 	PostKeygenResult(workId string)
+	BroadcastKeygenResult(chain string, pubKeyBytes []byte, address string) error
+	BroadcastKeySignResult(result *types.KeysignResult) error
 }
 
 // A client that connects to Sisu server
@@ -30,7 +32,7 @@ type DefaultClient struct {
 	connected bool
 }
 
-func NewClient(url string) *DefaultClient {
+func NewClient(url string) Client {
 	return &DefaultClient{
 		url: url,
 	}
@@ -65,7 +67,7 @@ func (c *DefaultClient) CheckHealth() error {
 }
 
 // @Deprecated
-func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKey []byte) error {
+func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKeyBytes []byte, address string) error {
 	utils.LogDebug("c.connected = ", c.connected)
 
 	if !c.connected {
@@ -73,10 +75,12 @@ func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKey []byte) error
 	}
 
 	utils.LogDebug("Sending keygen result to sisu server")
+
 	keygenResult := types.KeygenResult{
 		Chain:       chain,
 		Success:     true,
-		PubKeyBytes: pubKey,
+		PubKeyBytes: pubKeyBytes,
+		Address:     address,
 	}
 
 	var r interface{}
