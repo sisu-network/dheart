@@ -121,9 +121,9 @@ func (api *SingleNodeApi) keyGenEth(chain string) error {
 	return api.store.PutEncrypted(api.getKeygenKey(chain), encoded)
 }
 
-func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, []byte, error) {
+func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, error) {
 	if api.ethKeys[chain] == nil {
-		return nil, nil, fmt.Errorf("There is no private key for this chain")
+		return nil, fmt.Errorf("There is no private key for this chain")
 	}
 
 	privateKey := api.ethKeys[chain]
@@ -131,25 +131,25 @@ func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, [
 	err := tx.UnmarshalBinary(serialized)
 	if err != nil {
 		utils.LogError("Cannot unmarshall ETH tx.")
-		return nil, nil, err
+		return nil, err
 	}
 
 	signer := eTypes.NewEIP2930Signer(api.chainIds[chain])
 	h := signer.Hash(tx)
 	sig, err := crypto.Sign(h[:], privateKey)
 
-	return sig, crypto.FromECDSAPub(&privateKey.PublicKey), err
+	return sig, err
 }
 
 // Signing any transaction
 func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 	var err error
-	var pubkey, signature []byte
+	var signature []byte
 
 	utils.LogDebug("Signing transaction....")
 	switch req.OutChain {
 	case "eth":
-		signature, pubkey, err = api.keySignEth(req.OutChain, req.OutBytes)
+		signature, err = api.keySignEth(req.OutChain, req.OutBytes)
 	default:
 		return fmt.Errorf("Unknown chain: %s", req.OutChain)
 	}
@@ -161,11 +161,11 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 			utils.LogInfo("Sending Keysign to Sisu")
 
 			api.c.BroadcastKeySignResult(&types.KeysignResult{
+				Id:             req.Id,
 				Success:        true,
 				OutChain:       req.OutChain,
 				OutBlockHeight: req.OutBlockHeight,
 				OutHash:        req.OutHash,
-				PubKey:         pubkey,
 				OutBytes:       req.OutBytes,
 				Signature:      signature,
 			})
@@ -173,6 +173,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 	} else {
 		utils.LogError("Cannot do key gen. Err =", err)
 		api.c.BroadcastKeySignResult(&types.KeysignResult{
+			Id:             req.Id,
 			Success:        false,
 			ErrMesage:      err.Error(),
 			OutChain:       req.OutChain,

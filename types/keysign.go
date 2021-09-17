@@ -1,6 +1,7 @@
 package types
 
 type KeysignRequest struct {
+	Id             string
 	OutChain       string
 	OutHash        string
 	OutBlockHeight int64
@@ -11,11 +12,11 @@ type KeysignResult struct {
 	Success   bool
 	ErrMesage string
 
+	Id             string
 	OutChain       string
 	OutHash        string
 	OutBlockHeight int64
 
-	PubKey    []byte // Public key of the private key that used for signing.
 	OutBytes  []byte
 	Signature []byte
 }
