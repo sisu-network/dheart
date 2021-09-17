@@ -15,6 +15,7 @@ type KeysignResult struct {
 	OutHash        string
 	OutBlockHeight int64
 
+	PubKey    []byte // Public key of the private key that used for signing.
 	OutBytes  []byte
 	Signature []byte
 }
