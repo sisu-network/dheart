@@ -58,8 +58,7 @@ func (api *SingleNodeApi) Init() {
 		}
 	}
 
-	// TODO: Add more chain ids here.
-	api.chainIds["eth"] = big.NewInt(1)
+	api.chainIds = common.SUPPORTED_CHAINS_ID_MAP
 }
 
 // Empty function for checking health only.
@@ -73,10 +72,10 @@ func (api *SingleNodeApi) Version() string {
 func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types.PubKeyWrapper) error {
 	utils.LogInfo("keygen: chain = ", chain)
 	var err error
-	switch chain {
-	case "eth":
+
+	if utils.IsETHBasedChain(chain) {
 		err = api.keyGenEth(chain)
-	default:
+	} else {
 		return fmt.Errorf("Unknown chain: %s", chain)
 	}
 
@@ -147,10 +146,9 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 	var signature []byte
 
 	utils.LogDebug("Signing transaction....")
-	switch req.OutChain {
-	case "eth":
+	if utils.IsETHBasedChain(req.OutChain) {
 		signature, err = api.keySignEth(req.OutChain, req.OutBytes)
-	default:
+	} else {
 		return fmt.Errorf("Unknown chain: %s", req.OutChain)
 	}
 

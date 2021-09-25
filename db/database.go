@@ -177,9 +177,9 @@ func (d *SqlDatabase) SaveKeygenData(chain string, workId string, pids []*tss.Pa
 
 	pidString := getPidString(pids)
 	// Constructs multi-insert query to do all insertion in 1 query.
-	query := "INSERT keygen (chain, work_id, pids_string, batch_index, keygen_output) VALUES "
-	query = query + getQueryQuestionMark(len(keygenOutput), 5)
+	query := "INSERT INTO keygen (chain, work_id, pids_string, batch_index, keygen_output) VALUES "
 
+	rowCount := 0
 	params := make([]interface{}, 0)
 	for i, output := range keygenOutput {
 		bz, err := json.Marshal(output)
@@ -192,8 +192,11 @@ func (d *SqlDatabase) SaveKeygenData(chain string, workId string, pids []*tss.Pa
 		params = append(params, pidString)
 		params = append(params, i) // batch index
 		params = append(params, bz)
+
+		rowCount++
 	}
 
+	query = query + getQueryQuestionMark(rowCount, 5)
 	_, err := d.db.Exec(query, params...)
 
 	return err

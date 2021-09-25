@@ -103,7 +103,7 @@ func (c *DefaultClient) BroadcastKeySignResult(result *types.KeysignResult) erro
 	err := c.client.CallContext(context.Background(), &r, "tss_keySignResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
-		utils.LogError("Cannot post keygen result, err = ", err)
+		utils.LogError("Cannot post keysign result, err = ", err)
 		return err
 	}
 

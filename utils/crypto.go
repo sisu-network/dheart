@@ -13,7 +13,7 @@ import (
 )
 
 func IsEcDSA(chain string) bool {
-	return chain == common.CHAIN_ETH || chain == common.CHAIN_ETH_MAINNET
+	return chain == common.CHAIN_ETH || chain == common.CHAIN_SISU_ETH
 }
 
 func AESDecrypt(encrypted []byte, key []byte) ([]byte, error) {
