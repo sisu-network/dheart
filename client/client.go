@@ -8,14 +8,15 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/tss-lib/tss"
 )
 
 const (
-	RETRY_TIME = 10 * time.Second
+	RetryTime = 10 * time.Second
 )
 
 var (
-	SISU_SERVER_NOT_CONNECTED = errors.New("Sisu server is not connected")
+	ErrSisuServerNotConnected = errors.New("Sisu server is not connected")
 )
 
 type Client interface {
@@ -23,6 +24,7 @@ type Client interface {
 	PostKeygenResult(workId string)
 	BroadcastKeygenResult(chain string, pubKeyBytes []byte, address string) error
 	BroadcastKeySignResult(result *types.KeysignResult) error
+	PostCulprits(culprits []*tss.PartyID) error
 }
 
 // A client that connects to Sisu server
@@ -49,7 +51,7 @@ func (c *DefaultClient) TryDial() {
 			break
 		}
 
-		time.Sleep(RETRY_TIME)
+		time.Sleep(RetryTime)
 	}
 
 	utils.LogInfo("Sisu server is connected")
@@ -71,7 +73,7 @@ func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKeyBytes []byte, 
 	utils.LogDebug("c.connected = ", c.connected)
 
 	if !c.connected {
-		return SISU_SERVER_NOT_CONNECTED
+		return ErrSisuServerNotConnected
 	}
 
 	utils.LogDebug("Sending keygen result to sisu server")
@@ -96,6 +98,20 @@ func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKeyBytes []byte, 
 
 func (c *DefaultClient) PostKeygenResult(workId string) {
 	// TODO: implement this.
+}
+
+func (c *DefaultClient) PostCulprits(culprits []*tss.PartyID) error {
+	utils.LogDebug("sending blame nodes to sisu")
+
+	var r interface{}
+	err := c.client.CallContext(context.Background(), &r, "tss_keygenResult", culprits)
+	if err != nil {
+		// TODO: Retry on failure.
+		utils.LogError("Cannot post keygen result, err = ", err)
+		return err
+	}
+
+	return nil
 }
 
 func (c *DefaultClient) BroadcastKeySignResult(result *types.KeysignResult) error {

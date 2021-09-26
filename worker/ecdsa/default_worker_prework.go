@@ -66,6 +66,12 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 	// Waits for all members to respond.
 	presignIds, selectedPids, err := w.waitForMemberResponse()
 	if err != nil {
+		// Blame missing nodes and leader here
+		if w.availPresignManager != nil {
+			culprits := w.availPresignManager.GetUnavailableNodes(w.availableParties.parties, w.allParties)
+			w.blameMgr.AddPreExecutionCulprit(append(culprits, w.myPid))
+		}
+
 		utils.LogError("Leader: error while waiting for member response", err)
 		w.leaderFinalized(false, nil, nil)
 		w.callback.OnWorkFailed(w.request)
@@ -153,6 +159,7 @@ func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selec
 	// Get list of parties
 	pIDs := w.availableParties.getPartyList(w.request.N)
 	w.pIDs = tss.SortPartyIDs(pIDs)
+	w.pIDsMap = pidsToMap(w.pIDs)
 
 	// Broadcast success to everyone
 	msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, true, presignIds, w.pIDs)
@@ -188,6 +195,8 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 	case <-time.After(LeaderWaitTime):
 		// TODO: Report as failure here.
 		utils.LogError("member: leader wait timed out.")
+		// Blame leader
+		w.blameMgr.AddPreExecutionCulprit([]*tss.PartyID{leader})
 		w.callback.OnWorkFailed(w.request)
 
 	case msg := <-w.preExecMsgCh:
@@ -228,6 +237,7 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 		}
 
 		w.pIDs = tss.SortPartyIDs(pIDs)
+		w.pIDsMap = pidsToMap(w.pIDs)
 
 		if join {
 			if w.request.IsSigning() {
@@ -254,4 +264,13 @@ func (w *DefaultWorker) Stop() {
 			job.Stop()
 		}
 	}
+}
+
+func pidsToMap(pids []*tss.PartyID) map[string]*tss.PartyID {
+	res := make(map[string]*tss.PartyID)
+	for _, pid := range pids {
+		res[pid.Id] = pid
+	}
+
+	return res
 }

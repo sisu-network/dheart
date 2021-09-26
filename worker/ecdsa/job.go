@@ -3,6 +3,7 @@ package ecdsa
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
@@ -27,6 +28,9 @@ type JobCallback interface {
 
 	// Called when this signing job finishes.
 	OnJobSignFinished(job *Job, data *libCommon.SignatureData)
+
+	// OnJobTimeout on job timeout
+	OnJobTimeout()
 }
 
 type Job struct {
@@ -41,6 +45,8 @@ type Job struct {
 
 	party    tss.Party
 	callback JobCallback
+
+	timeOut time.Duration
 }
 
 func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, localPreparams *keygen.LocalPreParams, callback JobCallback) *Job {
@@ -58,6 +64,7 @@ func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, lo
 		endKeygenCh: endCh,
 		callback:    callback,
 		closeCh:     closeCh,
+		timeOut:     10 * time.Minute,
 	}
 }
 
@@ -110,9 +117,15 @@ func (job *Job) Stop() {
 func (job *Job) startListening() {
 	outCh := job.outCh
 
+	endTime := time.Now().Add(job.timeOut)
+
 	// TODO: Add timeout and missing messages.
 	for {
 		select {
+		case <-time.After(endTime.Sub(time.Now())):
+			job.callback.OnJobTimeout()
+			return
+
 		case <-job.closeCh:
 			utils.LogWarn("job closed")
 			return
@@ -130,10 +143,11 @@ func (job *Job) startListening() {
 
 		case data := <-job.endSigningCh:
 			job.callback.OnJobSignFinished(job, &data)
+			return
 		}
 	}
 }
 
-func (job *Job) processMessage(msg tss.Message) error {
+func (job *Job) processMessage(msg tss.Message) *tss.Error {
 	return helper.SharedPartyUpdater(job.party, msg)
 }

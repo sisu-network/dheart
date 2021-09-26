@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sisu-network/dheart/blame"
+	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
@@ -56,6 +58,7 @@ type DefaultWorker struct {
 	myPid      *tss.PartyID
 	allParties []*tss.PartyID
 	pIDs       tss.SortedPartyIDs
+	pIDsMap    map[string]*tss.PartyID
 	jobType    wTypes.WorkType
 	callback   WorkerCallback
 	workId     string
@@ -94,6 +97,11 @@ type DefaultWorker struct {
 	presignOutputs  []*presign.LocalPresignData
 	signingOutputs  []*libCommon.SignatureData
 	finalOutputLock *sync.RWMutex
+
+	blameMgr            *blame.Manager
+	availPresignManager *core.AvailPresignManager
+
+	curRound string
 }
 
 func NewKeygenWorker(
@@ -110,6 +118,7 @@ func NewKeygenWorker(
 	w.keygenInput = request.KeygenInput
 	w.threshold = request.Threshold
 	w.keygenOutputs = make([]*keygen.LocalPartySaveData, batchSize)
+	w.curRound = core.Keygen1
 
 	return w
 }
@@ -121,12 +130,15 @@ func NewPresignWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
+	availPresignMgr *core.AvailPresignManager,
 ) worker.Worker {
 	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
 
 	w.jobType = wTypes.ECDSA_PRESIGN
 	w.presignInput = request.PresignInput
 	w.presignOutputs = make([]*presign.LocalPresignData, batchSize)
+	w.availPresignManager = availPresignMgr
+	w.curRound = core.Presign11
 
 	return w
 }
@@ -138,6 +150,7 @@ func NewSigningWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
+	availPresignMgr *core.AvailPresignManager,
 ) worker.Worker {
 	// TODO: The request.Pids
 	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
@@ -145,6 +158,8 @@ func NewSigningWorker(
 	w.jobType = wTypes.ECDSA_SIGNING
 	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
 	w.signingMessage = request.Message
+	w.availPresignManager = availPresignMgr
+	w.curRound = core.Sign1
 
 	return w
 }
@@ -175,6 +190,7 @@ func baseWorker(
 		memberResponseCh:  make(chan *commonTypes.TssMessage, len(allParties)),
 		availableParties:  NewAvailableParties(),
 		preExecutionCache: worker.NewMessageCache(),
+		blameMgr:          blame.NewManager(),
 	}
 }
 
@@ -188,6 +204,7 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 		// For keygen, we skip the leader selection part since all parties need to be involved in the
 		// signing process.
 		w.pIDs = w.request.AllParties
+		w.pIDsMap = pidsToMap(w.pIDs)
 		go func() {
 			if err := w.executeWork(); err != nil {
 				utils.LogError("Error when executing work", err)
@@ -278,7 +295,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 	w.jobOutputLock.Unlock()
 
 	if count == w.batchSize {
-		// We have completed all job for current round. Send the list to the dispatcher.
+		// We have completed all job for current round. Send the list to the dispatcher. Move the worker to next round.
 		dest := msg.GetTo()
 		to := ""
 		if dest != nil {
@@ -290,6 +307,8 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 			utils.LogCritical("Cannot build TSS message, err", err)
 			return
 		}
+
+		w.moveToNextRound()
 
 		if dest == nil {
 			// broadcast
@@ -377,9 +396,25 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	// Now update all messages
 	for i := range w.jobs {
 		go func(id int) {
+			round, err := core.GetMsgRound(msgs[id].Content())
+			if err != nil {
+				utils.LogError("error when getting round %w", err)
+				// If cannot get msg round, blame the sender
+				w.blameMgr.AddCulpritByRound(w.curRound, []*tss.PartyID{msgs[id].GetFrom()})
+			}
+
+			if len(round) > 0 {
+				w.blameMgr.AddSender(round, tssMsg.From)
+			}
+
 			if err := w.jobs[id].processMessage(msgs[id]); err != nil {
-				// Message can be from bad actor/corrupted. Log and ignore.
+				// Message can be from bad actor/corrupted. Save the culprits, and ignore.
 				utils.LogError("cannot process message error", err)
+				if len(round) > 0 {
+					w.blameMgr.AddCulpritByRound(round, err.Culprits())
+				} else {
+					w.blameMgr.AddCulpritByRound(w.curRound, err.Culprits())
+				}
 			}
 		}(i)
 	}
@@ -432,6 +467,10 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 	}
 }
 
+func (w *DefaultWorker) OnJobTimeout() {
+	w.callback.OnWorkFailed(w.request)
+}
+
 // Implements OnJobSignFinished of JobCallback.
 func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureData) {
 	w.finalOutputLock.Lock()
@@ -463,6 +502,16 @@ func (w *DefaultWorker) GetWorkId() string {
 	return w.workId
 }
 
+func (w *DefaultWorker) GetCulprits() []*tss.PartyID {
+	// If pre execution error, return pre execution culprits
+	culprits := w.blameMgr.GetPreExecutionCulprits()
+	if len(culprits) > 0 {
+		return culprits
+	}
+
+	return w.blameMgr.GetRoundCulprits(w.curRound, w.pIDsMap)
+}
+
 func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {
 	for _, p := range w.allParties {
 		if p.Id == pid {
@@ -471,4 +520,32 @@ func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {
 	}
 
 	return nil
+}
+
+func (w *DefaultWorker) moveToNextRound() string {
+	switch w.jobType {
+	case wTypes.ECDSA_KEYGEN:
+		switch w.curRound {
+		case core.Keygen1:
+			return core.Keygen21
+		case core.Keygen21:
+			return core.Keygen22
+		case core.Keygen22:
+			return core.Keygen3
+		}
+
+	case wTypes.ECDSA_PRESIGN:
+		switch w.curRound {
+		case core.Presign11:
+			return core.Presign12
+		case core.Presign12:
+			return core.Presign2
+		case core.Presign2:
+			return core.Presign3
+		case core.Keygen3:
+			return core.Presign4
+		}
+	}
+
+	return ""
 }

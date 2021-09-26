@@ -13,7 +13,7 @@ type WorkRequest struct {
 	WorkType      WorkType
 	AllParties    []*tss.PartyID
 	WorkId        string
-	N             int // The number of avaiable participants required to do this task.
+	N             int // The number of available participants required to do this task.
 	ForcedPresign bool
 	BatchSize     int
 

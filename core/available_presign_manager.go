@@ -32,6 +32,33 @@ func NewAvailPresignManager(db db.Database) *AvailPresignManager {
 	}
 }
 
+func (m *AvailPresignManager) GetUnavailableNodes(sentNodes map[string]*tss.PartyID, allPids []*tss.PartyID) []*tss.PartyID {
+	pids := make([]string, 0)
+	for _, v := range m.available {
+		if len(v) > 0 {
+			pids = append(pids, v[0].Pids...)
+		}
+	}
+
+	missingIDs := make(map[string]struct{}, 0)
+	for _, pid := range pids {
+		if _, found := sentNodes[pid]; !found {
+			missingIDs[pid] = struct{}{}
+		}
+	}
+
+	missing := make([]*tss.PartyID, 0, len(missingIDs))
+	for id := range missingIDs {
+		for _, pid := range allPids {
+			if pid.Id == id {
+				missing = append(missing, pid)
+			}
+		}
+	}
+
+	return missing
+}
+
 func (m *AvailPresignManager) Load() error {
 	presignIds, pidStrings, err := m.db.GetAvailablePresignShortForm()
 	if err != nil {
@@ -92,7 +119,7 @@ func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []
 	m.lock.Unlock()
 
 	if selectedPidstring == "" {
-		return make([]string, 0), make([]*tss.PartyID, 0)
+		return []string{}, []*tss.PartyID{}
 	}
 
 	// Get selected pids

@@ -34,6 +34,8 @@ type EngineCallback interface {
 	OnWorkPresignFinished(workId string, data []*presign.LocalPresignData)
 
 	OnWorkSigningFinished(workId string, data []*libCommon.SignatureData)
+
+	OnWorkFailed(culprit []*tss.PartyID)
 }
 
 // An Engine is a main component for TSS signing. It takes the following roles:
@@ -130,10 +132,10 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 		w = ecdsa.NewKeygenWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
 
 	case types.ECDSA_PRESIGN:
-		w = ecdsa.NewPresignWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
+		w = ecdsa.NewPresignWorker(BatchSize, request, workPartyId, engine, engine.db, engine, engine.presignsManager)
 
 	case types.ECDSA_SIGNING:
-		w = ecdsa.NewSigningWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
+		w = ecdsa.NewSigningWorker(BatchSize, request, workPartyId, engine, engine.db, engine, engine.presignsManager)
 	}
 
 	engine.workLock.Lock()
@@ -360,6 +362,8 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 		return
 	}
 
+	culprits := worker.GetCulprits()
+	go engine.callback.OnWorkFailed(culprits)
 	worker.Stop()
 }
 

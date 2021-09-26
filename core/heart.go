@@ -89,6 +89,12 @@ func (h *Heart) OnWorkSigningFinished(workId string, data []*libCommon.Signature
 	// TODO: implement
 }
 
+func (h *Heart) OnWorkFailed(culprits []*tss.PartyID) {
+	if err := h.client.PostCulprits(culprits); err != nil {
+		utils.LogError("send culprits failed", err)
+	}
+}
+
 // --- End fo Engine callback /
 
 // --- Implements Server API  /

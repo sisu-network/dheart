@@ -145,6 +145,7 @@ type MockEngineCallback struct {
 	OnWorkKeygenFinishedFunc  func(workId string, data []*keygen.LocalPartySaveData)
 	OnWorkPresignFinishedFunc func(workId string, data []*presign.LocalPresignData)
 	OnWorkSigningFinishedFunc func(workId string, data []*libCommon.SignatureData)
+	OnWorkFailedFunc          func(culprits []*tss.PartyID)
 }
 
 func (cb *MockEngineCallback) OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData) {
@@ -167,6 +168,10 @@ func (cb *MockEngineCallback) OnWorkSigningFinished(workId string, data []*libCo
 
 func (cb *MockEngineCallback) OnPreExecutionFinished(workId string) {
 	// Do nothing.
+}
+
+func (cb *MockEngineCallback) OnWorkFailed(culprits []*tss.PartyID) {
+
 }
 
 //---/

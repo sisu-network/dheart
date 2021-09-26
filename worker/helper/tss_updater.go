@@ -5,8 +5,8 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-func SharedPartyUpdater(party tss.Party, msg tss.Message) error {
-	// do not send a message from this party back to itself
+func SharedPartyUpdater(party tss.Party, msg tss.Message) *tss.Error {
+	// Do not send a message from this party back to itself
 	if party.PartyID() == msg.GetFrom() {
 		return nil
 	}
