@@ -32,14 +32,16 @@ func NewAvailPresignManager(db db.Database) *AvailPresignManager {
 	}
 }
 
-func (m *AvailPresignManager) GetUnavailableNodes(sentNodes map[string]*tss.PartyID, allPids []*tss.PartyID) []*tss.PartyID {
-	pids := make([]string, 0)
-	for _, v := range m.available {
+func (m *AvailPresignManager) GetUnavailablePresigns(sentNodes map[string]*tss.PartyID, allPids []*tss.PartyID) []*tss.PartyID {
+	// Nodes that are chosen.
+	pids := make([]string, 0, len(m.inUse))
+	for _, v := range m.inUse {
 		if len(v) > 0 {
 			pids = append(pids, v[0].Pids...)
 		}
 	}
 
+	// Nodes that are chosen but don't send messages.
 	missingIDs := make(map[string]struct{}, 0)
 	for _, pid := range pids {
 		if _, found := sentNodes[pid]; !found {

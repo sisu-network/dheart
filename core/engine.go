@@ -132,10 +132,10 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 		w = ecdsa.NewKeygenWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
 
 	case types.ECDSA_PRESIGN:
-		w = ecdsa.NewPresignWorker(BatchSize, request, workPartyId, engine, engine.db, engine, engine.presignsManager)
+		w = ecdsa.NewPresignWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
 
 	case types.ECDSA_SIGNING:
-		w = ecdsa.NewSigningWorker(BatchSize, request, workPartyId, engine, engine.db, engine, engine.presignsManager)
+		w = ecdsa.NewSigningWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
 	}
 
 	engine.workLock.Lock()
@@ -369,6 +369,10 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 
 func (engine *Engine) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
 	return engine.presignsManager.GetAvailablePresigns(batchSize, n, pids)
+}
+
+func (engine *Engine) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
+	return engine.presignsManager.GetUnavailablePresigns(sentMsgNodes, pids)
 }
 
 func (engine *Engine) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {

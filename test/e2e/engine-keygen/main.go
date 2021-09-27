@@ -45,6 +45,10 @@ func (cb *EngineCallback) OnWorkSigningFinished(workerId string, data []*libComm
 	cb.signingDataCh <- data
 }
 
+func (cb *EngineCallback) OnWorkFailed(culprit []*tss.PartyID) {
+
+}
+
 func getSortedPartyIds(n int) tss.SortedPartyIDs {
 	keys := p2p.GetAllPrivateKeys(n)
 	partyIds := make([]*tss.PartyID, n)

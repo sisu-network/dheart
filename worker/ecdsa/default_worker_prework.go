@@ -66,11 +66,9 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 	// Waits for all members to respond.
 	presignIds, selectedPids, err := w.waitForMemberResponse()
 	if err != nil {
-		// Blame missing nodes and leader here
-		if w.availPresignManager != nil {
-			culprits := w.availPresignManager.GetUnavailableNodes(w.availableParties.parties, w.allParties)
-			w.blameMgr.AddPreExecutionCulprit(append(culprits, w.myPid))
-		}
+		// Only blame nodes that are chosen and don't send messages in time and the leader.
+		culprits := w.callback.GetUnavailablePresigns(w.availableParties.parties, w.allParties)
+		w.blameMgr.AddPreExecutionCulprit(append(culprits, w.myPid))
 
 		utils.LogError("Leader: error while waiting for member response", err)
 		w.leaderFinalized(false, nil, nil)

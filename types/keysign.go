@@ -1,5 +1,7 @@
 package types
 
+import "github.com/sisu-network/tss-lib/tss"
+
 type KeysignRequest struct {
 	Id             string
 	OutChain       string
@@ -19,4 +21,6 @@ type KeysignResult struct {
 
 	OutBytes  []byte
 	Signature []byte
+
+	Culprits []*tss.PartyID
 }

@@ -8,8 +8,8 @@ import (
 )
 
 type Manager struct {
-	// Message cache from round -> sender
-	sentMsg map[string]map[string]struct{}
+	// For each round, check which nodes sent message
+	sentNodes map[string]map[string]struct{}
 
 	roundCulprits        map[string][]*tss.PartyID
 	preExecutionCulprits []*tss.PartyID
@@ -19,7 +19,7 @@ type Manager struct {
 
 func NewManager() *Manager {
 	return &Manager{
-		sentMsg:       make(map[string]map[string]struct{}),
+		sentNodes:     make(map[string]map[string]struct{}),
 		roundCulprits: make(map[string][]*tss.PartyID),
 		mgrLock:       &sync.RWMutex{},
 	}
@@ -29,11 +29,11 @@ func (m *Manager) AddSender(round, sender string) {
 	m.mgrLock.Lock()
 	defer m.mgrLock.Unlock()
 
-	if _, ok := m.sentMsg[round]; !ok {
-		m.sentMsg[round] = make(map[string]struct{})
+	if _, ok := m.sentNodes[round]; !ok {
+		m.sentNodes[round] = make(map[string]struct{})
 	}
 
-	m.sentMsg[round][sender] = struct{}{}
+	m.sentNodes[round][sender] = struct{}{}
 }
 
 func (m *Manager) AddPreExecutionCulprit(culprits []*tss.PartyID) {
@@ -50,44 +50,36 @@ func (m *Manager) AddCulpritByRound(round string, culprits []*tss.PartyID) {
 	m.roundCulprits[round] = append(m.roundCulprits[round], culprits...)
 }
 
-// Return the different between node that sends messages and requests nodes
 func (m *Manager) GetRoundCulprits(round string, peers map[string]*tss.PartyID) []*tss.PartyID {
 	m.mgrLock.RLock()
 	defer m.mgrLock.RUnlock()
 
 	sentNodes := mapset.NewSet()
-	for node := range m.sentMsg[round] {
+	for node := range m.sentNodes[round] {
 		sentNodes.Add(node)
 	}
 
 	allPeers := mapset.NewSet()
 	for _, p := range peers {
-		allPeers.Add(p)
+		allPeers.Add(p.Id)
 	}
 
-	diff := allPeers.Difference(sentNodes).ToSlice()
-	res := make([]*tss.PartyID, len(diff))
-	for i, d := range diff {
-		res[i] = peers[d.(string)]
-	}
+	// Nodes that have not sent messages.
+	diff := allPeers.Difference(sentNodes)
 
-	// Peers not sent messages and peers sent error messages
-	// Dedup
+	// Merge with nodes that have sent error messages, and deduplicate.
 	for _, pid := range m.roundCulprits[round] {
-		found := false
-		for _, r := range res {
-			if r.Id == pid.Id {
-				found = true
-				break
-			}
-		}
+		diff.Add(pid.Id)
+	}
 
-		if !found {
-			res = append(res, pid)
+	culprits := make([]*tss.PartyID, 0, diff.Cardinality())
+	for _, p := range diff.ToSlice() {
+		if v, ok := peers[p.(string)]; ok {
+			culprits = append(culprits, v)
 		}
 	}
 
-	return res
+	return culprits
 }
 
 func (m *Manager) GetPreExecutionCulprits() []*tss.PartyID {

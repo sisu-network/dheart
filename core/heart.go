@@ -90,9 +90,7 @@ func (h *Heart) OnWorkSigningFinished(workId string, data []*libCommon.Signature
 }
 
 func (h *Heart) OnWorkFailed(culprits []*tss.PartyID) {
-	if err := h.client.PostCulprits(culprits); err != nil {
-		utils.LogError("send culprits failed", err)
-	}
+	// TODO: sent culprits to sisu here
 }
 
 // --- End fo Engine callback /

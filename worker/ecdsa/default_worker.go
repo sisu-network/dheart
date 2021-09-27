@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/sisu-network/dheart/blame"
-	"github.com/sisu-network/dheart/core"
+	"github.com/sisu-network/dheart/core/message"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
@@ -37,6 +37,8 @@ type WorkerCallback interface {
 	// GetAvailablePresigns returns a list of presign output that will be used for signing. The presign's
 	// party ids should match the pids params passed into the function.
 	GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID)
+
+	GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
 
 	GetPresignOutputs(presignIds []string) []*presign.LocalPresignData
 
@@ -98,10 +100,10 @@ type DefaultWorker struct {
 	signingOutputs  []*libCommon.SignatureData
 	finalOutputLock *sync.RWMutex
 
-	blameMgr            *blame.Manager
-	availPresignManager *core.AvailPresignManager
+	blameMgr *blame.Manager
 
-	curRound string
+	roundLock *sync.RWMutex
+	curRound  string
 }
 
 func NewKeygenWorker(
@@ -118,7 +120,7 @@ func NewKeygenWorker(
 	w.keygenInput = request.KeygenInput
 	w.threshold = request.Threshold
 	w.keygenOutputs = make([]*keygen.LocalPartySaveData, batchSize)
-	w.curRound = core.Keygen1
+	w.curRound = message.Keygen1
 
 	return w
 }
@@ -130,15 +132,13 @@ func NewPresignWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
-	availPresignMgr *core.AvailPresignManager,
 ) worker.Worker {
 	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
 
 	w.jobType = wTypes.ECDSA_PRESIGN
 	w.presignInput = request.PresignInput
 	w.presignOutputs = make([]*presign.LocalPresignData, batchSize)
-	w.availPresignManager = availPresignMgr
-	w.curRound = core.Presign11
+	w.curRound = message.Presign11
 
 	return w
 }
@@ -150,7 +150,6 @@ func NewSigningWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
-	availPresignMgr *core.AvailPresignManager,
 ) worker.Worker {
 	// TODO: The request.Pids
 	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
@@ -158,8 +157,7 @@ func NewSigningWorker(
 	w.jobType = wTypes.ECDSA_SIGNING
 	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
 	w.signingMessage = request.Message
-	w.availPresignManager = availPresignMgr
-	w.curRound = core.Sign1
+	w.curRound = message.Sign1
 
 	return w
 }
@@ -191,6 +189,7 @@ func baseWorker(
 		availableParties:  NewAvailableParties(),
 		preExecutionCache: worker.NewMessageCache(),
 		blameMgr:          blame.NewManager(),
+		roundLock:         &sync.RWMutex{},
 	}
 }
 
@@ -295,7 +294,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 	w.jobOutputLock.Unlock()
 
 	if count == w.batchSize {
-		// We have completed all job for current round. Send the list to the dispatcher. Move the worker to next round.
+		// We have completed all jobs for current round. Send the list to the dispatcher. Move the worker to next round.
 		dest := msg.GetTo()
 		to := ""
 		if dest != nil {
@@ -308,7 +307,9 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 			return
 		}
 
-		w.moveToNextRound()
+		w.roundLock.Lock()
+		w.curRound = message.NextRound(w.jobType, w.curRound)
+		w.roundLock.Unlock()
 
 		if dest == nil {
 			// broadcast
@@ -396,7 +397,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	// Now update all messages
 	for i := range w.jobs {
 		go func(id int) {
-			round, err := core.GetMsgRound(msgs[id].Content())
+			round, err := message.GetMsgRound(msgs[id].Content())
 			if err != nil {
 				utils.LogError("error when getting round %w", err)
 				// If cannot get msg round, blame the sender
@@ -520,32 +521,4 @@ func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {
 	}
 
 	return nil
-}
-
-func (w *DefaultWorker) moveToNextRound() string {
-	switch w.jobType {
-	case wTypes.ECDSA_KEYGEN:
-		switch w.curRound {
-		case core.Keygen1:
-			return core.Keygen21
-		case core.Keygen21:
-			return core.Keygen22
-		case core.Keygen22:
-			return core.Keygen3
-		}
-
-	case wTypes.ECDSA_PRESIGN:
-		switch w.curRound {
-		case core.Presign11:
-			return core.Presign12
-		case core.Presign12:
-			return core.Presign2
-		case core.Presign2:
-			return core.Presign3
-		case core.Keygen3:
-			return core.Presign4
-		}
-	}
-
-	return ""
 }

@@ -1,8 +1,9 @@
-package core
+package message
 
 import (
 	"errors"
 
+	wTypes "github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/ecdsa/signing"
@@ -57,4 +58,32 @@ func GetMsgRound(content tss.MessageContent) (string, error) {
 	default:
 		return "", errors.New("unknown round")
 	}
+}
+
+func NextRound(jobType wTypes.WorkType, curRound string) string {
+	switch jobType {
+	case wTypes.ECDSA_KEYGEN:
+		switch curRound {
+		case Keygen1:
+			return Keygen21
+		case Keygen21:
+			return Keygen22
+		case Keygen22:
+			return Keygen3
+		}
+
+	case wTypes.ECDSA_PRESIGN:
+		switch curRound {
+		case Presign11:
+			return Presign12
+		case Presign12:
+			return Presign2
+		case Presign2:
+			return Presign3
+		case Keygen3:
+			return Presign4
+		}
+	}
+
+	return curRound
 }

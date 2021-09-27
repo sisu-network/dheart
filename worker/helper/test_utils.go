@@ -65,6 +65,7 @@ type MockWorkerCallback struct {
 	OnWorkFailedFunc           func(request *types.WorkRequest)
 	GetAvailablePresignsFunc   func(count int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID)
 	GetPresignOutputsFunc      func(presignIds []string) []*presign.LocalPresignData
+	GetUnavailablePresignsFunc func(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
 
 	workerIndex     int
 	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)
@@ -92,6 +93,14 @@ type MockWorkerCallback struct {
 // 		signingCallback: signingCallback,
 // 	}
 // }
+
+func (cb *MockWorkerCallback) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
+	if cb.GetUnavailablePresignsFunc != nil {
+		return cb.GetUnavailablePresignsFunc(sentMsgNodes, pids)
+	}
+
+	return nil
+}
 
 func (cb *MockWorkerCallback) OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
 	if cb.OnWorkKeygenFinishedFunc != nil {
