@@ -62,7 +62,7 @@ func GetMsgRound(content tss.MessageContent) (string, error) {
 
 func NextRound(jobType wTypes.WorkType, curRound string) string {
 	switch jobType {
-	case wTypes.ECDSA_KEYGEN:
+	case wTypes.EcdsaKeygen:
 		switch curRound {
 		case Keygen1:
 			return Keygen21
@@ -72,7 +72,7 @@ func NextRound(jobType wTypes.WorkType, curRound string) string {
 			return Keygen3
 		}
 
-	case wTypes.ECDSA_PRESIGN:
+	case wTypes.EcdsaPresign:
 		switch curRound {
 		case Presign11:
 			return Presign12

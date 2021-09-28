@@ -75,7 +75,7 @@ func main() {
 	hash := signer.Hash(tx)
 
 	mockSisuClient := &mock.MockClient{
-		BroadcastKeySignResultFunc: func(result *types.KeysignResult) error {
+		PostKeysignResultFunc: func(result *types.KeysignResult) error {
 			ok := crypto.VerifySignature(pubKeyBytes, hash[:], result.Signature[:len(result.Signature)-1])
 			if !ok {
 				panic("signature verification failed")

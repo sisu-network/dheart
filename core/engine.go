@@ -12,6 +12,7 @@ import (
 	"github.com/sisu-network/dheart/core/signer"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
+	types2 "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
@@ -29,13 +30,13 @@ const (
 )
 
 type EngineCallback interface {
-	OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData)
+	OnWorkKeygenFinished(result *types2.KeygenResult)
 
-	OnWorkPresignFinished(workId string, data []*presign.LocalPresignData)
+	OnWorkPresignFinished(result *types2.PresignResult)
 
-	OnWorkSigningFinished(workId string, data []*libCommon.SignatureData)
+	OnWorkSigningFinished(result *types2.KeysignResult)
 
-	OnWorkFailed(culprit []*tss.PartyID)
+	OnWorkFailed(chain string, workType types.WorkType, culprits []*tss.PartyID)
 }
 
 // An Engine is a main component for TSS signing. It takes the following roles:
@@ -128,13 +129,13 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 
 	// Create a new worker.
 	switch request.WorkType {
-	case types.ECDSA_KEYGEN:
+	case types.EcdsaKeygen:
 		w = ecdsa.NewKeygenWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
 
-	case types.ECDSA_PRESIGN:
+	case types.EcdsaPresign:
 		w = ecdsa.NewPresignWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
 
-	case types.ECDSA_SIGNING:
+	case types.EcdsaSigning:
 		w = ecdsa.NewSigningWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
 	}
 
@@ -178,7 +179,12 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 	engine.db.SaveKeygenData(request.Chain, request.WorkId, request.AllParties, output)
 
 	// Make a callback and start next work.
-	engine.callback.OnWorkKeygenFinished(request.WorkId, output)
+	result := types2.KeygenResult{
+		Chain:   request.Chain,
+		Success: true,
+	}
+
+	engine.callback.OnWorkKeygenFinished(&result)
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
 }
@@ -186,7 +192,12 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
 	engine.db.SavePresignData(request.Chain, request.WorkId, pids, data)
 
-	engine.callback.OnWorkPresignFinished(request.WorkId, data)
+	result := types2.PresignResult{
+		Chain:   request.Chain,
+		Success: true,
+	}
+
+	engine.callback.OnWorkPresignFinished(&result)
 
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
@@ -194,7 +205,12 @@ func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*
 
 func (engine *Engine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
 	// TODO: save output.
-	engine.callback.OnWorkSigningFinished(request.WorkId, data)
+
+	result := types2.KeysignResult{
+		Success: true,
+	}
+
+	engine.callback.OnWorkSigningFinished(&result)
 
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
@@ -363,7 +379,7 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 	}
 
 	culprits := worker.GetCulprits()
-	go engine.callback.OnWorkFailed(culprits)
+	go engine.callback.OnWorkFailed(request.Chain, request.WorkType, culprits)
 	worker.Stop()
 }
 

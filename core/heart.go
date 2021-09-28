@@ -14,11 +14,10 @@ import (
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
+	types2 "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
-	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -74,23 +73,43 @@ func (h *Heart) createDb() {
 	}
 }
 
-// --- Implements Engien callback /
+// --- Implements Engine callback /
 
-func (h *Heart) OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData) {
-	// TODO: implement
-	h.client.PostKeygenResult(workId)
+func (h *Heart) OnWorkKeygenFinished(result *types2.KeygenResult) {
+	h.client.PostKeygenResult(result)
 }
 
-func (h *Heart) OnWorkPresignFinished(workId string, data []*presign.LocalPresignData) {
-	// TODO: implement
+func (h *Heart) OnWorkPresignFinished(result *types2.PresignResult) {
+	h.client.PostPresignResult(result)
 }
 
-func (h *Heart) OnWorkSigningFinished(workId string, data []*libCommon.SignatureData) {
-	// TODO: implement
+func (h *Heart) OnWorkSigningFinished(result *types2.KeysignResult) {
+	h.client.PostKeysignResult(result)
 }
 
-func (h *Heart) OnWorkFailed(culprits []*tss.PartyID) {
-	// TODO: sent culprits to sisu here
+func (h *Heart) OnWorkFailed(chain string, workType types.WorkType, culprits []*tss.PartyID) {
+	switch workType {
+	case types.EcdsaKeygen, types.EddsaKeygen:
+		result := types2.KeygenResult{
+			Chain:       chain,
+			Success:     false,
+			Culprits:    culprits,
+		}
+		h.client.PostKeygenResult(&result)
+	case types.EcdsaPresign, types.EddsaPresign:
+		result := types2.PresignResult{
+			Chain:       chain,
+			Success:     false,
+			Culprits:    culprits,
+		}
+		h.client.PostPresignResult(&result)
+	case types.EcdsaSigning, types.EddsaSigning:
+		result := types2.KeysignResult{
+			Success:     false,
+			Culprits:    culprits,
+		}
+		h.client.PostKeysignResult(&result)
+	}
 }
 
 // --- End fo Engine callback /

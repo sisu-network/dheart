@@ -58,7 +58,7 @@ func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, lo
 
 	return &Job{
 		index:       index,
-		jobType:     wTypes.ECDSA_KEYGEN,
+		jobType:     wTypes.EcdsaKeygen,
 		party:       party,
 		outCh:       outCh,
 		endKeygenCh: endCh,
@@ -76,7 +76,7 @@ func NewPresignJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, s
 
 	return &Job{
 		index:        index,
-		jobType:      wTypes.ECDSA_PRESIGN,
+		jobType:      wTypes.EcdsaPresign,
 		party:        party,
 		outCh:        outCh,
 		endPresignCh: endCh,
@@ -93,7 +93,7 @@ func NewSigningJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, m
 
 	return &Job{
 		index:        index,
-		jobType:      wTypes.ECDSA_SIGNING,
+		jobType:      wTypes.EcdsaSigning,
 		party:        party,
 		outCh:        outCh,
 		endSigningCh: endCh,

@@ -116,7 +116,7 @@ func NewKeygenWorker(
 ) worker.Worker {
 	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
 
-	w.jobType = wTypes.ECDSA_KEYGEN
+	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
 	w.threshold = request.Threshold
 	w.keygenOutputs = make([]*keygen.LocalPartySaveData, batchSize)
@@ -135,7 +135,7 @@ func NewPresignWorker(
 ) worker.Worker {
 	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
 
-	w.jobType = wTypes.ECDSA_PRESIGN
+	w.jobType = wTypes.EcdsaPresign
 	w.presignInput = request.PresignInput
 	w.presignOutputs = make([]*presign.LocalPresignData, batchSize)
 	w.curRound = message.Presign11
@@ -154,7 +154,7 @@ func NewSigningWorker(
 	// TODO: The request.Pids
 	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
 
-	w.jobType = wTypes.ECDSA_SIGNING
+	w.jobType = wTypes.EcdsaSigning
 	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
 	w.signingMessage = request.Message
 	w.curRound = message.Sign1
@@ -233,13 +233,13 @@ func (w *DefaultWorker) executeWork() error {
 	// Creates all jobs
 	for i := range w.jobs {
 		switch w.jobType {
-		case wTypes.ECDSA_KEYGEN:
+		case wTypes.EcdsaKeygen:
 			w.jobs[i] = NewKeygenJob(i, w.pIDs, params, w.keygenInput, w)
 
-		case wTypes.ECDSA_PRESIGN:
+		case wTypes.EcdsaPresign:
 			w.jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w)
 
-		case wTypes.ECDSA_SIGNING:
+		case wTypes.EcdsaSigning:
 			w.jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessage, w.signingInput[i], w)
 
 		default:
@@ -510,7 +510,11 @@ func (w *DefaultWorker) GetCulprits() []*tss.PartyID {
 		return culprits
 	}
 
-	return w.blameMgr.GetRoundCulprits(w.curRound, w.pIDsMap)
+	w.roundLock.Lock()
+	curRound := w.curRound
+	w.roundLock.Unlock()
+
+	return w.blameMgr.GetRoundCulprits(curRound, w.pIDsMap)
 }
 
 func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {

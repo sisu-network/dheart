@@ -66,7 +66,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := &types.WorkRequest{
 			WorkId:     "Signing0",
-			WorkType:   types.ECDSA_SIGNING,
+			WorkType:   types.EcdsaSigning,
 			BatchSize:  batchSize,
 			AllParties: helper.CopySortedPartyIds(pIDs),
 			Threshold:  len(pIDs) - 1,
@@ -133,7 +133,7 @@ func TestSigning_Timeout(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := &types.WorkRequest{
 			WorkId:     fmt.Sprintf("Signing_0"),
-			WorkType:   types.ECDSA_SIGNING,
+			WorkType:   types.EcdsaSigning,
 			BatchSize:  batchSize,
 			AllParties: helper.CopySortedPartyIds(pIDs),
 			Threshold:  len(pIDs) - 1,

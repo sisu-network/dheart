@@ -29,7 +29,7 @@ type WorkRequest struct {
 }
 
 func NewKeygenRequest(workId string, n int, PIDs tss.SortedPartyIDs, keygenInput keygen.LocalPreParams, threshold int) *WorkRequest {
-	request := baseRequest(ECDSA_KEYGEN, workId, n, PIDs)
+	request := baseRequest(EcdsaKeygen, workId, n, PIDs)
 	request.KeygenInput = &keygenInput
 	request.Threshold = threshold
 
@@ -37,7 +37,7 @@ func NewKeygenRequest(workId string, n int, PIDs tss.SortedPartyIDs, keygenInput
 }
 
 func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInput keygen.LocalPartySaveData, forcedPresign bool) *WorkRequest {
-	request := baseRequest(ECDSA_PRESIGN, workId, n, PIDs)
+	request := baseRequest(EcdsaPresign, workId, n, PIDs)
 	request.PresignInput = &presignInput
 	request.ForcedPresign = forcedPresign
 
@@ -45,7 +45,7 @@ func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInp
 }
 
 func NewSigningRequets(workId string, n int, PIDs tss.SortedPartyIDs, message string) *WorkRequest {
-	request := baseRequest(ECDSA_SIGNING, workId, n, PIDs)
+	request := baseRequest(EcdsaSigning, workId, n, PIDs)
 	request.Message = message
 
 	return request
@@ -62,17 +62,17 @@ func baseRequest(workType WorkType, workdId string, n int, pIDs tss.SortedPartyI
 
 func (request *WorkRequest) Validate() error {
 	switch request.WorkType {
-	case ECDSA_KEYGEN:
+	case EcdsaKeygen:
 		if request.KeygenInput == nil {
 			return errors.New("Keygen input could not be nil for keygen task")
 		}
-	case ECDSA_PRESIGN:
+	case EcdsaPresign:
 		if request.PresignInput == nil {
 			return errors.New("Presign input could not be nil for presign task")
 		}
-	case EDDSA_KEYGEN:
-	case EDDSA_PRESIGN:
-	case EDDSA_SIGNING:
+	case EddsaKeygen:
+	case EddsaPresign:
+	case EddsaSigning:
 	default:
 		return errors.New("Invalid request type")
 	}
@@ -81,11 +81,11 @@ func (request *WorkRequest) Validate() error {
 
 func (request *WorkRequest) GetPriority() int {
 	// Keygen
-	if request.WorkType == ECDSA_KEYGEN || request.WorkType == EDDSA_KEYGEN {
+	if request.WorkType == EcdsaKeygen || request.WorkType == EddsaKeygen {
 		return 100
 	}
 
-	if request.WorkType == ECDSA_PRESIGN || request.WorkType == EDDSA_PRESIGN {
+	if request.WorkType == EcdsaPresign || request.WorkType == EddsaPresign {
 		if request.ForcedPresign {
 			// Force presign
 			return 90
@@ -96,7 +96,7 @@ func (request *WorkRequest) GetPriority() int {
 	}
 
 	// Signing
-	if request.WorkType == ECDSA_SIGNING || request.WorkType == EDDSA_SIGNING {
+	if request.WorkType == EcdsaSigning || request.WorkType == EddsaSigning {
 		return 60
 	}
 
@@ -106,13 +106,13 @@ func (request *WorkRequest) GetPriority() int {
 }
 
 func (request *WorkRequest) IsKeygen() bool {
-	return request.WorkType == ECDSA_KEYGEN || request.WorkType == EDDSA_KEYGEN
+	return request.WorkType == EcdsaKeygen || request.WorkType == EddsaKeygen
 }
 
 func (request *WorkRequest) IsPresign() bool {
-	return request.WorkType == ECDSA_PRESIGN || request.WorkType == EDDSA_PRESIGN
+	return request.WorkType == EcdsaPresign || request.WorkType == EddsaPresign
 }
 
 func (request *WorkRequest) IsSigning() bool {
-	return request.WorkType == ECDSA_SIGNING || request.WorkType == EDDSA_SIGNING
+	return request.WorkType == EcdsaSigning || request.WorkType == EddsaSigning
 }

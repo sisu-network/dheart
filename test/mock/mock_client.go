@@ -5,10 +5,10 @@ import (
 )
 
 type MockClient struct {
-	TryDialFunc                func()
-	PostKeygenResultFunc       func(workId string)
-	BroadcastKeygenResultFunc  func(chain string, pubKeyBytes []byte, address string) error
-	BroadcastKeySignResultFunc func(result *types.KeysignResult) error
+	TryDialFunc           func()
+	PostKeygenResultFunc  func(result *types.KeygenResult) error
+	PostPresignResultFunc func(result *types.PresignResult) error
+	PostKeysignResultFunc func(result *types.KeysignResult) error
 }
 
 func (m *MockClient) TryDial() {
@@ -17,23 +17,25 @@ func (m *MockClient) TryDial() {
 	}
 }
 
-func (m *MockClient) PostKeygenResult(workId string) {
+func (m *MockClient) PostKeygenResult(result *types.KeygenResult) error {
 	if m.PostKeygenResultFunc != nil {
-		m.PostKeygenResultFunc(workId)
-	}
-}
-
-func (m *MockClient) BroadcastKeygenResult(chain string, pubKeyBytes []byte, address string) error {
-	if m.BroadcastKeygenResultFunc != nil {
-		return m.BroadcastKeygenResultFunc(chain, pubKeyBytes, address)
+		return m.PostKeygenResultFunc(result)
 	}
 
 	return nil
 }
 
-func (m *MockClient) BroadcastKeySignResult(result *types.KeysignResult) error {
-	if m.BroadcastKeySignResultFunc != nil {
-		return m.BroadcastKeySignResultFunc(result)
+func (m *MockClient) PostKeysignResult(result *types.KeysignResult) error {
+	if m.PostKeysignResultFunc != nil {
+		return m.PostKeysignResultFunc(result)
+	}
+
+	return nil
+}
+
+func (m *MockClient) PostPresignResult(result *types.PresignResult) error {
+	if m.PostPresignResultFunc != nil {
+		return m.PostPresignResultFunc(result)
 	}
 
 	return nil

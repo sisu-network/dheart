@@ -43,7 +43,7 @@ func TestPresignEndToEnd(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := &types.WorkRequest{
 			WorkId:       "Presign0",
-			WorkType:     types.ECDSA_PRESIGN,
+			WorkType:     types.EcdsaPresign,
 			AllParties:   helper.CopySortedPartyIds(pIDs),
 			PresignInput: presignInputs[i],
 			Threshold:    len(pIDs) - 1,
@@ -102,7 +102,7 @@ func TestPresign_Timeout(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := &types.WorkRequest{
 			WorkId:       "Presign0",
-			WorkType:     types.ECDSA_PRESIGN,
+			WorkType:     types.EcdsaPresign,
 			AllParties:   helper.CopySortedPartyIds(pIDs),
 			PresignInput: presignInputs[i],
 			Threshold:    len(pIDs) - 1,

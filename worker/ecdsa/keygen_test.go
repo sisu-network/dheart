@@ -38,7 +38,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 
 		request := &types.WorkRequest{
 			WorkId:      "Keygen0",
-			WorkType:    types.ECDSA_KEYGEN,
+			WorkType:    types.EcdsaKeygen,
 			AllParties:  helper.CopySortedPartyIds(pIDs),
 			KeygenInput: preparams,
 			Threshold:   threshold,
