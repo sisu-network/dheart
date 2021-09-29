@@ -80,7 +80,7 @@ func TestSigningEndToEnd(t *testing.T) {
 			batchSize,
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0),
+			helper.NewTestDispatcher(outCh, 0, 0),
 			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
 			&helper.MockWorkerCallback{
 				OnWorkSigningFinishedFunc: func(request *types.WorkRequest, data []*libCommon.SignatureData) {
@@ -118,7 +118,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	verifySignature(t, signingMsg, outputs, wrapper)
 }
 
-func TestSigning_Timeout(t *testing.T) {
+func TestSigning_PreExecutionTimeout(t *testing.T) {
 	wrapper := helper.LoadPresignSavedData(0)
 	n := len(wrapper.Outputs)
 	batchSize := len(wrapper.Outputs[0])
@@ -146,7 +146,7 @@ func TestSigning_Timeout(t *testing.T) {
 			batchSize,
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 3*time.Second+1),
+			helper.NewTestDispatcher(outCh, 3*time.Second+1, 0),
 			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
 			&helper.MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
@@ -156,6 +156,58 @@ func TestSigning_Timeout(t *testing.T) {
 				},
 			},
 			10*time.Minute,
+		)
+
+		workers[i] = worker
+	}
+
+	// Start all workers
+	startAllWorkers(workers)
+
+	// Run all workers
+	runAllWorkers(workers, outCh, done)
+
+	assert.EqualValues(t, 4, numFailedWorkers)
+}
+
+func TestSigning_ExecutionTimeout(t *testing.T) {
+	wrapper := helper.LoadPresignSavedData(0)
+	n := len(wrapper.Outputs)
+	batchSize := len(wrapper.Outputs[0])
+
+	// Batch should have the same set of party ids.
+	pIDs := wrapper.Outputs[0][0].PartyIds
+	outCh := make(chan *common.TssMessage, 4)
+	workers := make([]worker.Worker, n)
+	done := make(chan bool)
+	signingMsg := "This is a test"
+	var numFailedWorkers uint32
+
+	for i := 0; i < n; i++ {
+		request := &types.WorkRequest{
+			WorkId:     fmt.Sprintf("Signing_0"),
+			WorkType:   types.EcdsaSigning,
+			BatchSize:  batchSize,
+			AllParties: helper.CopySortedPartyIds(pIDs),
+			Threshold:  len(pIDs) - 1,
+			Message:    signingMsg,
+			N:          n,
+		}
+
+		worker := NewSigningWorker(
+			batchSize,
+			request,
+			pIDs[i],
+			helper.NewTestDispatcher(outCh, 0, 2*time.Second+1),
+			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
+			&helper.MockWorkerCallback{
+				OnWorkFailedFunc: func(request *types.WorkRequest) {
+					if n := atomic.AddUint32(&numFailedWorkers, 1); n == 4 {
+						done <- true
+					}
+				},
+			},
+			time.Second,
 		)
 
 		workers[i] = worker

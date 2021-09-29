@@ -253,27 +253,39 @@ type PresignDataWrapper struct {
 //---/
 
 type TestDispatcher struct {
-	msgCh chan *common.TssMessage
-	delay time.Duration
+	msgCh             chan *common.TssMessage
+	preExecutionDelay time.Duration
+	executionDelay    time.Duration
 }
 
-func NewTestDispatcher(msgCh chan *common.TssMessage, delay time.Duration) *TestDispatcher {
+func NewTestDispatcher(msgCh chan *common.TssMessage, preExecutionDelay, executionDelay time.Duration) *TestDispatcher {
 	return &TestDispatcher{
-		msgCh: msgCh,
-		delay: delay,
+		msgCh:             msgCh,
+		preExecutionDelay: preExecutionDelay,
+		executionDelay:    executionDelay,
 	}
 }
 
 //---/
 
 func (d *TestDispatcher) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
-	time.Sleep(d.delay)
+	if tssMessage.Type == common.TssMessage_UPDATE_MESSAGES {
+		time.Sleep(d.executionDelay)
+	} else {
+		time.Sleep(d.preExecutionDelay)
+	}
+
 	d.msgCh <- tssMessage
 }
 
 // Send a message to a single destination.
 func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
-	time.Sleep(d.delay)
+	if tssMessage.Type == common.TssMessage_UPDATE_MESSAGES {
+		time.Sleep(d.executionDelay)
+	} else {
+		time.Sleep(d.preExecutionDelay)
+	}
+
 	d.msgCh <- tssMessage
 }
 

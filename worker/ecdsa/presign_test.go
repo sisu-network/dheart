@@ -56,7 +56,7 @@ func TestPresignEndToEnd(t *testing.T) {
 			batchSize,
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0),
+			helper.NewTestDispatcher(outCh, 0, 0),
 			helper.NewMockDatabase(),
 			&helper.MockWorkerCallback{
 				OnWorkPresignFinishedFunc: func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
@@ -89,7 +89,7 @@ func TestPresignEndToEnd(t *testing.T) {
 	helper.SavePresignData(n, presignOutputs, 0)
 }
 
-func TestPresign_Timeout(t *testing.T) {
+func TestPresign_PreExecutionTimeout(t *testing.T) {
 	n := 4
 	batchSize := 1
 	pIDs := helper.GetTestPartyIds(n)
@@ -114,7 +114,7 @@ func TestPresign_Timeout(t *testing.T) {
 			batchSize,
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 3*time.Second+1),
+			helper.NewTestDispatcher(outCh, 3*time.Second+1, 0),
 			helper.NewMockDatabase(),
 			&helper.MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
@@ -124,6 +124,55 @@ func TestPresign_Timeout(t *testing.T) {
 				},
 			},
 			10*time.Minute,
+		)
+
+		workers[i] = worker
+	}
+
+	// Start all workers
+	startAllWorkers(workers)
+
+	// Run all workers
+	runAllWorkers(workers, outCh, done)
+
+	assert.EqualValues(t, 4, numFailedWorkers)
+}
+
+func TestPresign_ExecutionTimeout(t *testing.T) {
+	n := 4
+	batchSize := 1
+	pIDs := helper.GetTestPartyIds(n)
+	presignInputs := helper.LoadKeygenSavedData(pIDs)
+	outCh := make(chan *common.TssMessage)
+	workers := make([]worker.Worker, n)
+	done := make(chan bool)
+
+	var numFailedWorkers uint32
+
+	for i := 0; i < n; i++ {
+		request := &types.WorkRequest{
+			WorkId:       "Presign0",
+			WorkType:     types.EcdsaPresign,
+			AllParties:   helper.CopySortedPartyIds(pIDs),
+			PresignInput: presignInputs[i],
+			Threshold:    len(pIDs) - 1,
+			N:            n,
+		}
+
+		worker := NewPresignWorker(
+			batchSize,
+			request,
+			pIDs[i],
+			helper.NewTestDispatcher(outCh, 0, 2*time.Second),
+			helper.NewMockDatabase(),
+			&helper.MockWorkerCallback{
+				OnWorkFailedFunc: func(request *types.WorkRequest) {
+					if n := atomic.AddUint32(&numFailedWorkers, 1); n == 4 {
+						done <- true
+					}
+				},
+			},
+			time.Second,
 		)
 
 		workers[i] = worker
