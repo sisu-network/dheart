@@ -49,7 +49,14 @@ type Job struct {
 	timeOut time.Duration
 }
 
-func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, localPreparams *keygen.LocalPreParams, callback JobCallback) *Job {
+func NewKeygenJob(
+	index int,
+	pIDs tss.SortedPartyIDs,
+	params *tss.Parameters,
+	localPreparams *keygen.LocalPreParams,
+	callback JobCallback,
+	timeOut time.Duration,
+) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan keygen.LocalPartySaveData, len(pIDs))
 	closeCh := make(chan struct{}, 1)
@@ -64,11 +71,18 @@ func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, lo
 		endKeygenCh: endCh,
 		callback:    callback,
 		closeCh:     closeCh,
-		timeOut:     10 * time.Minute,
+		timeOut:     timeOut,
 	}
 }
 
-func NewPresignJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, savedData *keygen.LocalPartySaveData, callback JobCallback) *Job {
+func NewPresignJob(
+	index int,
+	pIDs tss.SortedPartyIDs,
+	params *tss.Parameters,
+	savedData *keygen.LocalPartySaveData,
+	callback JobCallback,
+	timeOut time.Duration,
+) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan presign.LocalPresignData, len(pIDs))
 
@@ -81,10 +95,19 @@ func NewPresignJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, s
 		outCh:        outCh,
 		endPresignCh: endCh,
 		callback:     callback,
+		timeOut:      timeOut,
 	}
 }
 
-func NewSigningJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, msg string, signingInput *presign.LocalPresignData, callback JobCallback) *Job {
+func NewSigningJob(
+	index int,
+	pIDs tss.SortedPartyIDs,
+	params *tss.Parameters,
+	msg string,
+	signingInput *presign.LocalPresignData,
+	callback JobCallback,
+	timeOut time.Duration,
+) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan libCommon.SignatureData, len(pIDs))
 
@@ -98,6 +121,7 @@ func NewSigningJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, m
 		outCh:        outCh,
 		endSigningCh: endCh,
 		callback:     callback,
+		timeOut:      timeOut,
 	}
 }
 

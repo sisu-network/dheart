@@ -102,6 +102,7 @@ func TestSigningEndToEnd(t *testing.T) {
 					return wrapper.Outputs[workerIndex]
 				},
 			},
+			10*time.Minute,
 		)
 
 		workers[i] = worker
@@ -154,6 +155,7 @@ func TestSigning_Timeout(t *testing.T) {
 					}
 				},
 			},
+			10*time.Minute,
 		)
 
 		workers[i] = worker

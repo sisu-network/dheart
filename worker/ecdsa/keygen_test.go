@@ -66,6 +66,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 					}
 				},
 			},
+			10*time.Minute,
 		)
 	}
 

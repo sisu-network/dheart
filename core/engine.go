@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -28,6 +29,8 @@ const (
 	MaxWorker = 2
 	BatchSize = 4
 )
+
+var defaultJobTimeout = 10 * time.Minute
 
 type EngineCallback interface {
 	OnWorkKeygenFinished(result *types2.KeygenResult)
@@ -64,24 +67,46 @@ type Engine struct {
 
 	// TODO: Remove used presigns after getting a match to avoid using duplicated presigns.
 	presignsManager *AvailPresignManager
+
+	presignJobTimeout time.Duration
+	keygenJobTimeout  time.Duration
+	signingJobTimeout time.Duration
 }
 
 func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback, privateKey ctypes.PrivKey) *Engine {
 	return &Engine{
-		myNode:          myNode,
-		myPid:           myNode.PartyId,
-		db:              db,
-		cm:              cm,
-		workers:         make(map[string]worker.Worker),
-		requestQueue:    NewRequestQueue(),
-		workLock:        &sync.RWMutex{},
-		preworkCache:    worker.NewMessageCache(),
-		callback:        callback,
-		nodes:           make(map[string]*Node),
-		signer:          signer.NewDefaultSigner(privateKey),
-		nodeLock:        &sync.RWMutex{},
-		presignsManager: NewAvailPresignManager(db),
+		myNode:            myNode,
+		myPid:             myNode.PartyId,
+		db:                db,
+		cm:                cm,
+		workers:           make(map[string]worker.Worker),
+		requestQueue:      NewRequestQueue(),
+		workLock:          &sync.RWMutex{},
+		preworkCache:      worker.NewMessageCache(),
+		callback:          callback,
+		nodes:             make(map[string]*Node),
+		signer:            signer.NewDefaultSigner(privateKey),
+		nodeLock:          &sync.RWMutex{},
+		presignsManager:   NewAvailPresignManager(db),
+		keygenJobTimeout:  defaultJobTimeout,
+		signingJobTimeout: defaultJobTimeout,
+		presignJobTimeout: defaultJobTimeout,
 	}
+}
+
+func (engine *Engine) WithKeygenTimeout(timeout time.Duration) *Engine {
+	engine.keygenJobTimeout = timeout
+	return engine
+}
+
+func (engine *Engine) WithPresignTimeout(timeout time.Duration) *Engine {
+	engine.presignJobTimeout = timeout
+	return engine
+}
+
+func (engine *Engine) WithSigningTimeout(timeout time.Duration) *Engine {
+	engine.signingJobTimeout = timeout
+	return engine
 }
 
 func (engine *Engine) Init() {
@@ -130,13 +155,13 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 	// Create a new worker.
 	switch request.WorkType {
 	case types.EcdsaKeygen:
-		w = ecdsa.NewKeygenWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
+		w = ecdsa.NewKeygenWorker(BatchSize, request, workPartyId, engine, engine.db, engine, engine.keygenJobTimeout)
 
 	case types.EcdsaPresign:
-		w = ecdsa.NewPresignWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
+		w = ecdsa.NewPresignWorker(BatchSize, request, workPartyId, engine, engine.db, engine, engine.presignJobTimeout)
 
 	case types.EcdsaSigning:
-		w = ecdsa.NewSigningWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
+		w = ecdsa.NewSigningWorker(BatchSize, request, workPartyId, engine, engine.db, engine, engine.signingJobTimeout)
 	}
 
 	engine.workLock.Lock()

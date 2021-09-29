@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	types2 "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
 )
 
 func TestEngineDelayStart(t *testing.T) {
@@ -42,7 +42,7 @@ func TestEngineDelayStart(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
-		cb := func(workerId string, data []*presign.LocalPresignData) {
+		cb := func(result *types2.PresignResult) {
 			outputLock.Lock()
 			defer outputLock.Unlock()
 
@@ -69,7 +69,7 @@ func TestEngineDelayStart(t *testing.T) {
 		request := types.NewPresignRequest(workId, n, helper.CopySortedPartyIds(pIDs), *savedData[i], true)
 
 		go func(engine *Engine, request *types.WorkRequest, delay time.Duration) {
-			// Deplay starting each engine to simluate that different workers can start at different times.
+			// Deplay starting each engine to simulate that different workers can start at different times.
 			time.Sleep(delay)
 			engine.AddRequest(request)
 		}(engines[i], request, time.Millisecond*time.Duration(i*350))

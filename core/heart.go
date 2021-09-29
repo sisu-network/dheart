@@ -91,22 +91,22 @@ func (h *Heart) OnWorkFailed(chain string, workType types.WorkType, culprits []*
 	switch workType {
 	case types.EcdsaKeygen, types.EddsaKeygen:
 		result := types2.KeygenResult{
-			Chain:       chain,
-			Success:     false,
-			Culprits:    culprits,
+			Chain:    chain,
+			Success:  false,
+			Culprits: culprits,
 		}
 		h.client.PostKeygenResult(&result)
 	case types.EcdsaPresign, types.EddsaPresign:
 		result := types2.PresignResult{
-			Chain:       chain,
-			Success:     false,
-			Culprits:    culprits,
+			Chain:    chain,
+			Success:  false,
+			Culprits: culprits,
 		}
 		h.client.PostPresignResult(&result)
 	case types.EcdsaSigning, types.EddsaSigning:
 		result := types2.KeysignResult{
-			Success:     false,
-			Culprits:    culprits,
+			Success:  false,
+			Culprits: culprits,
 		}
 		h.client.PostKeysignResult(&result)
 	}

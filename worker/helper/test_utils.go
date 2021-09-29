@@ -13,6 +13,7 @@ import (
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
+	types2 "github.com/sisu-network/dheart/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -151,26 +152,33 @@ func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*presign.
 //---/
 
 type MockEngineCallback struct {
-	OnWorkKeygenFinishedFunc  func(workId string, data []*keygen.LocalPartySaveData)
-	OnWorkPresignFinishedFunc func(workId string, data []*presign.LocalPresignData)
-	OnWorkSigningFinishedFunc func(workId string, data []*libCommon.SignatureData)
+	OnWorkKeygenFinishedFunc  func(result *types2.KeygenResult)
+	OnWorkPresignFinishedFunc func(result *types2.PresignResult)
+	OnWorkSigningFinishedFunc func(result *types2.KeysignResult)
+	OnWorkFailedFunc          func(chain string, workType types.WorkType, culprits []*tss.PartyID)
 }
 
-func (cb *MockEngineCallback) OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData) {
+func (cb *MockEngineCallback) OnWorkKeygenFinished(result *types2.KeygenResult) {
 	if cb.OnWorkKeygenFinishedFunc != nil {
-		cb.OnWorkKeygenFinishedFunc(workId, data)
+		cb.OnWorkKeygenFinishedFunc(result)
 	}
 }
 
-func (cb *MockEngineCallback) OnWorkPresignFinished(workId string, data []*presign.LocalPresignData) {
+func (cb *MockEngineCallback) OnWorkPresignFinished(result *types2.PresignResult) {
 	if cb.OnWorkPresignFinishedFunc != nil {
-		cb.OnWorkPresignFinishedFunc(workId, data)
+		cb.OnWorkPresignFinishedFunc(result)
 	}
 }
 
-func (cb *MockEngineCallback) OnWorkSigningFinished(workId string, data []*libCommon.SignatureData) {
+func (cb *MockEngineCallback) OnWorkSigningFinished(result *types2.KeysignResult) {
 	if cb.OnWorkSigningFinishedFunc != nil {
-		cb.OnWorkSigningFinishedFunc(workId, data)
+		cb.OnWorkSigningFinishedFunc(result)
+	}
+}
+
+func (cb *MockEngineCallback) OnWorkFailed(chain string, workType types.WorkType, culprits []*tss.PartyID) {
+	if cb.OnWorkFailedFunc != nil {
+		cb.OnWorkFailedFunc(chain, workType, culprits)
 	}
 }
 

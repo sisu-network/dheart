@@ -104,6 +104,8 @@ type DefaultWorker struct {
 
 	roundLock *sync.RWMutex
 	curRound  string
+
+	jobTimeout time.Duration
 }
 
 func NewKeygenWorker(
@@ -113,8 +115,9 @@ func NewKeygenWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
+	jobTimeout time.Duration,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
 
 	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
@@ -132,8 +135,9 @@ func NewPresignWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
+	jobTimeout time.Duration,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
 
 	w.jobType = wTypes.EcdsaPresign
 	w.presignInput = request.PresignInput
@@ -150,9 +154,10 @@ func NewSigningWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
+	jobTimeout time.Duration,
 ) worker.Worker {
 	// TODO: The request.Pids
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
 
 	w.jobType = wTypes.EcdsaSigning
 	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
@@ -170,6 +175,7 @@ func baseWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
+	timeOut time.Duration,
 ) *DefaultWorker {
 	return &DefaultWorker{
 		request:           request,
@@ -190,6 +196,7 @@ func baseWorker(
 		preExecutionCache: worker.NewMessageCache(),
 		blameMgr:          blame.NewManager(),
 		roundLock:         &sync.RWMutex{},
+		jobTimeout:        timeOut,
 	}
 }
 
@@ -234,13 +241,13 @@ func (w *DefaultWorker) executeWork() error {
 	for i := range w.jobs {
 		switch w.jobType {
 		case wTypes.EcdsaKeygen:
-			w.jobs[i] = NewKeygenJob(i, w.pIDs, params, w.keygenInput, w)
+			w.jobs[i] = NewKeygenJob(i, w.pIDs, params, w.keygenInput, w, w.jobTimeout)
 
 		case wTypes.EcdsaPresign:
-			w.jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w)
+			w.jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
 
 		case wTypes.EcdsaSigning:
-			w.jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessage, w.signingInput[i], w)
+			w.jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessage, w.signingInput[i], w, w.jobTimeout)
 
 		default:
 			// If job type is not correct, kill the whole worker.
