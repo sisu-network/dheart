@@ -17,6 +17,7 @@ import (
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/server"
 	"github.com/sisu-network/dheart/store"
+	"github.com/sisu-network/dheart/utils"
 )
 
 func LoadConfigEnv(filenames ...string) {
@@ -117,18 +118,20 @@ func SetupApiServer() {
 
 	handler := rpc.NewServer()
 	if os.Getenv("USE_ON_MEMORY") == "true" {
+		utils.LogInfo("Running single node mode...")
 		api := server.NewSingleNodeApi(c, store)
 		api.Init()
 
 		handler.RegisterName("tss", api)
 	} else {
 		// Use Heart
+		utils.LogInfo("Running multiple nodes mode...")
 		connectionConfig := getConnectionConfig()
 		heart := GetHeart(connectionConfig, client.NewClient(os.Getenv("SISU_SERVER_URL")))
 		handler.RegisterName("tss", server.NewTssApi(heart))
 	}
 
-	s := server.NewServer(handler, "localhost", 5678)
+	s := server.NewServer(handler, "0.0.0.0", 5678)
 
 	go c.TryDial()
 	go s.Run()
