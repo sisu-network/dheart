@@ -11,37 +11,35 @@ import (
 )
 
 const (
-	Keygen1   = "KGRound1Message"
-	Keygen21  = "KGRound2Message1"
-	Keygen22  = "KGRound2Message2"
-	Keygen3   = "KGRound3Message"
-	Presign11 = "PresignRound1Message1"
-	Presign12 = "PresignRound1Message2"
-	Presign2  = "PresignRound2Message"
-	Presign3  = "PresignRound3Message"
-	Presign4  = "PresignRound4Message"
-	Sign1     = "SignRound1Message"
+	Keygen1 = iota + 1
+	Keygen2
+	Keygen3
+	Presign1
+	Presign2
+	Presign3
+	Presign4
+	Sign1
 )
 
-func GetMsgRound(content tss.MessageContent) (string, error) {
+func GetMsgRound(content tss.MessageContent) (uint32, error) {
 	switch content.(type) {
 	case *keygen.KGRound1Message:
 		return Keygen1, nil
 
 	case *keygen.KGRound2Message1:
-		return Keygen21, nil
+		return Keygen1, nil
 
 	case *keygen.KGRound2Message2:
-		return Keygen22, nil
+		return Keygen2, nil
 
 	case *keygen.KGRound3Message:
 		return Keygen3, nil
 
 	case *presign.PresignRound1Message1:
-		return Presign11, nil
+		return Presign1, nil
 
 	case *presign.PresignRound1Message2:
-		return Presign12, nil
+		return Presign1, nil
 
 	case *presign.PresignRound2Message:
 		return Presign2, nil
@@ -56,31 +54,27 @@ func GetMsgRound(content tss.MessageContent) (string, error) {
 		return Sign1, nil
 
 	default:
-		return "", errors.New("unknown round")
+		return 0, errors.New("unknown round")
 	}
 }
 
-func NextRound(jobType wTypes.WorkType, curRound string) string {
+func NextRound(jobType wTypes.WorkType, curRound uint32) uint32 {
 	switch jobType {
 	case wTypes.EcdsaKeygen:
 		switch curRound {
 		case Keygen1:
-			return Keygen21
-		case Keygen21:
-			return Keygen22
-		case Keygen22:
+			return Keygen2
+		case Keygen2:
 			return Keygen3
 		}
 
 	case wTypes.EcdsaPresign:
 		switch curRound {
-		case Presign11:
-			return Presign12
-		case Presign12:
+		case Presign1:
 			return Presign2
 		case Presign2:
 			return Presign3
-		case Keygen3:
+		case Presign3:
 			return Presign4
 		}
 	}

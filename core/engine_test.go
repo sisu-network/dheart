@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	types2 "github.com/sisu-network/dheart/types"
+	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
@@ -44,7 +44,7 @@ func TestEngineDelayStart(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
-		cb := func(result *types2.PresignResult) {
+		cb := func(result *htypes.PresignResult) {
 			outputLock.Lock()
 			defer outputLock.Unlock()
 

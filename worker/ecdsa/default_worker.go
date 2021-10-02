@@ -102,8 +102,7 @@ type DefaultWorker struct {
 
 	blameMgr *blame.Manager
 
-	roundLock *sync.RWMutex
-	curRound  string
+	curRound uint32
 
 	jobTimeout time.Duration
 }
@@ -142,7 +141,7 @@ func NewPresignWorker(
 	w.jobType = wTypes.EcdsaPresign
 	w.presignInput = request.PresignInput
 	w.presignOutputs = make([]*presign.LocalPresignData, batchSize)
-	w.curRound = message.Presign11
+	w.curRound = message.Presign1
 
 	return w
 }
@@ -195,7 +194,6 @@ func baseWorker(
 		availableParties:  NewAvailableParties(),
 		preExecutionCache: worker.NewMessageCache(),
 		blameMgr:          blame.NewManager(),
-		roundLock:         &sync.RWMutex{},
 		jobTimeout:        timeOut,
 	}
 }
@@ -314,9 +312,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 			return
 		}
 
-		w.roundLock.Lock()
-		w.curRound = message.NextRound(w.jobType, w.curRound)
-		w.roundLock.Unlock()
+		atomic.StoreUint32(&w.curRound, message.NextRound(w.jobType, w.curRound))
 
 		if dest == nil {
 			// broadcast
@@ -408,20 +404,18 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 			if err != nil {
 				utils.LogError("error when getting round %w", err)
 				// If cannot get msg round, blame the sender
-				w.blameMgr.AddCulpritByRound(w.curRound, []*tss.PartyID{msgs[id].GetFrom()})
+				w.blameMgr.AddCulpritByRound(blame.CreateRoundKey(w.workId, w.curRound), []*tss.PartyID{msgs[id].GetFrom()})
 			}
 
-			if len(round) > 0 {
-				w.blameMgr.AddSender(round, tssMsg.From)
-			}
+			w.blameMgr.AddSender(blame.CreateRoundKey(w.workId, round), tssMsg.From)
 
 			if err := w.jobs[id].processMessage(msgs[id]); err != nil {
 				// Message can be from bad actor/corrupted. Save the culprits, and ignore.
 				utils.LogError("cannot process message error", err)
-				if len(round) > 0 {
-					w.blameMgr.AddCulpritByRound(round, err.Culprits())
+				if round > 0 {
+					w.blameMgr.AddCulpritByRound(blame.CreateRoundKey(w.workId, round), err.Culprits())
 				} else {
-					w.blameMgr.AddCulpritByRound(w.curRound, err.Culprits())
+					w.blameMgr.AddCulpritByRound(blame.CreateRoundKey(w.workId, atomic.LoadUint32(&w.curRound)), err.Culprits())
 				}
 			}
 		}(i)
@@ -511,17 +505,13 @@ func (w *DefaultWorker) GetWorkId() string {
 }
 
 func (w *DefaultWorker) GetCulprits() []*tss.PartyID {
-	// If pre execution error, return pre execution culprits
+	// If there's pre_execution error, return pre_execution culprits
 	culprits := w.blameMgr.GetPreExecutionCulprits()
 	if len(culprits) > 0 {
 		return culprits
 	}
 
-	w.roundLock.Lock()
-	curRound := w.curRound
-	w.roundLock.Unlock()
-
-	return w.blameMgr.GetRoundCulprits(curRound, w.pIDsMap)
+	return w.blameMgr.GetRoundCulprits(blame.CreateRoundKey(w.workId, atomic.LoadUint32(&w.curRound)), w.pIDsMap)
 }
 
 func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/p2p"
-	types2 "github.com/sisu-network/dheart/types"
+	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
@@ -15,30 +15,30 @@ import (
 )
 
 type EngineCallback struct {
-	keygenDataCh  chan *types2.KeygenResult
-	presignDataCh chan *types2.PresignResult
-	signingDataCh chan *types2.KeysignResult
+	keygenDataCh  chan *htypes.KeygenResult
+	presignDataCh chan *htypes.PresignResult
+	signingDataCh chan *htypes.KeysignResult
 }
 
 func NewEngineCallback(
-	keygenDataCh chan *types2.KeygenResult,
-	presignDataCh chan *types2.PresignResult,
-	signingDataCh chan *types2.KeysignResult,
+	keygenDataCh chan *htypes.KeygenResult,
+	presignDataCh chan *htypes.PresignResult,
+	signingDataCh chan *htypes.KeysignResult,
 ) *EngineCallback {
 	return &EngineCallback{
 		keygenDataCh, presignDataCh, signingDataCh,
 	}
 }
 
-func (cb *EngineCallback) OnWorkKeygenFinished(result *types2.KeygenResult) {
+func (cb *EngineCallback) OnWorkKeygenFinished(result *htypes.KeygenResult) {
 	cb.keygenDataCh <- result
 }
 
-func (cb *EngineCallback) OnWorkPresignFinished(result *types2.PresignResult) {
+func (cb *EngineCallback) OnWorkPresignFinished(result *htypes.PresignResult) {
 	cb.presignDataCh <- result
 }
 
-func (cb *EngineCallback) OnWorkSigningFinished(result *types2.KeysignResult) {
+func (cb *EngineCallback) OnWorkSigningFinished(result *htypes.KeysignResult) {
 	cb.signingDataCh <- result
 }
 
@@ -90,7 +90,7 @@ func main() {
 	pids = tss.SortPartyIDs(pids)
 
 	// Create new engine
-	outCh := make(chan *types2.KeygenResult)
+	outCh := make(chan *htypes.KeygenResult)
 	cb := NewEngineCallback(outCh, nil, nil)
 	engine := core.NewEngine(nodes[index], cm, helper.NewMockDatabase(), cb, allKeys[index])
 	cm.AddListener(p2p.TSSProtocolID, engine)

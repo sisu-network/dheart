@@ -13,7 +13,7 @@ import (
 	"github.com/sisu-network/dheart/core/signer"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
-	types2 "github.com/sisu-network/dheart/types"
+	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
@@ -33,11 +33,11 @@ const (
 var defaultJobTimeout = 10 * time.Minute
 
 type EngineCallback interface {
-	OnWorkKeygenFinished(result *types2.KeygenResult)
+	OnWorkKeygenFinished(result *htypes.KeygenResult)
 
-	OnWorkPresignFinished(result *types2.PresignResult)
+	OnWorkPresignFinished(result *htypes.PresignResult)
 
-	OnWorkSigningFinished(result *types2.KeysignResult)
+	OnWorkSigningFinished(result *htypes.KeysignResult)
 
 	OnWorkFailed(chain string, workType types.WorkType, culprits []*tss.PartyID)
 }
@@ -101,11 +101,6 @@ func (engine *Engine) WithKeygenTimeout(timeout time.Duration) *Engine {
 
 func (engine *Engine) WithPresignTimeout(timeout time.Duration) *Engine {
 	engine.presignJobTimeout = timeout
-	return engine
-}
-
-func (engine *Engine) WithSigningTimeout(timeout time.Duration) *Engine {
-	engine.signingJobTimeout = timeout
 	return engine
 }
 
@@ -204,7 +199,7 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 	engine.db.SaveKeygenData(request.Chain, request.WorkId, request.AllParties, output)
 
 	// Make a callback and start next work.
-	result := types2.KeygenResult{
+	result := htypes.KeygenResult{
 		Chain:   request.Chain,
 		Success: true,
 	}
@@ -217,7 +212,7 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
 	engine.db.SavePresignData(request.Chain, request.WorkId, pids, data)
 
-	result := types2.PresignResult{
+	result := htypes.PresignResult{
 		Chain:   request.Chain,
 		Success: true,
 	}
@@ -231,7 +226,7 @@ func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*
 func (engine *Engine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
 	// TODO: save output.
 
-	result := types2.KeysignResult{
+	result := htypes.KeysignResult{
 		Success: true,
 	}
 

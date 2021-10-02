@@ -13,7 +13,7 @@ import (
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
-	types2 "github.com/sisu-network/dheart/types"
+	dtypes "github.com/sisu-network/dheart/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -152,25 +152,25 @@ func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*presign.
 //---/
 
 type MockEngineCallback struct {
-	OnWorkKeygenFinishedFunc  func(result *types2.KeygenResult)
-	OnWorkPresignFinishedFunc func(result *types2.PresignResult)
-	OnWorkSigningFinishedFunc func(result *types2.KeysignResult)
+	OnWorkKeygenFinishedFunc  func(result *dtypes.KeygenResult)
+	OnWorkPresignFinishedFunc func(result *dtypes.PresignResult)
+	OnWorkSigningFinishedFunc func(result *dtypes.KeysignResult)
 	OnWorkFailedFunc          func(chain string, workType types.WorkType, culprits []*tss.PartyID)
 }
 
-func (cb *MockEngineCallback) OnWorkKeygenFinished(result *types2.KeygenResult) {
+func (cb *MockEngineCallback) OnWorkKeygenFinished(result *dtypes.KeygenResult) {
 	if cb.OnWorkKeygenFinishedFunc != nil {
 		cb.OnWorkKeygenFinishedFunc(result)
 	}
 }
 
-func (cb *MockEngineCallback) OnWorkPresignFinished(result *types2.PresignResult) {
+func (cb *MockEngineCallback) OnWorkPresignFinished(result *dtypes.PresignResult) {
 	if cb.OnWorkPresignFinishedFunc != nil {
 		cb.OnWorkPresignFinishedFunc(result)
 	}
 }
 
-func (cb *MockEngineCallback) OnWorkSigningFinished(result *types2.KeysignResult) {
+func (cb *MockEngineCallback) OnWorkSigningFinished(result *dtypes.KeysignResult) {
 	if cb.OnWorkSigningFinishedFunc != nil {
 		cb.OnWorkSigningFinishedFunc(result)
 	}

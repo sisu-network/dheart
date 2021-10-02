@@ -14,7 +14,7 @@ import (
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
-	types2 "github.com/sisu-network/dheart/types"
+	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
@@ -75,36 +75,36 @@ func (h *Heart) createDb() {
 
 // --- Implements Engine callback /
 
-func (h *Heart) OnWorkKeygenFinished(result *types2.KeygenResult) {
+func (h *Heart) OnWorkKeygenFinished(result *htypes.KeygenResult) {
 	h.client.PostKeygenResult(result)
 }
 
-func (h *Heart) OnWorkPresignFinished(result *types2.PresignResult) {
+func (h *Heart) OnWorkPresignFinished(result *htypes.PresignResult) {
 	h.client.PostPresignResult(result)
 }
 
-func (h *Heart) OnWorkSigningFinished(result *types2.KeysignResult) {
+func (h *Heart) OnWorkSigningFinished(result *htypes.KeysignResult) {
 	h.client.PostKeysignResult(result)
 }
 
 func (h *Heart) OnWorkFailed(chain string, workType types.WorkType, culprits []*tss.PartyID) {
 	switch workType {
 	case types.EcdsaKeygen, types.EddsaKeygen:
-		result := types2.KeygenResult{
+		result := htypes.KeygenResult{
 			Chain:    chain,
 			Success:  false,
 			Culprits: culprits,
 		}
 		h.client.PostKeygenResult(&result)
 	case types.EcdsaPresign, types.EddsaPresign:
-		result := types2.PresignResult{
+		result := htypes.PresignResult{
 			Chain:    chain,
 			Success:  false,
 			Culprits: culprits,
 		}
 		h.client.PostPresignResult(&result)
 	case types.EcdsaSigning, types.EddsaSigning:
-		result := types2.KeysignResult{
+		result := htypes.KeysignResult{
 			Success:  false,
 			Culprits: culprits,
 		}
