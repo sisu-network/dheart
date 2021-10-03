@@ -309,10 +309,10 @@ func (d *SqlDatabase) DeleteKeygenWork(workId string) error {
 }
 
 func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error) {
-	// 1. Constract the query
+	// 1. Construct the query
 	questions := getQueryQuestionMark(1, len(presignIds))
 
-	query := "SELECT presign_output FROM presign WHERE presign_id IN = " + questions + " ORDER BY created_time DESC"
+	query := "SELECT presign_output FROM presign WHERE presign_id IN " + questions + " ORDER BY created_time DESC"
 
 	// Execute the query
 	interfaceArr := make([]interface{}, len(presignIds))
@@ -321,7 +321,6 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 	}
 
 	rows, err := d.db.Query(query, interfaceArr...)
-
 	if err != nil {
 		return nil, err
 	}

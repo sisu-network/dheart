@@ -32,7 +32,8 @@ func NewAvailPresignManager(db db.Database) *AvailPresignManager {
 	}
 }
 
-func (m *AvailPresignManager) GetUnavailablePresigns(sentNodes map[string]*tss.PartyID, allPids []*tss.PartyID) []*tss.PartyID {
+// GetUnavailablePresigns returns a list of choosen nodes that has not sent messages
+func (m *AvailPresignManager) GetUnavailablePresigns(sentNodes map[string]*tss.PartyID, allParties []*tss.PartyID) []*tss.PartyID {
 	// Nodes that are chosen.
 	pids := make([]string, 0, len(m.inUse))
 	for _, v := range m.inUse {
@@ -51,7 +52,7 @@ func (m *AvailPresignManager) GetUnavailablePresigns(sentNodes map[string]*tss.P
 
 	missing := make([]*tss.PartyID, 0, len(missingIDs))
 	for id := range missingIDs {
-		for _, pid := range allPids {
+		for _, pid := range allParties {
 			if pid.Id == id {
 				missing = append(missing, pid)
 			}
@@ -131,7 +132,7 @@ func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []
 	}
 
 	pidStrings := strings.Split(selectedPidstring, ",")
-	selectedPids := make([]*tss.PartyID, len(selectedPidstring))
+	selectedPids := make([]*tss.PartyID, len(pidStrings))
 
 	for i, pidString := range pidStrings {
 		for _, p := range pids {

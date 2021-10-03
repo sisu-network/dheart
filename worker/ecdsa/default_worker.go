@@ -403,19 +403,19 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 			round, err := message.GetMsgRound(msgs[id].Content())
 			if err != nil {
 				utils.LogError("error when getting round %w", err)
-				// If cannot get msg round, blame the sender
-				w.blameMgr.AddCulpritByRound(blame.CreateRoundKey(w.workId, w.curRound), []*tss.PartyID{msgs[id].GetFrom()})
+				// If we cannot get msg round, blame the sender
+				w.blameMgr.AddCulpritByRound(w.workId, w.curRound, []*tss.PartyID{msgs[id].GetFrom()})
 			}
 
-			w.blameMgr.AddSender(blame.CreateRoundKey(w.workId, round), tssMsg.From)
+			w.blameMgr.AddSender(w.workId, round, tssMsg.From)
 
 			if err := w.jobs[id].processMessage(msgs[id]); err != nil {
 				// Message can be from bad actor/corrupted. Save the culprits, and ignore.
 				utils.LogError("cannot process message error", err)
 				if round > 0 {
-					w.blameMgr.AddCulpritByRound(blame.CreateRoundKey(w.workId, round), err.Culprits())
+					w.blameMgr.AddCulpritByRound(w.workId, round, err.Culprits())
 				} else {
-					w.blameMgr.AddCulpritByRound(blame.CreateRoundKey(w.workId, atomic.LoadUint32(&w.curRound)), err.Culprits())
+					w.blameMgr.AddCulpritByRound(w.workId, atomic.LoadUint32(&w.curRound), err.Culprits())
 				}
 			}
 		}(i)
@@ -511,7 +511,7 @@ func (w *DefaultWorker) GetCulprits() []*tss.PartyID {
 		return culprits
 	}
 
-	return w.blameMgr.GetRoundCulprits(blame.CreateRoundKey(w.workId, atomic.LoadUint32(&w.curRound)), w.pIDsMap)
+	return w.blameMgr.GetRoundCulprits(w.workId, atomic.LoadUint32(&w.curRound), w.pIDsMap)
 }
 
 func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {

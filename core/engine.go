@@ -196,7 +196,9 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
 
 func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
 	// Save to database
-	engine.db.SaveKeygenData(request.Chain, request.WorkId, request.AllParties, output)
+	if err := engine.db.SaveKeygenData(request.Chain, request.WorkId, request.AllParties, output); err != nil {
+		utils.LogError("error when saving keygen data", err)
+	}
 
 	// Make a callback and start next work.
 	result := htypes.KeygenResult{
@@ -210,7 +212,9 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 }
 
 func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
-	engine.db.SavePresignData(request.Chain, request.WorkId, pids, data)
+	if err := engine.db.SavePresignData(request.Chain, request.WorkId, pids, data); err != nil {
+		utils.LogError("error when saving presign data", err)
+	}
 
 	result := htypes.PresignResult{
 		Chain:   request.Chain,

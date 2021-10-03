@@ -67,15 +67,28 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 	presignIds, selectedPids, err := w.waitForMemberResponse()
 	if err != nil {
 		// Only blame nodes that are chosen and don't send messages in time and the leader.
-		culprits := w.callback.GetUnavailablePresigns(w.availableParties.parties, w.allParties)
+		var culprits []*tss.PartyID
+		if w.request.IsSigning() {
+			// Only get unavailable presign when the round is signing
+			culprits = w.callback.GetUnavailablePresigns(w.availableParties.parties, w.allParties)
+		} else {
+			// Blame nodes that does not send messages
+			for _, party := range w.allParties {
+				if _, ok := w.availableParties.parties[party.Id]; !ok {
+					culprits = append(culprits, party)
+				}
+			}
+		}
+
 		w.blameMgr.AddPreExecutionCulprit(append(culprits, w.myPid))
 
 		utils.LogError("Leader: error while waiting for member response", err)
 		w.leaderFinalized(false, nil, nil)
 		w.callback.OnWorkFailed(w.request)
-	} else {
-		w.leaderFinalized(true, presignIds, selectedPids)
+		return
 	}
+
+	w.leaderFinalized(true, presignIds, selectedPids)
 }
 
 func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error) {
@@ -95,8 +108,7 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 		timeDiff := end.Sub(now)
 		select {
 		case <-time.After(timeDiff):
-			// Timeout
-			return nil, nil, errors.New("timeout")
+			return nil, nil, errors.New("timeout waiting for member response")
 
 		case tssMsg := <-w.memberResponseCh:
 			// Check if this member is one of the parties we know
@@ -133,7 +145,6 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 	if w.request.IsSigning() {
 		// Check if we can find a presign list that match this of nodes.
 		presignIds, selectedPids := w.callback.GetAvailablePresigns(w.batchSize, w.request.N, w.availableParties.getPartyList(w.request.N))
-
 		if len(presignIds) == w.batchSize {
 			// Announce this as success and return
 			return true, presignIds, selectedPids

@@ -8,7 +8,7 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-// Manager keeps track of the nodes that have sent messages in each round to find the culprits.
+// Manager keeps track of the nodes that have sent messages in each round to find the culprits if not successful.
 // It also keeps track of pre_execution culprits in keysign and presign round.
 type Manager struct {
 	// For each round, check which nodes sent message
@@ -16,7 +16,7 @@ type Manager struct {
 	// Key: workID + round, value: set of sent nodes
 	sentNodes map[string]map[string]struct{}
 
-	// Key: workID + round, value: set of sent nodes
+	// Key: workID + round, value: set of culprits in that round.
 	roundCulprits        map[string][]*tss.PartyID
 	preExecutionCulprits []*tss.PartyID
 
@@ -31,10 +31,11 @@ func NewManager() *Manager {
 	}
 }
 
-func (m *Manager) AddSender(key, sender string) {
+func (m *Manager) AddSender(workId string, round uint32, sender string) {
 	m.mgrLock.Lock()
 	defer m.mgrLock.Unlock()
 
+	key := createRoundKey(workId, round)
 	if _, ok := m.sentNodes[key]; !ok {
 		m.sentNodes[key] = make(map[string]struct{})
 	}
@@ -49,24 +50,26 @@ func (m *Manager) AddPreExecutionCulprit(culprits []*tss.PartyID) {
 	m.preExecutionCulprits = append(m.preExecutionCulprits, culprits...)
 }
 
-func (m *Manager) AddCulpritByRound(key string, culprits []*tss.PartyID) {
+func (m *Manager) AddCulpritByRound(workID string, round uint32, culprits []*tss.PartyID) {
 	m.mgrLock.Lock()
 	defer m.mgrLock.Unlock()
 
+	key := createRoundKey(workID, round)
 	m.roundCulprits[key] = append(m.roundCulprits[key], culprits...)
 }
 
-func (m *Manager) GetRoundCulprits(key string, peers map[string]*tss.PartyID) []*tss.PartyID {
+func (m *Manager) GetRoundCulprits(workId string, round uint32, allParties map[string]*tss.PartyID) []*tss.PartyID {
 	m.mgrLock.RLock()
 	defer m.mgrLock.RUnlock()
 
+	key := createRoundKey(workId, round)
 	sentNodes := mapset.NewSet()
 	for node := range m.sentNodes[key] {
 		sentNodes.Add(node)
 	}
 
 	allPeers := mapset.NewSet()
-	for _, p := range peers {
+	for _, p := range allParties {
 		allPeers.Add(p.Id)
 	}
 
@@ -80,7 +83,7 @@ func (m *Manager) GetRoundCulprits(key string, peers map[string]*tss.PartyID) []
 
 	culprits := make([]*tss.PartyID, 0, diff.Cardinality())
 	for _, p := range diff.ToSlice() {
-		if v, ok := peers[p.(string)]; ok {
+		if v, ok := allParties[p.(string)]; ok {
 			culprits = append(culprits, v)
 		}
 	}
@@ -95,6 +98,6 @@ func (m *Manager) GetPreExecutionCulprits() []*tss.PartyID {
 	return m.preExecutionCulprits
 }
 
-func CreateRoundKey(workID string, round uint32) string {
+func createRoundKey(workID string, round uint32) string {
 	return fmt.Sprintf("%s:%d", workID, round)
 }
