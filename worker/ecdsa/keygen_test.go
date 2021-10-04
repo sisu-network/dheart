@@ -1,6 +1,7 @@
 package ecdsa
 
 import (
+	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -146,4 +147,22 @@ func TestKeygenTimeout(t *testing.T) {
 
 	// Run all workers
 	runAllWorkers(workers, outCh, done)
+}
+
+// Dont' delete this. This is used for generating preparams for tests.
+// We do not use that right now because we have generate the preparams and save them into a file.
+// In the future, if we want to re-generate the preparams, we will need to call this function.
+func generateTestPreparams(n int) {
+	for i := 0; i < n; i++ {
+		preParams, _ := keygen.GeneratePreParams(1 * time.Minute)
+		bz, err := json.Marshal(preParams)
+		if err != nil {
+			panic(err)
+		}
+
+		err = helper.SaveTestPreparams(i, bz)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
