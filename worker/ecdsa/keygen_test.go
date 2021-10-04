@@ -6,12 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/stretchr/testify/assert"
 )
 
 //--- Miscellaneous helpers functions -- /
@@ -90,7 +91,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	}
 
 	// Save final outputs. Uncomment this line when you want to save keygen output to fixtures.
-	helper.SaveKeygenOutput(finalOutput)
+	assert.NoError(t, helper.SaveKeygenOutput(finalOutput))
 }
 
 func TestKeygenTimeout(t *testing.T) {
@@ -137,7 +138,7 @@ func TestKeygenTimeout(t *testing.T) {
 					}
 				},
 			},
-			1*time.Second,
+			time.Second,
 		)
 	}
 
@@ -148,6 +149,9 @@ func TestKeygenTimeout(t *testing.T) {
 	runAllWorkers(workers, outCh, done)
 }
 
+// Dont' delete this. This is used for generating preparams for tests.
+// We do not use that right now because we have generate the preparams and save them into a file.
+// In the future, if we want to re-generate the preparams, we will need to call this function.
 func generateTestPreparams(n int) {
 	for i := 0; i < n; i++ {
 		preParams, _ := keygen.GeneratePreParams(1 * time.Minute)
