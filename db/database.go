@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	PRESIGN_STATUS_NOT_USED = "not_used"
-	PRESIGN_STATUS_USED     = "used"
+	PresignStatusNotUsed = "not_used"
+	PresignStatusUsed    = "used"
 )
 
 type Database interface {
@@ -137,22 +137,20 @@ func (d *SqlDatabase) SavePreparams(chain string, preparams *keygen.LocalPrePara
 		return err
 	}
 
-	query := "INSERT preparams(chain, preparams) VALUES (?, ?)"
+	query := "INSERT INTO preparams(chain, preparams) VALUES (?, ?)"
 	_, err = d.db.Exec(query, chain, bz)
-
 	return err
 }
 
 func (d *SqlDatabase) LoadPreparams(chain string) (*keygen.LocalPreParams, error) {
-	query := "SELECT preparams FROM preparams where chain=?"
-
+	query := "SELECT preparams FROM preparams WHERE chain=?"
 	rows, err := d.db.Query(query, chain)
 	if err != nil {
 		return nil, err
 	}
 
 	if !rows.Next() {
-		return nil, fmt.Errorf("There is no preparams.")
+		return nil, fmt.Errorf("there is no preparams")
 	}
 
 	var bz []byte
@@ -204,7 +202,6 @@ func (d *SqlDatabase) SaveKeygenData(chain string, workId string, pids []*tss.Pa
 
 func (d *SqlDatabase) LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error) {
 	query := "SELECT keygen_output FROM keygen WHERE chain=? AND work_id=? AND batch_index=0"
-
 	params := []interface{}{
 		chain,
 		workId,
@@ -216,13 +213,16 @@ func (d *SqlDatabase) LoadKeygenData(chain, workId string) (*keygen.LocalPartySa
 	}
 
 	result := &keygen.LocalPartySaveData{}
-
 	if rows.Next() {
 		var bz []byte
 
-		rows.Scan(&bz)
-		err := json.Unmarshal(bz, result)
-		if err != nil {
+		if err := rows.Scan(&bz); err != nil {
+			utils.LogError("Cannot scan row", err)
+			return nil, err
+		}
+
+		if err := json.Unmarshal(bz, result); err != nil {
+			utils.LogError("Cannot unmarshal result", err)
 			return nil, err
 		}
 	} else {
@@ -258,7 +258,7 @@ func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.P
 		params = append(params, pidString)
 
 		params = append(params, i) // batch_index
-		params = append(params, PRESIGN_STATUS_NOT_USED)
+		params = append(params, PresignStatusNotUsed)
 
 		params = append(params, bz)
 	}
@@ -271,8 +271,7 @@ func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.P
 // GetAllPresignIndexes returns all available presign data sets in short form (pids, workId, index)
 // We don't want to load full data of presign sets since it might take too much memmory.
 func (d *SqlDatabase) GetAvailablePresignShortForm() ([]string, []string, error) {
-	query := fmt.Sprintf("SELECT presign_id, pids_string FROM presign WHERE status='%s'", PRESIGN_STATUS_NOT_USED)
-
+	query := fmt.Sprintf("SELECT presign_id, pids_string FROM presign WHERE status='%s'", PresignStatusNotUsed)
 	pids := make([]string, 0)
 	presignIds := make([]string, 0)
 
@@ -281,16 +280,15 @@ func (d *SqlDatabase) GetAvailablePresignShortForm() ([]string, []string, error)
 		return nil, nil, err
 	}
 
-	for {
-		if rows.Next() {
-			var presignId, pid string
-
-			rows.Scan(&presignId, &pid)
-			presignIds = append(presignIds, presignId)
-			pids = append(pids, pid)
-		} else {
-			break
+	for rows.Next() {
+		var presignId, pid string
+		if err := rows.Scan(&presignId, &pid); err != nil {
+			utils.LogError("cannot scan row", err)
+			return nil, nil, err
 		}
+
+		presignIds = append(presignIds, presignId)
+		pids = append(pids, pid)
 	}
 
 	return presignIds, pids, nil
@@ -309,10 +307,10 @@ func (d *SqlDatabase) DeleteKeygenWork(workId string) error {
 }
 
 func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error) {
-	// 1. Constract the query
+	// 1. Construct the query
 	questions := getQueryQuestionMark(1, len(presignIds))
 
-	query := "SELECT presign_output FROM presign WHERE presign_id IN = " + questions + " ORDER BY created_time DESC"
+	query := "SELECT presign_output FROM presign WHERE presign_id IN " + questions + " ORDER BY created_time DESC"
 
 	// Execute the query
 	interfaceArr := make([]interface{}, len(presignIds))
@@ -321,28 +319,26 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 	}
 
 	rows, err := d.db.Query(query, interfaceArr...)
-
 	if err != nil {
 		return nil, err
 	}
 
 	// 2. Scan every rows and save it to loaded array
 	results := make([]*presign.LocalPresignData, 0)
-	for {
-		if rows.Next() {
-			var bz []byte
-			rows.Scan(&bz)
-
-			var data *presign.LocalPresignData
-			err := json.Unmarshal(bz, data)
-			if err != nil {
-				utils.LogError("Cannot unmarshall data")
-			} else {
-				results = append(results, data)
-			}
-		} else {
-			break
+	for rows.Next() {
+		var bz []byte
+		if err := rows.Scan(&bz); err != nil {
+			utils.LogError("Cannot unmarshall data", err)
+			return nil, err
 		}
+
+		data := presign.LocalPresignData{}
+		if err := json.Unmarshal(bz, &data); err != nil {
+			utils.LogError("Cannot unmarshall data", err)
+			return nil, err
+		}
+
+		results = append(results, &data)
 	}
 
 	return results, nil
@@ -350,10 +346,9 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 
 func (d *SqlDatabase) UpdatePresignStatus(presignIds []string) error {
 	presignString := getQueryQuestionMark(1, len(presignIds))
-
 	query := fmt.Sprintf(
 		"UPDATE status FROM presign SET status = %s WHERE presign_id IN (%s)",
-		PRESIGN_STATUS_USED,
+		PresignStatusUsed,
 		presignString,
 	)
 

@@ -3,24 +3,24 @@ package types
 type WorkType int32
 
 const (
-	ECDSA_KEYGEN = iota
-	ECDSA_PRESIGN
-	ECDSA_SIGNING
+	EcdsaKeygen = iota
+	EcdsaPresign
+	EcdsaSigning
 
-	EDDSA_KEYGEN
-	EDDSA_PRESIGN
-	EDDSA_SIGNING
+	EddsaKeygen
+	EddsaPresign
+	EddsaSigning
 )
 
 var (
 	WorkTypeStrings = map[WorkType]string{
-		ECDSA_KEYGEN:  "ECDSA_KEYGEN",
-		ECDSA_PRESIGN: "ECDSA_PRESIGN",
-		ECDSA_SIGNING: "ECDSA_SIGNING",
+		EcdsaKeygen:  "ECDSA_KEYGEN",
+		EcdsaPresign: "ECDSA_PRESIGN",
+		EcdsaSigning: "ECDSA_SIGNING",
 
-		EDDSA_KEYGEN:  "EDDSA_KEYGEN",
-		EDDSA_PRESIGN: "EDDSA_PRESIGN",
-		EDDSA_SIGNING: "EDDSA_SIGNING",
+		EddsaKeygen:  "EDDSA_KEYGEN",
+		EddsaPresign: "EDDSA_PRESIGN",
+		EddsaSigning: "EDDSA_SIGNING",
 	}
 )
 

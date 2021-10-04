@@ -91,7 +91,13 @@ func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types
 			time.Sleep(time.Second * 3)
 			utils.LogInfo("Sending keygen to Sisu")
 
-			if err := api.c.BroadcastKeygenResult(chain, publicKeyBytes, address); err != nil {
+			result := types.KeygenResult{
+				Chain:       chain,
+				Success:     true,
+				PubKeyBytes: publicKeyBytes,
+				Address:     address,
+			}
+			if err := api.c.PostKeygenResult(&result); err != nil {
 				utils.LogError("Error while broadcasting KeygenResult", err)
 			}
 		}()
@@ -158,7 +164,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 			time.Sleep(time.Second * 3)
 			utils.LogInfo("Sending Keysign to Sisu")
 
-			api.c.BroadcastKeySignResult(&types.KeysignResult{
+			api.c.PostKeysignResult(&types.KeysignResult{
 				Id:             req.Id,
 				Success:        true,
 				OutChain:       req.OutChain,
@@ -170,7 +176,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 		}()
 	} else {
 		utils.LogError("Cannot do key gen. Err =", err)
-		api.c.BroadcastKeySignResult(&types.KeysignResult{
+		api.c.PostKeysignResult(&types.KeysignResult{
 			Id:             req.Id,
 			Success:        false,
 			ErrMesage:      err.Error(),

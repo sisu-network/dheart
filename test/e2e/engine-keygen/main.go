@@ -5,44 +5,45 @@ import (
 	"math/big"
 	"time"
 
-	libCommon "github.com/sisu-network/tss-lib/common"
-	"github.com/sisu-network/tss-lib/tss"
-
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/p2p"
+	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	"github.com/sisu-network/tss-lib/tss"
 )
 
 type EngineCallback struct {
-	keygenDataCh  chan []*keygen.LocalPartySaveData
-	presignDataCh chan []*presign.LocalPresignData
-	signingDataCh chan []*libCommon.SignatureData
+	keygenDataCh  chan *htypes.KeygenResult
+	presignDataCh chan *htypes.PresignResult
+	signingDataCh chan *htypes.KeysignResult
 }
 
 func NewEngineCallback(
-	keygenDataCh chan []*keygen.LocalPartySaveData,
-	presignDataCh chan []*presign.LocalPresignData,
-	signingDataCh chan []*libCommon.SignatureData,
+	keygenDataCh chan *htypes.KeygenResult,
+	presignDataCh chan *htypes.PresignResult,
+	signingDataCh chan *htypes.KeysignResult,
 ) *EngineCallback {
 	return &EngineCallback{
 		keygenDataCh, presignDataCh, signingDataCh,
 	}
 }
 
-func (cb *EngineCallback) OnWorkKeygenFinished(workerId string, data []*keygen.LocalPartySaveData) {
-	cb.keygenDataCh <- data
+func (cb *EngineCallback) OnWorkKeygenFinished(result *htypes.KeygenResult) {
+	cb.keygenDataCh <- result
 }
 
-func (cb *EngineCallback) OnWorkPresignFinished(workerId string, data []*presign.LocalPresignData) {
-	cb.presignDataCh <- data
+func (cb *EngineCallback) OnWorkPresignFinished(result *htypes.PresignResult) {
+	cb.presignDataCh <- result
 }
 
-func (cb *EngineCallback) OnWorkSigningFinished(workerId string, data []*libCommon.SignatureData) {
-	cb.signingDataCh <- data
+func (cb *EngineCallback) OnWorkSigningFinished(result *htypes.KeysignResult) {
+	cb.signingDataCh <- result
+}
+
+func (cb *EngineCallback) OnWorkFailed(chain string, workType types.WorkType, culprit []*tss.PartyID) {
+
 }
 
 func getSortedPartyIds(n int) tss.SortedPartyIDs {
@@ -89,7 +90,7 @@ func main() {
 	pids = tss.SortPartyIDs(pids)
 
 	// Create new engine
-	outCh := make(chan []*keygen.LocalPartySaveData)
+	outCh := make(chan *htypes.KeygenResult)
 	cb := NewEngineCallback(outCh, nil, nil)
 	engine := core.NewEngine(nodes[index], cm, helper.NewMockDatabase(), cb, allKeys[index])
 	cm.AddListener(p2p.TSSProtocolID, engine)
@@ -110,7 +111,7 @@ func main() {
 	}
 
 	select {
-	case data := <-outCh:
-		utils.LogInfo("Data length = ", len(data))
+	case result := <-outCh:
+		utils.LogInfo("Result ", result)
 	}
 }

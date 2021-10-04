@@ -2,6 +2,7 @@ package worker
 
 import (
 	commonTypes "github.com/sisu-network/dheart/types/common"
+	"github.com/sisu-network/tss-lib/tss"
 )
 
 type Worker interface {
@@ -17,6 +18,9 @@ type Worker interface {
 
 	// ProcessNewMessage receives new message from network and update current tss round.
 	ProcessNewMessage(tssMsg *commonTypes.TssMessage) error
+
+	// GetCulprits ...
+	GetCulprits() []*tss.PartyID
 
 	// Stop stops the worker and cleans all the resources
 	Stop()
