@@ -12,6 +12,7 @@ import (
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/run"
 	"github.com/sisu-network/dheart/test/mock"
+	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -65,8 +66,9 @@ func main() {
 
 	done := make(chan bool)
 	mockClient := &mock.MockClient{
-		PostKeygenResultFunc: func(workId string) {
+		PostKeygenResultFunc: func(result *types.KeygenResult) error {
 			done <- true
+			return nil
 		},
 	}
 

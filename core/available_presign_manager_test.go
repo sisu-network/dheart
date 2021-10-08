@@ -8,6 +8,7 @@ import (
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,6 +25,8 @@ func getMokDbForAvailManager(presignPids, pids []string) db.Database {
 }
 
 func TestAvailManagerHappyCase(t *testing.T) {
+	t.Parallel()
+
 	selectedPids := "2,3,5"
 
 	presignPids := []string{"work0-0", "work0-1", "work1-0", "work1-1", "work1-2", "work2-0"}
@@ -35,14 +38,15 @@ func TestAvailManagerHappyCase(t *testing.T) {
 	partyIds := getPartyIdsFromStrings(allPids)
 
 	availManager := NewAvailPresignManager(mockDb)
-	availManager.Load()
+	assert.NoError(t, availManager.Load())
 	assert.Equal(t, 3, len(availManager.available))
 
 	// Get and consumes 3 presigns
-	presignIds, _ := availManager.GetAvailablePresigns(3, 3, partyIds)
+	presignIds, selectedPIDs := availManager.GetAvailablePresigns(3, 3, partyIds)
 	assert.Equal(t, 3, len(presignIds))
+	assert.Equal(t, 3, len(selectedPIDs))
 
-	// We should have 1 pid string in use (2,3,5) and 2 available pid string: (1,2,3) and (3,4,5)
+	// We should have 1 pid string in use (2,3,5) and 2 available pid strings: (1,2,3) and (3,4,5)
 	assert.Equal(t, 1, len(availManager.inUse))
 	assert.Equal(t, 2, len(availManager.available))
 
@@ -61,6 +65,8 @@ func TestAvailManagerHappyCase(t *testing.T) {
 }
 
 func TestAvailManagerNotFound(t *testing.T) {
+	t.Parallel()
+
 	presignPids := []string{"work0-0", "work0-1", "work1-0", "work1-1", "work2-0"}
 	pids := []string{"1,2,4", "1,2,4", "2,3,5", "2,3,5", "3,4,5"}
 
@@ -70,7 +76,7 @@ func TestAvailManagerNotFound(t *testing.T) {
 	partyIds := getPartyIdsFromStrings(appPids)
 
 	availManager := NewAvailPresignManager(mockDb)
-	availManager.Load()
+	assert.NoError(t, availManager.Load())
 	assert.Equal(t, 3, len(availManager.available))
 
 	presignIds, _ := availManager.GetAvailablePresigns(3, 3, partyIds)
@@ -81,6 +87,8 @@ func TestAvailManagerNotFound(t *testing.T) {
 }
 
 func TestAvailManagerPresignNotUsed(t *testing.T) {
+	t.Parallel()
+
 	selectedPids := "2,3,5"
 
 	presignPids := []string{"work0-0", "work0-1", "work1-0", "work1-1", "work1-2", "work2-0"}
@@ -89,7 +97,7 @@ func TestAvailManagerPresignNotUsed(t *testing.T) {
 	partyIds := getPartyIdsFromStrings([]string{"2", "3", "4", "5", "6", "7"})
 
 	availManager := NewAvailPresignManager(mockDb)
-	availManager.Load()
+	assert.NoError(t, availManager.Load())
 
 	presignIds, _ := availManager.GetAvailablePresigns(3, 3, partyIds)
 	assert.Equal(t, 3, len(presignIds))
@@ -106,4 +114,29 @@ func TestAvailManagerPresignNotUsed(t *testing.T) {
 	availManager.updateUsage(selectedPids, selectedAps, false)
 	assert.Equal(t, 0, len(availManager.inUse))
 	assert.Equal(t, 3, len(availManager.available))
+}
+
+func TestAvailPresignManager_GetUnavailablePresigns(t *testing.T) {
+	presignPids := []string{"work0-0", "work0-1", "work1-0", "work1-1", "work1-2", "work2-0"}
+	pids := []string{"1,2,4", "1,2,4", "2,3,5", "2,3,5", "2,3,5", "3,4,5"}
+
+	mockDb := getMokDbForAvailManager(presignPids, pids)
+
+	allPids := []string{"2", "3", "4", "5", "6", "7"}
+	partyIds := getPartyIdsFromStrings(allPids)
+
+	availManager := NewAvailPresignManager(mockDb)
+	assert.NoError(t, availManager.Load())
+	assert.Equal(t, 3, len(availManager.available))
+
+	// Get and consumes 3 presigns
+	availManager.GetAvailablePresigns(3, 3, partyIds)
+	sentNodes := map[string]*tss.PartyID{
+		"2": partyIds[0],
+		"3": partyIds[1],
+	}
+
+	unavailablePartyIDs := availManager.GetUnavailablePresigns(sentNodes, partyIds)
+	assert.Len(t, unavailablePartyIDs, 1)
+	assert.Equal(t, "5", unavailablePartyIDs[0].Id)
 }

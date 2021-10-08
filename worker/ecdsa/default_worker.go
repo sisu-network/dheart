@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sisu-network/dheart/blame"
+	"github.com/sisu-network/dheart/core/message"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
@@ -36,6 +38,8 @@ type WorkerCallback interface {
 	// party ids should match the pids params passed into the function.
 	GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID)
 
+	GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
+
 	GetPresignOutputs(presignIds []string) []*presign.LocalPresignData
 
 	OnPreExecutionFinished(request *types.WorkRequest)
@@ -56,6 +60,7 @@ type DefaultWorker struct {
 	myPid      *tss.PartyID
 	allParties []*tss.PartyID
 	pIDs       tss.SortedPartyIDs
+	pIDsMap    map[string]*tss.PartyID
 	jobType    wTypes.WorkType
 	callback   WorkerCallback
 	workId     string
@@ -94,6 +99,12 @@ type DefaultWorker struct {
 	presignOutputs  []*presign.LocalPresignData
 	signingOutputs  []*libCommon.SignatureData
 	finalOutputLock *sync.RWMutex
+
+	blameMgr *blame.Manager
+
+	curRound uint32
+
+	jobTimeout time.Duration
 }
 
 func NewKeygenWorker(
@@ -103,13 +114,15 @@ func NewKeygenWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
+	jobTimeout time.Duration,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
 
-	w.jobType = wTypes.ECDSA_KEYGEN
+	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
 	w.threshold = request.Threshold
 	w.keygenOutputs = make([]*keygen.LocalPartySaveData, batchSize)
+	w.curRound = message.Keygen1
 
 	return w
 }
@@ -121,12 +134,14 @@ func NewPresignWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
+	jobTimeout time.Duration,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
 
-	w.jobType = wTypes.ECDSA_PRESIGN
+	w.jobType = wTypes.EcdsaPresign
 	w.presignInput = request.PresignInput
 	w.presignOutputs = make([]*presign.LocalPresignData, batchSize)
+	w.curRound = message.Presign1
 
 	return w
 }
@@ -138,13 +153,15 @@ func NewSigningWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
+	jobTimeout time.Duration,
 ) worker.Worker {
 	// TODO: The request.Pids
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
 
-	w.jobType = wTypes.ECDSA_SIGNING
+	w.jobType = wTypes.EcdsaSigning
 	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
 	w.signingMessage = request.Message
+	w.curRound = message.Sign1
 
 	return w
 }
@@ -157,6 +174,7 @@ func baseWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
+	timeOut time.Duration,
 ) *DefaultWorker {
 	return &DefaultWorker{
 		request:           request,
@@ -175,6 +193,8 @@ func baseWorker(
 		memberResponseCh:  make(chan *commonTypes.TssMessage, len(allParties)),
 		availableParties:  NewAvailableParties(),
 		preExecutionCache: worker.NewMessageCache(),
+		blameMgr:          blame.NewManager(),
+		jobTimeout:        timeOut,
 	}
 }
 
@@ -188,6 +208,7 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 		// For keygen, we skip the leader selection part since all parties need to be involved in the
 		// signing process.
 		w.pIDs = w.request.AllParties
+		w.pIDsMap = pidsToMap(w.pIDs)
 		go func() {
 			if err := w.executeWork(); err != nil {
 				utils.LogError("Error when executing work", err)
@@ -217,14 +238,14 @@ func (w *DefaultWorker) executeWork() error {
 	// Creates all jobs
 	for i := range w.jobs {
 		switch w.jobType {
-		case wTypes.ECDSA_KEYGEN:
-			w.jobs[i] = NewKeygenJob(i, w.pIDs, params, w.keygenInput, w)
+		case wTypes.EcdsaKeygen:
+			w.jobs[i] = NewKeygenJob(i, w.pIDs, params, w.keygenInput, w, w.jobTimeout)
 
-		case wTypes.ECDSA_PRESIGN:
-			w.jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w)
+		case wTypes.EcdsaPresign:
+			w.jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
 
-		case wTypes.ECDSA_SIGNING:
-			w.jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessage, w.signingInput[i], w)
+		case wTypes.EcdsaSigning:
+			w.jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessage, w.signingInput[i], w, w.jobTimeout)
 
 		default:
 			// If job type is not correct, kill the whole worker.
@@ -278,7 +299,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 	w.jobOutputLock.Unlock()
 
 	if count == w.batchSize {
-		// We have completed all job for current round. Send the list to the dispatcher.
+		// We have completed all jobs for current round. Send the list to the dispatcher. Move the worker to next round.
 		dest := msg.GetTo()
 		to := ""
 		if dest != nil {
@@ -290,6 +311,8 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 			utils.LogCritical("Cannot build TSS message, err", err)
 			return
 		}
+
+		atomic.StoreUint32(&w.curRound, message.NextRound(w.jobType, w.curRound))
 
 		if dest == nil {
 			// broadcast
@@ -377,9 +400,23 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	// Now update all messages
 	for i := range w.jobs {
 		go func(id int) {
+			round, err := message.GetMsgRound(msgs[id].Content())
+			if err != nil {
+				utils.LogError("error when getting round %w", err)
+				// If we cannot get msg round, blame the sender
+				w.blameMgr.AddCulpritByRound(w.workId, w.curRound, []*tss.PartyID{msgs[id].GetFrom()})
+			}
+
+			w.blameMgr.AddSender(w.workId, round, tssMsg.From)
+
 			if err := w.jobs[id].processMessage(msgs[id]); err != nil {
-				// Message can be from bad actor/corrupted. Log and ignore.
+				// Message can be from bad actor/corrupted. Save the culprits, and ignore.
 				utils.LogError("cannot process message error", err)
+				if round > 0 {
+					w.blameMgr.AddCulpritByRound(w.workId, round, err.Culprits())
+				} else {
+					w.blameMgr.AddCulpritByRound(w.workId, atomic.LoadUint32(&w.curRound), err.Culprits())
+				}
 			}
 		}(i)
 	}
@@ -432,6 +469,10 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 	}
 }
 
+func (w *DefaultWorker) OnJobTimeout() {
+	w.callback.OnWorkFailed(w.request)
+}
+
 // Implements OnJobSignFinished of JobCallback.
 func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureData) {
 	w.finalOutputLock.Lock()
@@ -461,6 +502,16 @@ func (w *DefaultWorker) GetPartyId() string {
 
 func (w *DefaultWorker) GetWorkId() string {
 	return w.workId
+}
+
+func (w *DefaultWorker) GetCulprits() []*tss.PartyID {
+	// If there's pre_execution error, return pre_execution culprits
+	culprits := w.blameMgr.GetPreExecutionCulprits()
+	if len(culprits) > 0 {
+		return culprits
+	}
+
+	return w.blameMgr.GetRoundCulprits(w.workId, atomic.LoadUint32(&w.curRound), w.pIDsMap)
 }
 
 func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {

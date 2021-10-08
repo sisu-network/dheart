@@ -11,18 +11,18 @@ import (
 )
 
 const (
-	RETRY_TIME = 10 * time.Second
+	RetryTime = 10 * time.Second
 )
 
 var (
-	SISU_SERVER_NOT_CONNECTED = errors.New("Sisu server is not connected")
+	ErrSisuServerNotConnected = errors.New("Sisu server is not connected")
 )
 
 type Client interface {
 	TryDial()
-	PostKeygenResult(workId string)
-	BroadcastKeygenResult(chain string, pubKeyBytes []byte, address string) error
-	BroadcastKeySignResult(result *types.KeysignResult) error
+	PostKeygenResult(result *types.KeygenResult) error
+	PostPresignResult(result *types.PresignResult) error
+	PostKeysignResult(result *types.KeysignResult) error
 }
 
 // A client that connects to Sisu server
@@ -49,7 +49,7 @@ func (c *DefaultClient) TryDial() {
 			break
 		}
 
-		time.Sleep(RETRY_TIME)
+		time.Sleep(RetryTime)
 	}
 
 	utils.LogInfo("Sisu server is connected")
@@ -66,25 +66,17 @@ func (c *DefaultClient) CheckHealth() error {
 	return nil
 }
 
-// @Deprecated
-func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKeyBytes []byte, address string) error {
+func (c *DefaultClient) PostKeygenResult(result *types.KeygenResult) error {
 	utils.LogDebug("c.connected = ", c.connected)
 
 	if !c.connected {
-		return SISU_SERVER_NOT_CONNECTED
+		return ErrSisuServerNotConnected
 	}
 
 	utils.LogDebug("Sending keygen result to sisu server")
 
-	keygenResult := types.KeygenResult{
-		Chain:       chain,
-		Success:     true,
-		PubKeyBytes: pubKeyBytes,
-		Address:     address,
-	}
-
 	var r interface{}
-	err := c.client.CallContext(context.Background(), &r, "tss_keygenResult", keygenResult)
+	err := c.client.CallContext(context.Background(), &r, "tss_keygenResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
 		utils.LogError("Cannot post keygen result, err = ", err)
@@ -94,16 +86,40 @@ func (c *DefaultClient) BroadcastKeygenResult(chain string, pubKeyBytes []byte, 
 	return nil
 }
 
-func (c *DefaultClient) PostKeygenResult(workId string) {
-	// TODO: implement this.
-}
+func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
+	utils.LogDebug("c.connected = ", c.connected)
 
-func (c *DefaultClient) BroadcastKeySignResult(result *types.KeysignResult) error {
+	if !c.connected {
+		return ErrSisuServerNotConnected
+	}
+
+	utils.LogDebug("Sending presign result to sisu server")
+
 	var r interface{}
-	err := c.client.CallContext(context.Background(), &r, "tss_keySignResult", result)
+	err := c.client.CallContext(context.Background(), &r, "tss_presignResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
-		utils.LogError("Cannot post keysign result, err = ", err)
+		utils.LogError("Cannot post keygen result, err = ", err)
+		return err
+	}
+
+	return nil
+}
+
+func (c *DefaultClient) PostKeysignResult(result *types.KeysignResult) error {
+	utils.LogDebug("c.connected = ", c.connected)
+
+	if !c.connected {
+		return ErrSisuServerNotConnected
+	}
+
+	utils.LogDebug("Sending keysign result to sisu server")
+
+	var r interface{}
+	err := c.client.CallContext(context.Background(), &r, "tss_keysignResult", result)
+	if err != nil {
+		// TODO: Retry on failure.
+		utils.LogError("Cannot post keygen result, err = ", err)
 		return err
 	}
 

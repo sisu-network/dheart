@@ -6,12 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/stretchr/testify/assert"
 )
 
 //--- Miscellaneous helpers functions -- /
@@ -38,7 +39,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 
 		request := &types.WorkRequest{
 			WorkId:      "Keygen0",
-			WorkType:    types.ECDSA_KEYGEN,
+			WorkType:    types.EcdsaKeygen,
 			AllParties:  helper.CopySortedPartyIds(pIDs),
 			KeygenInput: preparams,
 			Threshold:   threshold,
@@ -51,7 +52,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 			batchSize,
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0),
+			helper.NewTestDispatcher(outCh, 0, 0),
 			helper.NewMockDatabase(),
 			&helper.MockWorkerCallback{
 				OnWorkKeygenFinishedFunc: func(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
@@ -66,6 +67,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 					}
 				},
 			},
+			10*time.Minute,
 		)
 	}
 
@@ -89,9 +91,67 @@ func TestKeygenEndToEnd(t *testing.T) {
 	}
 
 	// Save final outputs. Uncomment this line when you want to save keygen output to fixtures.
-	helper.SaveKeygenOutput(finalOutput)
+	assert.NoError(t, helper.SaveKeygenOutput(finalOutput))
 }
 
+func TestKeygenTimeout(t *testing.T) {
+	totalParticipants := 6
+	threshold := 1
+	batchSize := 1
+
+	pIDs := helper.GetTestPartyIds(totalParticipants)
+
+	outCh := make(chan *common.TssMessage)
+
+	done := make(chan bool)
+	workers := make([]worker.Worker, totalParticipants)
+	outputLock := &sync.Mutex{}
+	failedWorkCounts := 0
+
+	// Generates n workers
+	for i := 0; i < totalParticipants; i++ {
+		preparams := helper.LoadPreparams(i)
+
+		request := &types.WorkRequest{
+			WorkId:      "Keygen0",
+			WorkType:    types.EcdsaKeygen,
+			AllParties:  helper.CopySortedPartyIds(pIDs),
+			KeygenInput: preparams,
+			Threshold:   threshold,
+			N:           totalParticipants,
+		}
+
+		workers[i] = NewKeygenWorker(
+			batchSize,
+			request,
+			pIDs[i],
+			helper.NewTestDispatcher(outCh, 0, 2*time.Second),
+			helper.NewMockDatabase(),
+			&helper.MockWorkerCallback{
+				OnWorkFailedFunc: func(request *types.WorkRequest) {
+					outputLock.Lock()
+					defer outputLock.Unlock()
+
+					failedWorkCounts++
+					if failedWorkCounts == totalParticipants {
+						done <- true
+					}
+				},
+			},
+			time.Second,
+		)
+	}
+
+	// Start all workers
+	startAllWorkers(workers)
+
+	// Run all workers
+	runAllWorkers(workers, outCh, done)
+}
+
+// Dont' delete this. This is used for generating preparams for tests.
+// We do not use that right now because we have generate the preparams and save them into a file.
+// In the future, if we want to re-generate the preparams, we will need to call this function.
 func generateTestPreparams(n int) {
 	for i := 0; i < n; i++ {
 		preParams, _ := keygen.GeneratePreParams(1 * time.Minute)

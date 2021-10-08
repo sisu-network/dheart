@@ -13,6 +13,7 @@ import (
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
+	dtypes "github.com/sisu-network/dheart/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -65,6 +66,7 @@ type MockWorkerCallback struct {
 	OnWorkFailedFunc           func(request *types.WorkRequest)
 	GetAvailablePresignsFunc   func(count int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID)
 	GetPresignOutputsFunc      func(presignIds []string) []*presign.LocalPresignData
+	GetUnavailablePresignsFunc func(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
 
 	workerIndex     int
 	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)
@@ -92,6 +94,14 @@ type MockWorkerCallback struct {
 // 		signingCallback: signingCallback,
 // 	}
 // }
+
+func (cb *MockWorkerCallback) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
+	if cb.GetUnavailablePresignsFunc != nil {
+		return cb.GetUnavailablePresignsFunc(sentMsgNodes, pids)
+	}
+
+	return nil
+}
 
 func (cb *MockWorkerCallback) OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
 	if cb.OnWorkKeygenFinishedFunc != nil {
@@ -142,26 +152,33 @@ func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*presign.
 //---/
 
 type MockEngineCallback struct {
-	OnWorkKeygenFinishedFunc  func(workId string, data []*keygen.LocalPartySaveData)
-	OnWorkPresignFinishedFunc func(workId string, data []*presign.LocalPresignData)
-	OnWorkSigningFinishedFunc func(workId string, data []*libCommon.SignatureData)
+	OnWorkKeygenFinishedFunc  func(result *dtypes.KeygenResult)
+	OnWorkPresignFinishedFunc func(result *dtypes.PresignResult)
+	OnWorkSigningFinishedFunc func(result *dtypes.KeysignResult)
+	OnWorkFailedFunc          func(chain string, workType types.WorkType, culprits []*tss.PartyID)
 }
 
-func (cb *MockEngineCallback) OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData) {
+func (cb *MockEngineCallback) OnWorkKeygenFinished(result *dtypes.KeygenResult) {
 	if cb.OnWorkKeygenFinishedFunc != nil {
-		cb.OnWorkKeygenFinishedFunc(workId, data)
+		cb.OnWorkKeygenFinishedFunc(result)
 	}
 }
 
-func (cb *MockEngineCallback) OnWorkPresignFinished(workId string, data []*presign.LocalPresignData) {
+func (cb *MockEngineCallback) OnWorkPresignFinished(result *dtypes.PresignResult) {
 	if cb.OnWorkPresignFinishedFunc != nil {
-		cb.OnWorkPresignFinishedFunc(workId, data)
+		cb.OnWorkPresignFinishedFunc(result)
 	}
 }
 
-func (cb *MockEngineCallback) OnWorkSigningFinished(workId string, data []*libCommon.SignatureData) {
+func (cb *MockEngineCallback) OnWorkSigningFinished(result *dtypes.KeysignResult) {
 	if cb.OnWorkSigningFinishedFunc != nil {
-		cb.OnWorkSigningFinishedFunc(workId, data)
+		cb.OnWorkSigningFinishedFunc(result)
+	}
+}
+
+func (cb *MockEngineCallback) OnWorkFailed(chain string, workType types.WorkType, culprits []*tss.PartyID) {
+	if cb.OnWorkFailedFunc != nil {
+		cb.OnWorkFailedFunc(chain, workType, culprits)
 	}
 }
 
@@ -236,27 +253,39 @@ type PresignDataWrapper struct {
 //---/
 
 type TestDispatcher struct {
-	msgCh chan *common.TssMessage
-	delay time.Duration
+	msgCh             chan *common.TssMessage
+	preExecutionDelay time.Duration
+	executionDelay    time.Duration
 }
 
-func NewTestDispatcher(msgCh chan *common.TssMessage, delay time.Duration) *TestDispatcher {
+func NewTestDispatcher(msgCh chan *common.TssMessage, preExecutionDelay, executionDelay time.Duration) *TestDispatcher {
 	return &TestDispatcher{
-		msgCh: msgCh,
-		delay: delay,
+		msgCh:             msgCh,
+		preExecutionDelay: preExecutionDelay,
+		executionDelay:    executionDelay,
 	}
 }
 
 //---/
 
 func (d *TestDispatcher) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
-	time.Sleep(d.delay)
+	if tssMessage.Type == common.TssMessage_UPDATE_MESSAGES {
+		time.Sleep(d.executionDelay)
+	} else {
+		time.Sleep(d.preExecutionDelay)
+	}
+
 	d.msgCh <- tssMessage
 }
 
 // Send a message to a single destination.
 func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
-	time.Sleep(d.delay)
+	if tssMessage.Type == common.TssMessage_UPDATE_MESSAGES {
+		time.Sleep(d.executionDelay)
+	} else {
+		time.Sleep(d.preExecutionDelay)
+	}
+
 	d.msgCh <- tssMessage
 }
 

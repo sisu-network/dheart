@@ -3,6 +3,7 @@ package ecdsa
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
@@ -27,6 +28,9 @@ type JobCallback interface {
 
 	// Called when this signing job finishes.
 	OnJobSignFinished(job *Job, data *libCommon.SignatureData)
+
+	// OnJobTimeout on job timeout
+	OnJobTimeout()
 }
 
 type Job struct {
@@ -41,9 +45,18 @@ type Job struct {
 
 	party    tss.Party
 	callback JobCallback
+
+	timeOut time.Duration
 }
 
-func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, localPreparams *keygen.LocalPreParams, callback JobCallback) *Job {
+func NewKeygenJob(
+	index int,
+	pIDs tss.SortedPartyIDs,
+	params *tss.Parameters,
+	localPreparams *keygen.LocalPreParams,
+	callback JobCallback,
+	timeOut time.Duration,
+) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan keygen.LocalPartySaveData, len(pIDs))
 	closeCh := make(chan struct{}, 1)
@@ -52,16 +65,24 @@ func NewKeygenJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, lo
 
 	return &Job{
 		index:       index,
-		jobType:     wTypes.ECDSA_KEYGEN,
+		jobType:     wTypes.EcdsaKeygen,
 		party:       party,
 		outCh:       outCh,
 		endKeygenCh: endCh,
 		callback:    callback,
 		closeCh:     closeCh,
+		timeOut:     timeOut,
 	}
 }
 
-func NewPresignJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, savedData *keygen.LocalPartySaveData, callback JobCallback) *Job {
+func NewPresignJob(
+	index int,
+	pIDs tss.SortedPartyIDs,
+	params *tss.Parameters,
+	savedData *keygen.LocalPartySaveData,
+	callback JobCallback,
+	timeOut time.Duration,
+) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan presign.LocalPresignData, len(pIDs))
 
@@ -69,15 +90,24 @@ func NewPresignJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, s
 
 	return &Job{
 		index:        index,
-		jobType:      wTypes.ECDSA_PRESIGN,
+		jobType:      wTypes.EcdsaPresign,
 		party:        party,
 		outCh:        outCh,
 		endPresignCh: endCh,
 		callback:     callback,
+		timeOut:      timeOut,
 	}
 }
 
-func NewSigningJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, msg string, signingInput *presign.LocalPresignData, callback JobCallback) *Job {
+func NewSigningJob(
+	index int,
+	pIDs tss.SortedPartyIDs,
+	params *tss.Parameters,
+	msg string,
+	signingInput *presign.LocalPresignData,
+	callback JobCallback,
+	timeOut time.Duration,
+) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan libCommon.SignatureData, len(pIDs))
 
@@ -86,11 +116,12 @@ func NewSigningJob(index int, pIDs tss.SortedPartyIDs, params *tss.Parameters, m
 
 	return &Job{
 		index:        index,
-		jobType:      wTypes.ECDSA_SIGNING,
+		jobType:      wTypes.EcdsaSigning,
 		party:        party,
 		outCh:        outCh,
 		endSigningCh: endCh,
 		callback:     callback,
+		timeOut:      timeOut,
 	}
 }
 
@@ -110,9 +141,15 @@ func (job *Job) Stop() {
 func (job *Job) startListening() {
 	outCh := job.outCh
 
+	endTime := time.Now().Add(job.timeOut)
+
 	// TODO: Add timeout and missing messages.
 	for {
 		select {
+		case <-time.After(endTime.Sub(time.Now())):
+			job.callback.OnJobTimeout()
+			return
+
 		case <-job.closeCh:
 			utils.LogWarn("job closed")
 			return
@@ -130,10 +167,11 @@ func (job *Job) startListening() {
 
 		case data := <-job.endSigningCh:
 			job.callback.OnJobSignFinished(job, &data)
+			return
 		}
 	}
 }
 
-func (job *Job) processMessage(msg tss.Message) error {
+func (job *Job) processMessage(msg tss.Message) *tss.Error {
 	return helper.SharedPartyUpdater(job.party, msg)
 }

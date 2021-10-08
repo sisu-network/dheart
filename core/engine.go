@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -12,6 +13,7 @@ import (
 	"github.com/sisu-network/dheart/core/signer"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
+	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
@@ -28,12 +30,16 @@ const (
 	BatchSize = 4
 )
 
+var defaultJobTimeout = 10 * time.Minute
+
 type EngineCallback interface {
-	OnWorkKeygenFinished(workId string, data []*keygen.LocalPartySaveData)
+	OnWorkKeygenFinished(result *htypes.KeygenResult)
 
-	OnWorkPresignFinished(workId string, data []*presign.LocalPresignData)
+	OnWorkPresignFinished(result *htypes.PresignResult)
 
-	OnWorkSigningFinished(workId string, data []*libCommon.SignatureData)
+	OnWorkSigningFinished(result *htypes.KeysignResult)
+
+	OnWorkFailed(chain string, workType types.WorkType, culprits []*tss.PartyID)
 }
 
 // An Engine is a main component for TSS signing. It takes the following roles:
@@ -61,24 +67,41 @@ type Engine struct {
 
 	// TODO: Remove used presigns after getting a match to avoid using duplicated presigns.
 	presignsManager *AvailPresignManager
+
+	presignJobTimeout time.Duration
+	keygenJobTimeout  time.Duration
+	signingJobTimeout time.Duration
 }
 
 func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback, privateKey ctypes.PrivKey) *Engine {
 	return &Engine{
-		myNode:          myNode,
-		myPid:           myNode.PartyId,
-		db:              db,
-		cm:              cm,
-		workers:         make(map[string]worker.Worker),
-		requestQueue:    NewRequestQueue(),
-		workLock:        &sync.RWMutex{},
-		preworkCache:    worker.NewMessageCache(),
-		callback:        callback,
-		nodes:           make(map[string]*Node),
-		signer:          signer.NewDefaultSigner(privateKey),
-		nodeLock:        &sync.RWMutex{},
-		presignsManager: NewAvailPresignManager(db),
+		myNode:            myNode,
+		myPid:             myNode.PartyId,
+		db:                db,
+		cm:                cm,
+		workers:           make(map[string]worker.Worker),
+		requestQueue:      NewRequestQueue(),
+		workLock:          &sync.RWMutex{},
+		preworkCache:      worker.NewMessageCache(),
+		callback:          callback,
+		nodes:             make(map[string]*Node),
+		signer:            signer.NewDefaultSigner(privateKey),
+		nodeLock:          &sync.RWMutex{},
+		presignsManager:   NewAvailPresignManager(db),
+		keygenJobTimeout:  defaultJobTimeout,
+		signingJobTimeout: defaultJobTimeout,
+		presignJobTimeout: defaultJobTimeout,
 	}
+}
+
+func (engine *Engine) WithKeygenTimeout(timeout time.Duration) *Engine {
+	engine.keygenJobTimeout = timeout
+	return engine
+}
+
+func (engine *Engine) WithPresignTimeout(timeout time.Duration) *Engine {
+	engine.presignJobTimeout = timeout
+	return engine
 }
 
 func (engine *Engine) Init() {
@@ -126,14 +149,14 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 
 	// Create a new worker.
 	switch request.WorkType {
-	case types.ECDSA_KEYGEN:
-		w = ecdsa.NewKeygenWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
+	case types.EcdsaKeygen:
+		w = ecdsa.NewKeygenWorker(BatchSize, request, workPartyId, engine, engine.db, engine, engine.keygenJobTimeout)
 
-	case types.ECDSA_PRESIGN:
-		w = ecdsa.NewPresignWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
+	case types.EcdsaPresign:
+		w = ecdsa.NewPresignWorker(BatchSize, request, workPartyId, engine, engine.db, engine, engine.presignJobTimeout)
 
-	case types.ECDSA_SIGNING:
-		w = ecdsa.NewSigningWorker(BatchSize, request, workPartyId, engine, engine.db, engine)
+	case types.EcdsaSigning:
+		w = ecdsa.NewSigningWorker(BatchSize, request, workPartyId, engine, engine.db, engine, engine.signingJobTimeout)
 	}
 
 	engine.workLock.Lock()
@@ -173,18 +196,32 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
 
 func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
 	// Save to database
-	engine.db.SaveKeygenData(request.Chain, request.WorkId, request.AllParties, output)
+	if err := engine.db.SaveKeygenData(request.Chain, request.WorkId, request.AllParties, output); err != nil {
+		utils.LogError("error when saving keygen data", err)
+	}
 
 	// Make a callback and start next work.
-	engine.callback.OnWorkKeygenFinished(request.WorkId, output)
+	result := htypes.KeygenResult{
+		Chain:   request.Chain,
+		Success: true,
+	}
+
+	engine.callback.OnWorkKeygenFinished(&result)
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
 }
 
 func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
-	engine.db.SavePresignData(request.Chain, request.WorkId, pids, data)
+	if err := engine.db.SavePresignData(request.Chain, request.WorkId, pids, data); err != nil {
+		utils.LogError("error when saving presign data", err)
+	}
 
-	engine.callback.OnWorkPresignFinished(request.WorkId, data)
+	result := htypes.PresignResult{
+		Chain:   request.Chain,
+		Success: true,
+	}
+
+	engine.callback.OnWorkPresignFinished(&result)
 
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
@@ -192,7 +229,12 @@ func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*
 
 func (engine *Engine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
 	// TODO: save output.
-	engine.callback.OnWorkSigningFinished(request.WorkId, data)
+
+	result := htypes.KeysignResult{
+		Success: true,
+	}
+
+	engine.callback.OnWorkSigningFinished(&result)
 
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
@@ -360,11 +402,17 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 		return
 	}
 
+	culprits := worker.GetCulprits()
+	go engine.callback.OnWorkFailed(request.Chain, request.WorkType, culprits)
 	worker.Stop()
 }
 
 func (engine *Engine) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
 	return engine.presignsManager.GetAvailablePresigns(batchSize, n, pids)
+}
+
+func (engine *Engine) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
+	return engine.presignsManager.GetUnavailablePresigns(sentMsgNodes, pids)
 }
 
 func (engine *Engine) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {

@@ -43,7 +43,7 @@ func (ap *AvailableParties) getPartyList(n int) []*tss.PartyID {
 	ap.lock.RLock()
 	defer ap.lock.RUnlock()
 
-	arr := make([]*tss.PartyID, 0)
+	arr := make([]*tss.PartyID, 0, n)
 	for _, party := range ap.parties {
 		arr = append(arr, party)
 		if len(arr) == n {
