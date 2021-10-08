@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
@@ -13,6 +14,8 @@ import (
 	"github.com/sisu-network/dheart/store"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
+
+	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 const (
@@ -82,7 +85,7 @@ func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types
 	utils.LogInfo("err = ", err)
 	pubKey := api.ethKeys[chain].Public()
 	publicKeyECDSA, _ := pubKey.(*ecdsa.PublicKey)
-	publicKeyBytes := crypto.CompressPubkey(publicKeyECDSA)
+	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
 	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
 
 	if err == nil {
@@ -145,7 +148,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 	var err error
 	var signature []byte
 
-	utils.LogDebug("Signing transaction....")
+	utils.LogDebug("Signing transaction for chain", req.OutChain)
 	if utils.IsETHBasedChain(req.OutChain) {
 		signature, err = api.keySignEth(req.OutChain, req.OutBytes)
 	} else {
@@ -158,7 +161,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 			time.Sleep(time.Second * 3)
 			utils.LogInfo("Sending Keysign to Sisu")
 
-			api.c.BroadcastKeySignResult(&types.KeysignResult{
+			result := &types.KeysignResult{
 				Id:             req.Id,
 				Success:        true,
 				OutChain:       req.OutChain,
@@ -166,7 +169,10 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 				OutHash:        req.OutHash,
 				OutBytes:       req.OutBytes,
 				Signature:      signature,
-			})
+			}
+
+			// api.deployToChain(result)
+			api.c.BroadcastKeySignResult(result)
 		}()
 	} else {
 		utils.LogError("Cannot do key gen. Err =", err)
@@ -187,4 +193,39 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
 
 func (api *SingleNodeApi) SetPrivKey(encodedKey string, keyType string) error {
 	return nil
+}
+
+// Used for debugging only.
+func (api *SingleNodeApi) deployToChain(result *types.KeysignResult) {
+	utils.LogInfo("Deploying to chain", result.OutChain)
+
+	chainId := big.NewInt(1)
+	rpcEndpoint := "http://localhost:7545"
+
+	if result.OutChain == "sisu-eth" {
+		chainId = big.NewInt(36767)
+		rpcEndpoint = "http://localhost:8545"
+	}
+
+	tx := &eTypes.Transaction{}
+	tx.UnmarshalBinary(result.OutBytes)
+
+	signedTx, err := tx.WithSignature(eTypes.NewEIP155Signer(chainId), result.Signature)
+	if err != nil {
+		utils.LogError("cannot set signatuer for tx, err =", err)
+		return
+	}
+
+	client, err := ethclient.Dial(rpcEndpoint)
+	if err != nil {
+		utils.LogError("Cannot dial chain", result.OutChain, "at endpoint", rpcEndpoint)
+		// TODO: Add retry mechanism here.
+		return
+	}
+
+	if err := client.SendTransaction(context.Background(), signedTx); err != nil {
+		utils.LogError("cannot dispatch tx, err =", err)
+	} else {
+		utils.LogDebug("Deployment succeeded")
+	}
 }
