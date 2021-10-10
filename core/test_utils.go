@@ -5,11 +5,11 @@ import (
 	"math/big"
 	"sort"
 
-	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"

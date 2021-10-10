@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
 
-	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
+	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"

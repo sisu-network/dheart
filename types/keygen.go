@@ -1,8 +1,8 @@
 package types
 
 import (
-	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
+	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/sisu-network/tss-lib/tss"
 )
 

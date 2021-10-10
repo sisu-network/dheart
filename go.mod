@@ -3,10 +3,9 @@ module github.com/sisu-network/dheart
 go 1.16
 
 require (
-	github.com/DATA-DOG/go-sqlmock v1.5.0 // indirect
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Microsoft/go-winio v0.5.0 // indirect
-	github.com/cosmos/cosmos-sdk v0.42.1
-	github.com/deckarep/golang-set v1.7.1 // indirect
+	github.com/deckarep/golang-set v1.7.1
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
@@ -22,6 +21,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
+	github.com/sisu-network/cosmos-sdk v0.42.1-fork001
 	github.com/sisu-network/tss-lib v0.1.1
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954

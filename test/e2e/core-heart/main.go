@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/run"
@@ -15,7 +15,7 @@ import (
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
 
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 )
 
 func getPublicKeys(n int) []ctypes.PubKey {

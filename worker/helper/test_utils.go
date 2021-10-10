@@ -10,13 +10,13 @@ import (
 	"runtime"
 	"time"
 
-	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
+	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	dtypes "github.com/sisu-network/dheart/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"

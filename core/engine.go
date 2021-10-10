@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p-core/peer"
+	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
 	"github.com/sisu-network/dheart/core/signer"

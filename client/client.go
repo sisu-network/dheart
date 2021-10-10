@@ -99,7 +99,7 @@ func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
 	err := c.client.CallContext(context.Background(), &r, "tss_presignResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
-		utils.LogError("Cannot post keygen result, err = ", err)
+		utils.LogError("Cannot post presign result, err = ", err)
 		return err
 	}
 
@@ -107,8 +107,6 @@ func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
 }
 
 func (c *DefaultClient) PostKeysignResult(result *types.KeysignResult) error {
-	utils.LogDebug("c.connected = ", c.connected)
-
 	if !c.connected {
 		return ErrSisuServerNotConnected
 	}
@@ -119,7 +117,7 @@ func (c *DefaultClient) PostKeysignResult(result *types.KeysignResult) error {
 	err := c.client.CallContext(context.Background(), &r, "tss_keysignResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
-		utils.LogError("Cannot post keygen result, err = ", err)
+		utils.LogError("Cannot post keysign result, err = ", err)
 		return err
 	}
 
