@@ -27,9 +27,8 @@ type Client interface {
 
 // A client that connects to Sisu server
 type DefaultClient struct {
-	client    *rpc.Client
-	url       string
-	connected bool
+	client *rpc.Client
+	url    string
 }
 
 func NewClient(url string) Client {
@@ -45,7 +44,6 @@ func (c *DefaultClient) TryDial() {
 		utils.LogInfo("Dialing...", c.url)
 		c.client, _ = rpc.DialContext(context.Background(), c.url)
 		if err := c.CheckHealth(); err == nil {
-			c.connected = true
 			break
 		}
 
@@ -67,12 +65,6 @@ func (c *DefaultClient) CheckHealth() error {
 }
 
 func (c *DefaultClient) PostKeygenResult(result *types.KeygenResult) error {
-	utils.LogDebug("c.connected = ", c.connected)
-
-	if !c.connected {
-		return ErrSisuServerNotConnected
-	}
-
 	utils.LogDebug("Sending keygen result to sisu server")
 
 	var r interface{}
@@ -87,12 +79,6 @@ func (c *DefaultClient) PostKeygenResult(result *types.KeygenResult) error {
 }
 
 func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
-	utils.LogDebug("c.connected = ", c.connected)
-
-	if !c.connected {
-		return ErrSisuServerNotConnected
-	}
-
 	utils.LogDebug("Sending presign result to sisu server")
 
 	var r interface{}
@@ -107,10 +93,6 @@ func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
 }
 
 func (c *DefaultClient) PostKeysignResult(result *types.KeysignResult) error {
-	if !c.connected {
-		return ErrSisuServerNotConnected
-	}
-
 	utils.LogDebug("Sending keysign result to sisu server")
 
 	var r interface{}
