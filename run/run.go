@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"strconv"
+	"path/filepath"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/rpc"
@@ -27,26 +27,15 @@ func LoadConfigEnv(filenames ...string) {
 	}
 }
 
-func GetSisuClient() client.Client {
-	url := os.Getenv("SISU_SERVER_URL")
-	c := client.NewClient(url)
-	return c
-}
-
-func GetHeart(conConfig p2p.ConnectionsConfig, client client.Client) *core.Heart {
+func GetHeart(cfg config.HeartConfig, client client.Client) *core.Heart {
 	// DB Config
-	port, err := strconv.Atoi(os.Getenv("DB_PORT"))
-	if err != nil {
-		panic(err)
-	}
-
 	dbConfig := config.DbConfig{
-		Port:          port,
-		Host:          os.Getenv("DB_HOST"),
-		Username:      os.Getenv("DB_USERNAME"),
-		Password:      os.Getenv("DB_PASSWORD"),
-		Schema:        os.Getenv("DB_SCHEMA"),
-		MigrationPath: os.Getenv("DB_MIGRATION_PATH"),
+		Port:          cfg.Db.Port,
+		Host:          cfg.Db.Host,
+		Username:      cfg.Db.Username,
+		Password:      cfg.Db.Password,
+		Schema:        cfg.Db.Schema,
+		MigrationPath: cfg.Db.MigrationPath,
 	}
 
 	aesKey, err := hex.DecodeString(os.Getenv("AES_KEY_HEX"))
@@ -58,24 +47,20 @@ func GetHeart(conConfig p2p.ConnectionsConfig, client client.Client) *core.Heart
 	heartConfig := config.HeartConfig{
 		Db:         dbConfig,
 		AesKey:     aesKey,
-		Connection: conConfig,
+		Connection: cfg.Connection,
 	}
 
 	return core.NewHeart(heartConfig, client)
 }
 
-func getConnectionConfig() p2p.ConnectionsConfig {
+func getConnectionConfig(cfg config.HeartConfig) p2p.ConnectionsConfig {
 	var connectionConfig p2p.ConnectionsConfig
-	connectionConfig.HostId = "localhost"
-	port, err := strconv.Atoi(os.Getenv("DHEART_PORT"))
-	if err != nil {
-		panic(err)
-	}
-	connectionConfig.Port = port
+	connectionConfig.HostId = "0.0.0.0"
+	connectionConfig.Port = cfg.Port
 
 	// Bootstrapped peers.
-	connectionConfig.BootstrapPeers = make([]multiaddr.Multiaddr, 0)
-	peerString := os.Getenv("BOOTSTRAP_PEERS")
+	connectionConfig.BootstrapPeerAddrs = make([]multiaddr.Multiaddr, 0)
+	peerString := cfg.Connection.BootstrapPeers
 	peers := strings.Split(peerString, ",")
 	for _, peerInfo := range peers {
 		arr := strings.Split(peerInfo, "@")
@@ -85,25 +70,28 @@ func getConnectionConfig() p2p.ConnectionsConfig {
 		peerId := arr[0]
 		ip := arr[1]
 
-		mulAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", ip, port, peerId))
+		mulAddr, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", ip, cfg.Port, peerId))
 		if err != nil {
 			panic(err)
 		}
-		connectionConfig.BootstrapPeers = append(connectionConfig.BootstrapPeers, mulAddr)
+		connectionConfig.BootstrapPeerAddrs = append(connectionConfig.BootstrapPeerAddrs, mulAddr)
 	}
 
 	return connectionConfig
 }
 
 func SetupApiServer() {
-	c := GetSisuClient()
-
-	path := os.Getenv("HOME_DIR")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err := os.MkdirAll(path, os.ModePerm)
+	homeDir := os.Getenv("HOME_DIR")
+	if _, err := os.Stat(homeDir); os.IsNotExist(err) {
+		err := os.MkdirAll(homeDir, os.ModePerm)
 		if err != nil {
 			panic(err)
 		}
+	}
+
+	cfg, err := config.ReadConfig(filepath.Join(homeDir, "dheart.toml"))
+	if err != nil {
+		panic(err)
 	}
 
 	aesKey, err := hex.DecodeString(os.Getenv("AES_KEY_HEX"))
@@ -111,13 +99,15 @@ func SetupApiServer() {
 		panic(err)
 	}
 
-	store, err := store.NewStore(path+"/apidb", aesKey)
+	store, err := store.NewStore(filepath.Join(homeDir, "/apidb"), aesKey)
 	if err != nil {
 		panic(err)
 	}
 
+	c := client.NewClient(cfg.SisuServerUrl)
+
 	handler := rpc.NewServer()
-	if os.Getenv("USE_ON_MEMORY") == "true" {
+	if cfg.UseOnMemory {
 		utils.LogInfo("Running single node mode...")
 		api := server.NewSingleNodeApi(c, store)
 		api.Init()
@@ -126,8 +116,7 @@ func SetupApiServer() {
 	} else {
 		// Use Heart
 		utils.LogInfo("Running multiple nodes mode...")
-		connectionConfig := getConnectionConfig()
-		heart := GetHeart(connectionConfig, client.NewClient(os.Getenv("SISU_SERVER_URL")))
+		heart := GetHeart(cfg, c)
 		handler.RegisterName("tss", server.NewTssApi(heart))
 	}
 

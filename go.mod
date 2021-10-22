@@ -3,6 +3,7 @@ module github.com/sisu-network/dheart
 go 1.16
 
 require (
+	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/deckarep/golang-set v1.7.1
 	github.com/docker/distribution v2.7.1+incompatible // indirect
