@@ -32,12 +32,13 @@ type P2PMessage struct {
 }
 
 type ConnectionsConfig struct {
-	HostId         string
-	Port           int
-	Rendezvous     string
-	Protocol       protocol.ID
-	BootstrapPeers []maddr.Multiaddr
-	PrivateKeyType string
+	HostId             string
+	Port               int
+	Rendezvous         string
+	Protocol           protocol.ID
+	BootstrapPeers     string
+	BootstrapPeerAddrs []maddr.Multiaddr
+	PrivateKeyType     string
 }
 
 type P2PDataListener interface {
@@ -73,7 +74,7 @@ func NewConnectionManager(config ConnectionsConfig) ConnectionManager {
 	return &DefaultConnectionManager{
 		port:             config.Port,
 		rendezvous:       config.Rendezvous,
-		bootstrapPeers:   config.BootstrapPeers,
+		bootstrapPeers:   config.BootstrapPeerAddrs,
 		hostId:           config.HostId,
 		connections:      make(map[peer.ID]*Connection),
 		protocolListener: make(map[protocol.ID]P2PDataListener),

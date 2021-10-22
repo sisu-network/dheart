@@ -139,10 +139,10 @@ func GetMockConnectionConfig(n, index int) (ConnectionsConfig, []byte) {
 	}
 
 	return ConnectionsConfig{
-		Port:           TEST_PORT_BASE * (index + 1),
-		Rendezvous:     "rendezvous",
-		Protocol:       TSSProtocolID,
-		BootstrapPeers: peers,
-		HostId:         peerIds[index].String(),
+		Port:               TEST_PORT_BASE * (index + 1),
+		Rendezvous:         "rendezvous",
+		Protocol:           TSSProtocolID,
+		BootstrapPeerAddrs: peers,
+		HostId:             peerIds[index].String(),
 	}, privateKey
 }

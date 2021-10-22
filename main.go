@@ -2,10 +2,9 @@ package main
 
 import (
 	"math/big"
+	"os"
 	"os/signal"
 	"syscall"
-
-	"os"
 
 	"github.com/sisu-network/tss-lib/tss"
 

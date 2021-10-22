@@ -9,6 +9,7 @@ import (
 
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/run"
 	"github.com/sisu-network/dheart/test/mock"
@@ -72,9 +73,13 @@ func main() {
 		},
 	}
 
+	cfg := config.HeartConfig{}
+
 	conConfig, privKey := p2p.GetMockConnectionConfig(n, index)
+	cfg.Connection = conConfig
+
 	encryptedKey := getEncrypted(privKey)
-	heart := run.GetHeart(conConfig, mockClient)
+	heart := run.GetHeart(cfg, mockClient)
 
 	err := heart.SetPrivKey(hex.EncodeToString(encryptedKey), "secp256k1")
 	if err != nil {
