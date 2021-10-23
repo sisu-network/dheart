@@ -37,6 +37,7 @@ WORKDIR /app
 #     && touch /app/.env && echo "#SAMPLE_KEY:SAMPLE_VALUE" > /app/.env
 
 COPY --from=builder /tmp/go-app/out/dheart /app/dheart
+COPY --from=builder /tmp/go-app/db/migrations /app/db/migrations
 
 COPY .env.docker.local /app/.env
 

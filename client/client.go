@@ -38,13 +38,18 @@ func NewClient(url string) Client {
 }
 
 func (c *DefaultClient) TryDial() {
-	utils.LogInfo("Trying to dial Sisu server")
+	utils.LogInfo("Trying to dial Sisu server, url = ", c.url)
 
 	for {
 		utils.LogInfo("Dialing...", c.url)
-		c.client, _ = rpc.DialContext(context.Background(), c.url)
-		if err := c.CheckHealth(); err == nil {
-			break
+		var err error
+		c.client, err = rpc.DialContext(context.Background(), c.url)
+		if err == nil {
+			if err := c.CheckHealth(); err == nil {
+				break
+			}
+		} else {
+			utils.LogError("Cannot dial, err = ", err)
 		}
 
 		time.Sleep(RetryTime)
