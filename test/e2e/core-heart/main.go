@@ -57,14 +57,6 @@ func main() {
 
 	run.LoadConfigEnv("../../../.env")
 
-	// Overwrite some env variables (like schema names) so that it fits into testing multiple local
-	// nodes.
-	os.Setenv("DB_MIGRATION_PATH", "file://../../../db/migrations/")
-	if index != 0 {
-		os.Setenv("DB_SCHEMA", fmt.Sprintf("dheart%d", index))
-	}
-	os.Setenv("USE_ON_MEMORY", "")
-
 	done := make(chan bool)
 	mockClient := &mock.MockClient{
 		PostKeygenResultFunc: func(result *types.KeygenResult) error {
@@ -73,7 +65,14 @@ func main() {
 		},
 	}
 
-	cfg := config.HeartConfig{}
+	dbConfig := config.GetLocalhostDbConfig()
+	dbConfig.Schema = fmt.Sprintf("dheart%d", index)
+	dbConfig.MigrationPath = "file://../../../db/migrations/"
+
+	cfg := config.HeartConfig{
+		UseOnMemory: false,
+		Db:          dbConfig,
+	}
 
 	conConfig, privKey := p2p.GetMockConnectionConfig(n, index)
 	cfg.Connection = conConfig

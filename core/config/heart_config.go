@@ -8,8 +8,8 @@ import (
 )
 
 type DbConfig struct {
-	Port          int
 	Host          string
+	Port          int
 	Username      string
 	Password      string
 	Schema        string
@@ -40,4 +40,14 @@ func ReadConfig(path string) (HeartConfig, error) {
 	}
 
 	return cfg, nil
+}
+
+func GetLocalhostDbConfig() DbConfig {
+	return DbConfig{
+		Host:     "0.0.0.0",
+		Port:     3306,
+		Username: "root",
+		Password: "password",
+		Schema:   "dheart",
+	}
 }
