@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/joho/godotenv"
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/p2p"
@@ -26,6 +27,13 @@ type MockSisuNode struct {
 	server  *mock.Server
 	client  *mock.DheartClient
 	privKey *secp256k1.PrivKey
+}
+
+func loadConfigEnv(filenames ...string) {
+	err := godotenv.Load(filenames...)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func createNodes(index int, n int, keygenCh chan types.KeygenResult, keysignCh chan *types.KeysignResult) *MockSisuNode {
@@ -71,40 +79,39 @@ func generateEthTx() *etypes.Transaction {
 	return tx
 }
 
-func main() {
-	var n int
-	flag.IntVar(&n, "n", 0, "Total nodes")
-	flag.Parse()
-
-	if n == 0 {
-		n = 2
-	}
-
-	keygenChs := make([]chan types.KeygenResult, n)
-	keysignChs := make([]chan *types.KeysignResult, n)
-	tendermintPubKeys := make([]ctypes.PubKey, n)
-	nodes := make([]*MockSisuNode, n)
-
-	for i := 0; i < n; i++ {
-		keygenChs[i] = make(chan types.KeygenResult)
-		keysignChs[i] = make(chan *types.KeysignResult)
-
-		nodes[i] = createNodes(i, n, keygenChs[i], keysignChs[i])
-
-		go nodes[i].server.Run()
-
-		tendermintPubKeys[i] = nodes[i].privKey.PubKey()
-	}
-
-	time.Sleep(time.Second)
-
-	// Test keygen
-	for i := 0; i < n; i++ {
-		nodes[i].client.SetPrivKey(hex.EncodeToString(nodes[i].privKey.Bytes()), "secp256k1")
-		nodes[i].client.KeyGen("Keygen0", "eth", tendermintPubKeys)
-	}
+func setPrivateKeys(nodes []*MockSisuNode) {
+	n := len(nodes)
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
+
+	aesKey, err := hex.DecodeString(os.Getenv("AES_KEY_HEX"))
+	if err != nil {
+		panic(err)
+	}
+
+	for i := 0; i < n; i++ {
+		encrypt, err := utils.AESDEncrypt(nodes[i].privKey.Bytes(), []byte(aesKey))
+		if err != nil {
+			panic(err)
+		}
+		nodes[i].client.SetPrivKey(hex.EncodeToString(encrypt), "secp256k1")
+
+		wg.Done()
+	}
+
+	wg.Wait()
+	utils.LogInfo("Done Setting private key!")
+	time.Sleep(time.Second)
+}
+
+func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs []chan types.KeygenResult) {
+	n := len(nodes)
+	wg := new(sync.WaitGroup)
+	wg.Add(n)
+
+	for i := 0; i < n; i++ {
+		nodes[i].client.KeyGen("Keygen0", "eth", tendermintPubKeys)
+	}
 
 	for i := 0; i < n; i++ {
 		go func(index int) {
@@ -114,10 +121,15 @@ func main() {
 	}
 
 	wg.Wait()
+	utils.LogInfo("Done keygen!")
+	time.Sleep(time.Second)
+}
 
-	utils.LogInfo("All keygen tasks finished")
+func keysign(nodes []*MockSisuNode, keysignChs []chan *types.KeysignResult) {
+	n := len(nodes)
+	wg := new(sync.WaitGroup)
+	wg.Add(n)
 
-	// Test keysign.
 	for i := 0; i < n; i++ {
 		tx := generateEthTx()
 		bz, err := tx.MarshalBinary()
@@ -144,7 +156,45 @@ func main() {
 	}
 
 	wg.Wait()
+}
 
+func main() {
+	var n int
+	flag.IntVar(&n, "n", 0, "Total nodes")
+	flag.Parse()
+
+	if n == 0 {
+		n = 2
+	}
+
+	loadConfigEnv("../../../.env")
+
+	keygenChs := make([]chan types.KeygenResult, n)
+	keysignChs := make([]chan *types.KeysignResult, n)
+	tendermintPubKeys := make([]ctypes.PubKey, n)
+	nodes := make([]*MockSisuNode, n)
+
+	for i := 0; i < n; i++ {
+		keygenChs[i] = make(chan types.KeygenResult)
+		keysignChs[i] = make(chan *types.KeysignResult)
+
+		nodes[i] = createNodes(i, n, keygenChs[i], keysignChs[i])
+
+		go nodes[i].server.Run()
+
+		tendermintPubKeys[i] = nodes[i].privKey.PubKey()
+	}
+
+	time.Sleep(time.Second)
+
+	// Set private keys
+	setPrivateKeys(nodes)
+
+	keygen(nodes, tendermintPubKeys, keygenChs)
+	utils.LogInfo("All keygen tasks finished")
+
+	// Test keysign.
+	keysign(nodes, keysignChs)
 	utils.LogInfo("Finished all keysign!")
 
 	c := make(chan os.Signal, 1)

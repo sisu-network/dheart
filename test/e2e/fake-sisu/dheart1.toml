@@ -3,7 +3,7 @@
 
 home-dir = "/root/"
 use-on-memory = false
-sisu-server-url = "http://host.docker.internal:25456"
+sisu-server-url = "http://host.docker.internal:25457"
 port = 28300
 
 ###############################################################################
@@ -14,5 +14,5 @@ port = 28300
   port = 3306
   username = "root"
   password = "password"
-  schema = "dheart0"
+  schema = "dheart1"
   migration-path = "file://db/migrations/"

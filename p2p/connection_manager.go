@@ -171,14 +171,6 @@ func (cm *DefaultConnectionManager) handleStream(stream network.Stream) {
 					FromPeerId: peerIDString,
 					Data:       dataBuf,
 				})
-
-				// // Update status manager
-				// peerId, err := peer.Decode(peerIDString)
-				// if err == nil {
-				// 	cm.statusManager.UpdatePeerStatus(peerId, STATUS_CONNECTED)
-				// } else {
-				// 	utils.LogError(err)
-				// }
 			}(peerIDString, dataBuf)
 		}
 	}

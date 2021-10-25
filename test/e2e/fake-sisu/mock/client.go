@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
-	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	dTypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
@@ -58,25 +56,20 @@ func (c *DheartClient) KeyGen(keygenId string, chain string, pubKeys []ctypes.Pu
 	// Wrap pubkeys
 	wrappers := make([]dTypes.PubKeyWrapper, len(pubKeys))
 	for i, pubKey := range pubKeys {
+
 		switch pubKey.Type() {
 		case "ed25519":
 			wrappers[i] = dTypes.PubKeyWrapper{
 				KeyType: pubKey.Type(),
-				Ed25519: &ed25519.PubKey{
-					Key: pubKey.Bytes(),
-				},
+				Key:     pubKey.Bytes(),
 			}
 		case "secp256k1":
 			wrappers[i] = dTypes.PubKeyWrapper{
 				KeyType: pubKey.Type(),
-				Secp256k1: &secp256k1.PubKey{
-					Key: pubKey.Bytes(),
-				},
+				Key:     pubKey.Bytes(),
 			}
 		}
 	}
-
-	utils.LogInfo("Broadcasting keygen to Dheart")
 
 	var result string
 	err := c.client.CallContext(context.Background(), &result, "tss_keyGen", keygenId, chain, wrappers)

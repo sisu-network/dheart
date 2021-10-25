@@ -1,19 +1,17 @@
 package config
 
 import (
-	"fmt"
-
 	"github.com/BurntSushi/toml"
 	"github.com/sisu-network/dheart/p2p"
 )
 
 type DbConfig struct {
-	Host          string
-	Port          int
-	Username      string
-	Password      string
-	Schema        string
-	MigrationPath string
+	Host          string `toml:"host"`
+	Port          int    `toml:"port"`
+	Username      string `toml:"username"`
+	Password      string `toml:"password"`
+	Schema        string `toml:"schema"`
+	MigrationPath string `toml:"migration-path"`
 }
 
 type HeartConfig struct {
@@ -31,8 +29,6 @@ type HeartConfig struct {
 
 func ReadConfig(path string) (HeartConfig, error) {
 	cfg := HeartConfig{}
-
-	fmt.Println("path = ", path)
 
 	_, err := toml.DecodeFile(path, &cfg)
 	if err != nil {

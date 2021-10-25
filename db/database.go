@@ -72,6 +72,8 @@ func (d *SqlDatabase) Connect() error {
 	password := d.config.Password
 	schema := d.config.Schema
 
+	utils.LogInfo("Schema = ", schema)
+
 	// Connect to the db
 	database, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/", username, password, host, d.config.Port))
 	if err != nil {
@@ -98,6 +100,8 @@ func (d *SqlDatabase) DoMigration() error {
 	if err != nil {
 		return err
 	}
+
+	utils.LogInfo("Migration path =", d.config.MigrationPath)
 
 	m, err := migrate.NewWithDatabaseInstance(
 		d.config.MigrationPath,

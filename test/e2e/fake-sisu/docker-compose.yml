@@ -9,3 +9,12 @@ services:
     restart: on-failure
     volumes:
       - ./dheart0.toml:/root/dheart.toml
+  dheart1:
+    image: dheart
+    expose:
+      - 28300
+    ports:
+      - 5679:5678
+    restart: on-failure
+    volumes:
+      - ./dheart1.toml:/root/dheart.toml

@@ -41,10 +41,12 @@ func NewHeart(config config.HeartConfig, client client.Client) *Heart {
 	}
 }
 
-func (h *Heart) Start() {
+func (h *Heart) Start() error {
 	utils.LogInfo("Starting heart")
 	// Create db
-	h.createDb()
+	if err := h.createDb(); err != nil {
+		return err
+	}
 
 	// Connection manager
 	h.cm = p2p.NewConnectionManager(h.config.Connection)
@@ -60,17 +62,19 @@ func (h *Heart) Start() {
 	err := h.cm.Start(h.privateKey.Bytes())
 	if err != nil {
 		utils.LogError("Cannot start connection manager. err =", err)
+		return err
 	} else {
 		utils.LogError("Connected manager started!")
 	}
+
+	return nil
 }
 
-func (h *Heart) createDb() {
+func (h *Heart) createDb() error {
 	h.db = db.NewDatabase(&h.config.Db)
 	err := h.db.Init()
-	if err != nil {
-		panic(err)
-	}
+
+	return err
 }
 
 // --- Implements Engine callback /
@@ -119,13 +123,19 @@ func (h *Heart) OnWorkFailed(chain string, workType types.WorkType, culprits []*
 // SetPrivKey receives encrypted private key from Sisu, decrypts it and start the engine,
 // network communication, etc.
 func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
+	if h.privateKey != nil {
+		return fmt.Errorf("The private key has been set!")
+	}
+
 	encrypted, err := hex.DecodeString(encodedKey)
 	if err != nil {
+		utils.LogError("Failed to decode string, err =", err)
 		return err
 	}
 
 	decrypted, err := utils.AESDecrypt(encrypted, h.aesKey)
 	if err != nil {
+		utils.LogError("Failed to decrypt key, err =", err)
 		return err
 	}
 
@@ -139,7 +149,10 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 			return fmt.Errorf("Unsupported key type: %s", keyType)
 		}
 
-		h.Start()
+		err := h.Start()
+		if err != nil {
+			utils.LogError("Failed to start heart, err =", err)
+		}
 	}
 
 	return nil
@@ -165,6 +178,7 @@ func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) 
 		preparams, err = h.generatePreparams(chain)
 		if err != nil {
 			// TODO Broadcast failure to Sisu using client.
+			utils.LogError("Failed to generate preparams, err =", err)
 			return
 		}
 	}
