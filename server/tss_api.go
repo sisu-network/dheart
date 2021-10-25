@@ -24,6 +24,10 @@ func NewTssApi(heart *core.Heart) *TssApi {
 	}
 }
 
+func (api *TssApi) Init() {
+
+}
+
 func (api *TssApi) Version() string {
 	return "1"
 }
@@ -66,4 +70,8 @@ func (api *TssApi) Setup(configs []common.ChainConfig) error {
 
 func (api *TssApi) SetPrivKey(encodedKey string, keyType string) error {
 	return api.heart.SetPrivKey(encodedKey, keyType)
+}
+
+func (api *TssApi) KeySign(req *types.KeysignRequest) error {
+	return nil
 }

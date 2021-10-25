@@ -12,12 +12,10 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/sisu-network/dheart/client"
-	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/server"
 	"github.com/sisu-network/dheart/store"
-	"github.com/sisu-network/dheart/utils"
 )
 
 func LoadConfigEnv(filenames ...string) {
@@ -25,32 +23,6 @@ func LoadConfigEnv(filenames ...string) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func GetHeart(cfg config.HeartConfig, client client.Client) *core.Heart {
-	// DB Config
-	dbConfig := config.DbConfig{
-		Port:          cfg.Db.Port,
-		Host:          cfg.Db.Host,
-		Username:      cfg.Db.Username,
-		Password:      cfg.Db.Password,
-		Schema:        cfg.Db.Schema,
-		MigrationPath: cfg.Db.MigrationPath,
-	}
-
-	aesKey, err := hex.DecodeString(os.Getenv("AES_KEY_HEX"))
-	if err != nil {
-		panic(err)
-	}
-
-	// Heart Config
-	heartConfig := config.HeartConfig{
-		Db:         dbConfig,
-		AesKey:     aesKey,
-		Connection: cfg.Connection,
-	}
-
-	return core.NewHeart(heartConfig, client)
 }
 
 func getConnectionConfig(cfg config.HeartConfig) p2p.ConnectionsConfig {
@@ -107,18 +79,9 @@ func SetupApiServer() {
 	c := client.NewClient(cfg.SisuServerUrl)
 
 	handler := rpc.NewServer()
-	if cfg.UseOnMemory {
-		utils.LogInfo("Running single node mode...")
-		api := server.NewSingleNodeApi(c, store)
-		api.Init()
-
-		handler.RegisterName("tss", api)
-	} else {
-		// Use Heart
-		utils.LogInfo("Running multiple nodes mode...")
-		heart := GetHeart(cfg, c)
-		handler.RegisterName("tss", server.NewTssApi(heart))
-	}
+	serverApi := server.GetApi(cfg, store, c)
+	serverApi.Init()
+	handler.RegisterName("tss", serverApi)
 
 	s := server.NewServer(handler, "0.0.0.0", 5678)
 
