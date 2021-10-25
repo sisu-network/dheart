@@ -48,8 +48,8 @@ func getEncrypted(privKey []byte) []byte {
 
 func main() {
 	var index, n int
-	flag.IntVar(&index, "index", 0, "listening port")
-	flag.IntVar(&n, "n", 0, "listening port")
+	flag.IntVar(&index, "index", 0, "node index")
+	flag.IntVar(&n, "n", 0, "Total nodes")
 	flag.Parse()
 
 	if n == 0 {
