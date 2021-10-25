@@ -1,0 +1,17 @@
+# This is a TOML config file.
+# For more information, see https://github.com/toml-lang/toml
+
+home-dir = "/root/"
+use-on-memory = true
+sisu-server-url = "http://host.docker.internal:25456"
+port = 28300
+
+###############################################################################
+###                        Database Configuration                           ###
+###############################################################################
+[db]
+  host = "host.docker.internal"
+  port = 3306
+  username = "root"
+  password = "password"
+  schema = "dheart"
