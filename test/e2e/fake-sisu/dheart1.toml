@@ -16,3 +16,7 @@ port = 28300
   password = "password"
   schema = "dheart1"
   migration-path = "file://db/migrations/"
+[connection]
+  port = 28300
+  rendezvous = "rendezvous"
+  peers = ["/dns/dheart0/tcp/28300/p2p/16Uiu2HAmAdMooaRjvKX9owraEtZt4sgDxDrpKgmQcvDofyHPqkmH"]
