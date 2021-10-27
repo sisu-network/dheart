@@ -36,7 +36,7 @@ func genEnv() {
 AES_KEY_HEX=c787ef22ade5afc8a5e22041c17869e7e4714190d88ecec0a84e241c9431add0
 `, homeDir)
 
-	ioutil.WriteFile(".env", []byte(content), 0644)
+	ioutil.WriteFile(".env", []byte(content), 0600)
 }
 
 func main() {

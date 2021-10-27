@@ -44,5 +44,5 @@ func WriteConfigFile(configFilePath string, config HeartConfig) {
 		panic(err)
 	}
 
-	ioutil.WriteFile(configFilePath, buffer.Bytes(), 0644)
+	ioutil.WriteFile(configFilePath, buffer.Bytes(), 0600)
 }

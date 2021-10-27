@@ -83,7 +83,7 @@ func (api *TssApi) getPubkeysFromWrapper(keyWrappers []types.PubKeyWrapper) ([]c
 		case "secp256k1":
 			pubKeys[i] = &secp256k1.PubKey{Key: wrapper.Key}
 		default:
-			return make([]ctypes.PubKey, 0), fmt.Errorf("unknown key type", keyType)
+			return make([]ctypes.PubKey, 0), fmt.Errorf("unknown key type %s", keyType)
 		}
 	}
 

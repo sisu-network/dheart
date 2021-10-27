@@ -6,11 +6,11 @@ import (
 )
 
 type ApiHandler struct {
-	keygenCh  chan types.KeygenResult
+	keygenCh  chan *types.KeygenResult
 	keysignCh chan *types.KeysignResult
 }
 
-func NewApi(keygenCh chan types.KeygenResult, keysignCh chan *types.KeysignResult) *ApiHandler {
+func NewApi(keygenCh chan *types.KeygenResult, keysignCh chan *types.KeysignResult) *ApiHandler {
 	return &ApiHandler{
 		keygenCh:  keygenCh,
 		keysignCh: keysignCh,
@@ -25,7 +25,7 @@ func (a *ApiHandler) Version() string {
 func (api *ApiHandler) CheckHealth() {
 }
 
-func (a *ApiHandler) KeygenResult(result types.KeygenResult) bool {
+func (a *ApiHandler) KeygenResult(result *types.KeygenResult) bool {
 	utils.LogInfo("There is a Keygen Result")
 	utils.LogInfo("Success = ", result.Success)
 

@@ -43,7 +43,7 @@ func loadConfigEnv(filenames ...string) {
 
 func resetDb(index int) {
 	// reset the dev db
-	database, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", "root", "password", "0.0.0.0", "3306", fmt.Sprintf("dheart%d", index)))
+	database, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", "root", "password", "0.0.0.0", 3306, fmt.Sprintf("dheart%d", index)))
 	if err != nil {
 		panic(err)
 	}
@@ -53,7 +53,7 @@ func resetDb(index int) {
 	database.Exec("DROP TABLE presign")
 }
 
-func createNodes(index int, n int, keygenCh chan types.KeygenResult, keysignCh chan *types.KeysignResult) *MockSisuNode {
+func createNodes(index int, n int, keygenCh chan *types.KeygenResult, keysignCh chan *types.KeysignResult) *MockSisuNode {
 	port := 25456 + index
 	heartPort := 5678 + index
 
@@ -121,7 +121,7 @@ func setPrivateKeys(nodes []*MockSisuNode) {
 	time.Sleep(time.Second)
 }
 
-func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs []chan types.KeygenResult) {
+func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs []chan *types.KeygenResult) *types.KeygenResult {
 	n := len(nodes)
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
@@ -130,9 +130,11 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 		nodes[i].client.KeyGen("Keygen0", TEST_CHAIN, tendermintPubKeys)
 	}
 
+	results := make([]*types.KeygenResult, n)
 	for i := 0; i < n; i++ {
 		go func(index int) {
-			<-keygenChs[index]
+			result := <-keygenChs[index]
+			results[index] = result
 			wg.Done()
 		}(i)
 	}
@@ -140,6 +142,8 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 	wg.Wait()
 	utils.LogInfo("Done keygen!")
 	time.Sleep(time.Second)
+
+	return results[0]
 }
 
 func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignChs []chan *types.KeysignResult) {
@@ -147,13 +151,13 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
 
-	for i := 0; i < n; i++ {
-		tx := generateEthTx()
-		bz, err := tx.MarshalBinary()
-		if err != nil {
-			panic(err)
-		}
+	tx := generateEthTx()
+	bz, err := tx.MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
 
+	for i := 0; i < n; i++ {
 		request := &types.KeysignRequest{
 			Id:             "Keysign0",
 			OutChain:       TEST_CHAIN,
@@ -164,14 +168,19 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 		nodes[i].client.KeySign(request, tendermintPubKeys)
 	}
 
+	results := make([]*types.KeysignResult, n)
+
 	for i := 0; i < n; i++ {
 		go func(index int) {
-			<-keysignChs[index]
+			result := <-keysignChs[index]
+			results[index] = result
 			wg.Done()
 		}(i)
 	}
 
 	wg.Wait()
+
+	// Verify signing result.
 }
 
 func main() {
@@ -189,13 +198,13 @@ func main() {
 
 	loadConfigEnv("../../../.env")
 
-	keygenChs := make([]chan types.KeygenResult, n)
+	keygenChs := make([]chan *types.KeygenResult, n)
 	keysignChs := make([]chan *types.KeysignResult, n)
 	tendermintPubKeys := make([]ctypes.PubKey, n)
 	nodes := make([]*MockSisuNode, n)
 
 	for i := 0; i < n; i++ {
-		keygenChs[i] = make(chan types.KeygenResult)
+		keygenChs[i] = make(chan *types.KeygenResult)
 		keysignChs[i] = make(chan *types.KeysignResult)
 
 		nodes[i] = createNodes(i, n, keygenChs[i], keysignChs[i])
