@@ -410,7 +410,12 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	// Do all message validation first before processing.
 	// TODO: Add more validation here.
 	msgs := make([]tss.ParsedMessage, w.batchSize)
-	for i := range w.jobs {
+	// Now update all messages
+	w.jobsLock.RLock()
+	jobs := w.jobs
+	w.jobsLock.RUnlock()
+
+	for i := range jobs {
 		fromString := tssMsg.From
 		from := helper.GetPidFromString(fromString, w.pIDs)
 		if from == nil {
@@ -438,11 +443,6 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		w.preExecutionCache.AddMessage(tssMsg)
 		return nil
 	}
-
-	// Now update all messages
-	w.jobsLock.RLock()
-	jobs := w.jobs
-	w.jobsLock.RUnlock()
 
 	for i, j := range jobs {
 		go func(id int, job *Job) {
