@@ -195,6 +195,7 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
 }
 
 func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
+	utils.LogInfo("Keygen finished for chain", request.Chain)
 	// Save to database
 	if err := engine.db.SaveKeygenData(request.Chain, request.WorkId, request.AllParties, output); err != nil {
 		utils.LogError("error when saving keygen data", err)
@@ -212,6 +213,8 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 }
 
 func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+	utils.LogInfo("Presign finished for chain", request.Chain)
+
 	if err := engine.db.SavePresignData(request.Chain, request.WorkId, pids, data); err != nil {
 		utils.LogError("error when saving presign data", err)
 	}
@@ -228,8 +231,7 @@ func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*
 }
 
 func (engine *Engine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
-	// TODO: save output.
-
+	utils.LogInfo("Signing finished for chain", request.Chain)
 	result := htypes.KeysignResult{
 		Success: true,
 	}

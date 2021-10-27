@@ -150,7 +150,7 @@ func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, e
 }
 
 // Signing any transaction
-func (api *SingleNodeApi) KeySign(req *types.KeysignRequest) error {
+func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.PubKeyWrapper) error {
 	var err error
 	var signature []byte
 

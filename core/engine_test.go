@@ -68,7 +68,7 @@ func TestEngineDelayStart(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, n, helper.CopySortedPartyIds(pIDs), *savedData[i], true)
+		request := types.NewPresignRequest("eth", workId, n, helper.CopySortedPartyIds(pIDs), *savedData[i], true)
 
 		go func(engine *Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simulate that different workers can start at different times.
@@ -132,7 +132,7 @@ func TestEngineJobTimeout(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, n, helper.CopySortedPartyIds(pIDs), *savedData[i], true)
+		request := types.NewPresignRequest("eth", workId, n, helper.CopySortedPartyIds(pIDs), *savedData[i], true)
 
 		go func(engine *Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simulate that different workers can start at different times.

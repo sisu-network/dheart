@@ -72,6 +72,31 @@ func (api *TssApi) SetPrivKey(encodedKey string, keyType string) error {
 	return api.heart.SetPrivKey(encodedKey, keyType)
 }
 
-func (api *TssApi) KeySign(req *types.KeysignRequest) error {
+func (api *TssApi) getPubkeysFromWrapper(keyWrappers []types.PubKeyWrapper) ([]ctypes.PubKey, error) {
+	pubKeys := make([]ctypes.PubKey, len(keyWrappers))
+
+	for i, wrapper := range keyWrappers {
+		keyType := wrapper.KeyType
+		switch keyType {
+		case "ed25519":
+			pubKeys[i] = &ed25519.PubKey{Key: wrapper.Key}
+		case "secp256k1":
+			pubKeys[i] = &secp256k1.PubKey{Key: wrapper.Key}
+		default:
+			return make([]ctypes.PubKey, 0), fmt.Errorf("unknown key type", keyType)
+		}
+	}
+
+	return pubKeys, nil
+}
+
+func (api *TssApi) KeySign(req *types.KeysignRequest, keyWrappers []types.PubKeyWrapper) error {
+	pubKeys, err := api.getPubkeysFromWrapper(keyWrappers)
+	if err != nil {
+		return err
+	}
+
+	api.heart.Keysign(req.OutBytes, req.OutBlockHeight, req.OutChain, pubKeys)
+
 	return nil
 }

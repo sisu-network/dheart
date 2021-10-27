@@ -1,15 +1,16 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/hex"
 	"flag"
 	"fmt"
 	"math/big"
 	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
@@ -23,6 +24,10 @@ import (
 	"github.com/sisu-network/dheart/utils"
 )
 
+const (
+	TEST_CHAIN = "eth"
+)
+
 type MockSisuNode struct {
 	server  *mock.Server
 	client  *mock.DheartClient
@@ -34,6 +39,18 @@ func loadConfigEnv(filenames ...string) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func resetDb(index int) {
+	// reset the dev db
+	database, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", "root", "password", "0.0.0.0", "3306", fmt.Sprintf("dheart%d", index)))
+	if err != nil {
+		panic(err)
+	}
+	defer database.Close()
+
+	database.Exec("DROP TABLE keygen")
+	database.Exec("DROP TABLE presign")
 }
 
 func createNodes(index int, n int, keygenCh chan types.KeygenResult, keysignCh chan *types.KeysignResult) *MockSisuNode {
@@ -110,7 +127,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 	wg.Add(n)
 
 	for i := 0; i < n; i++ {
-		nodes[i].client.KeyGen("Keygen0", "eth", tendermintPubKeys)
+		nodes[i].client.KeyGen("Keygen0", TEST_CHAIN, tendermintPubKeys)
 	}
 
 	for i := 0; i < n; i++ {
@@ -125,7 +142,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 	time.Sleep(time.Second)
 }
 
-func keysign(nodes []*MockSisuNode, keysignChs []chan *types.KeysignResult) {
+func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignChs []chan *types.KeysignResult) {
 	n := len(nodes)
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
@@ -139,13 +156,12 @@ func keysign(nodes []*MockSisuNode, keysignChs []chan *types.KeysignResult) {
 
 		request := &types.KeysignRequest{
 			Id:             "Keysign0",
-			OutChain:       "eth",
+			OutChain:       TEST_CHAIN,
 			OutHash:        "Hash0",
 			OutBlockHeight: 123,
 			OutBytes:       bz,
 		}
-		nodes[i].client.KeySign(request)
-		wg.Add(1)
+		nodes[i].client.KeySign(request, tendermintPubKeys)
 	}
 
 	for i := 0; i < n; i++ {
@@ -165,6 +181,10 @@ func main() {
 
 	if n == 0 {
 		n = 2
+	}
+
+	for i := 0; i < n; i++ {
+		resetDb(i)
 	}
 
 	loadConfigEnv("../../../.env")
@@ -194,10 +214,6 @@ func main() {
 	utils.LogInfo("All keygen tasks finished")
 
 	// Test keysign.
-	keysign(nodes, keysignChs)
+	keysign(nodes, tendermintPubKeys, keysignChs)
 	utils.LogInfo("Finished all keysign!")
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
 }

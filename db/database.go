@@ -28,7 +28,7 @@ type Database interface {
 	LoadPreparams(chain string) (*keygen.LocalPreParams, error)
 
 	SaveKeygenData(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
-	LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error)
+	LoadKeygenData(chain string) (*keygen.LocalPartySaveData, error)
 
 	SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
 	GetAvailablePresignShortForm() ([]string, []string, error) // Returns presignIds, pids, error
@@ -204,11 +204,10 @@ func (d *SqlDatabase) SaveKeygenData(chain string, workId string, pids []*tss.Pa
 	return err
 }
 
-func (d *SqlDatabase) LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error) {
-	query := "SELECT keygen_output FROM keygen WHERE chain=? AND work_id=? AND batch_index=0"
+func (d *SqlDatabase) LoadKeygenData(chain string) (*keygen.LocalPartySaveData, error) {
+	query := "SELECT keygen_output FROM keygen WHERE chain=? AND batch_index=0"
 	params := []interface{}{
 		chain,
-		workId,
 	}
 
 	rows, err := d.db.Query(query, params...)
@@ -230,7 +229,7 @@ func (d *SqlDatabase) LoadKeygenData(chain, workId string) (*keygen.LocalPartySa
 			return nil, err
 		}
 	} else {
-		utils.LogVerbose("There is no such keygen output for ", chain, workId)
+		utils.LogVerbose("There is no such keygen output for ", chain)
 	}
 
 	return result, nil

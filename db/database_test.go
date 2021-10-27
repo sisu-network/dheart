@@ -80,7 +80,7 @@ func TestSqlDatabase_LoadKeygenData(t *testing.T) {
 		WillReturnRows(rows).
 		WillReturnError(nil)
 
-	got, err := sqlDatabase.LoadKeygenData(chain, workId)
+	got, err := sqlDatabase.LoadKeygenData(chain)
 	assert.NoError(t, err)
 	assert.EqualValues(t, data, *got)
 

@@ -81,11 +81,29 @@ func (c *DheartClient) KeyGen(keygenId string, chain string, pubKeys []ctypes.Pu
 	return nil
 }
 
-func (c *DheartClient) KeySign(req *dTypes.KeysignRequest) error {
+func (c *DheartClient) KeySign(req *dTypes.KeysignRequest, pubKeys []ctypes.PubKey) error {
 	utils.LogVerbose("Broadcasting key signing to Dheart")
 
+	// Wrap pubkeys
+	wrappers := make([]dTypes.PubKeyWrapper, len(pubKeys))
+	for i, pubKey := range pubKeys {
+
+		switch pubKey.Type() {
+		case "ed25519":
+			wrappers[i] = dTypes.PubKeyWrapper{
+				KeyType: pubKey.Type(),
+				Key:     pubKey.Bytes(),
+			}
+		case "secp256k1":
+			wrappers[i] = dTypes.PubKeyWrapper{
+				KeyType: pubKey.Type(),
+				Key:     pubKey.Bytes(),
+			}
+		}
+	}
+
 	var r interface{}
-	err := c.client.CallContext(context.Background(), &r, "tss_keySign", req)
+	err := c.client.CallContext(context.Background(), &r, "tss_keySign", req, wrappers)
 	if err != nil {
 		utils.LogError("Cannot send KeySign request, err = ", err)
 		return err

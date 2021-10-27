@@ -16,7 +16,7 @@ type Api interface {
 	Init()
 	SetPrivKey(encodedKey string, keyType string) error
 	KeyGen(keygenId string, chain string, tPubKeys []types.PubKeyWrapper) error
-	KeySign(req *types.KeysignRequest) error
+	KeySign(req *types.KeysignRequest, tPubKeys []types.PubKeyWrapper) error
 }
 
 func getHeart(cfg config.HeartConfig, client client.Client) *core.Heart {

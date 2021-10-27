@@ -1,6 +1,7 @@
 package core
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"time"
@@ -185,11 +186,11 @@ func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) 
 
 	h.engine.AddNodes(nodes)
 
-	request := types.NewKeygenRequest(workId, len(tPubKeys), pids, *preparams, n-1)
+	request := types.NewKeygenRequest(chain, workId, len(tPubKeys), pids, *preparams, n-1)
 	h.engine.AddRequest(request)
 }
 
-func (h *Heart) Keysign(txs [][]byte, block int64, chain string, tPubKeys []ctypes.PubKey) {
+func (h *Heart) Keysign(tx []byte, block int64, chain string, tPubKeys []ctypes.PubKey) error {
 	n := len(tPubKeys)
 
 	nodes := NewNodes(tPubKeys)
@@ -198,12 +199,21 @@ func (h *Heart) Keysign(txs [][]byte, block int64, chain string, tPubKeys []ctyp
 		pids[i] = node.PartyId
 	}
 
-	// sorted := tss.SortPartyIDs(pids)
+	sorted := tss.SortPartyIDs(pids)
 	h.engine.AddNodes(nodes)
 
-	// Divide the txs array into multiple batches.
+	// TODO: Find unique workId
+	hash := sha256.Sum256(tx)
+	workId := hex.EncodeToString(hash[:])
+	request := types.NewSigningRequets(chain, workId, len(tPubKeys), sorted, string(tx))
 
-	// request := types.NewSigningRequets(workId, n, sorted)
+	presignInput, err := h.db.LoadKeygenData(chain)
+	if err != nil {
+		return err
+	}
+
+	request.PresignInput = presignInput
+	return h.engine.AddRequest(request)
 }
 
 // --- End of Server API  /

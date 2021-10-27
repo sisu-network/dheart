@@ -236,7 +236,7 @@ func (m *MockDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresign
 	return nil, nil
 }
 
-func (m *MockDatabase) LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error) {
+func (m *MockDatabase) LoadKeygenData(chain string) (*keygen.LocalPartySaveData, error) {
 	return nil, nil
 }
 
