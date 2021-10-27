@@ -3,7 +3,7 @@ package types
 type WorkType int32
 
 const (
-	EcdsaKeygen = iota
+	EcdsaKeygen WorkType = iota
 	EcdsaPresign
 	EcdsaSigning
 

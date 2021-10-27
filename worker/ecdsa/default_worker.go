@@ -77,7 +77,12 @@ type DefaultWorker struct {
 	// Execution
 	threshold  int
 	jobs       []*Job
+	jobsLock   *sync.RWMutex
 	dispatcher interfaces.MessageDispatcher
+	// Current job type of this worker. In most case, it's the same as jobType. However, in some case
+	// it could be different. For example, a signing work that requires presign will have curJobType
+	// value equal presign.
+	curJobType atomic.Value
 
 	isExecutionStarted atomic.Value
 	keygenInput        *keygen.LocalPreParams
@@ -186,6 +191,7 @@ func baseWorker(
 		dispatcher:        dispatcher,
 		callback:          callback,
 		jobs:              make([]*Job, batchSize),
+		jobsLock:          &sync.RWMutex{},
 		jobOutput:         make(map[string][]tss.Message),
 		jobOutputLock:     &sync.RWMutex{},
 		finalOutputLock:   &sync.RWMutex{},
@@ -210,7 +216,7 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 		w.pIDs = w.request.AllParties
 		w.pIDsMap = pidsToMap(w.pIDs)
 		go func() {
-			if err := w.executeWork(); err != nil {
+			if err := w.executeWork(w.jobType); err != nil {
 				utils.LogError("Error when executing work", err)
 				return
 			}
@@ -223,7 +229,8 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 }
 
 // Start actual execution of the work.
-func (w *DefaultWorker) executeWork() error {
+func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
+	utils.LogInfo("Executing work type", wTypes.WorkTypeStrings[workType])
 	p2pCtx := tss.NewPeerContext(w.pIDs)
 
 	// Assign the correct
@@ -235,17 +242,33 @@ func (w *DefaultWorker) executeWork() error {
 
 	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.threshold)
 
+	jobs := make([]*Job, w.batchSize)
+	nextJobType := w.jobType
 	// Creates all jobs
-	for i := range w.jobs {
+	for i := range jobs {
 		switch w.jobType {
 		case wTypes.EcdsaKeygen:
-			w.jobs[i] = NewKeygenJob(i, w.pIDs, params, w.keygenInput, w, w.jobTimeout)
+			jobs[i] = NewKeygenJob(i, w.pIDs, params, w.keygenInput, w, w.jobTimeout)
+			nextJobType = wTypes.EcdsaKeygen
 
 		case wTypes.EcdsaPresign:
-			w.jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
+			jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
+			nextJobType = wTypes.EcdsaPresign
 
 		case wTypes.EcdsaSigning:
-			w.jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessage, w.signingInput[i], w, w.jobTimeout)
+			if w.signingInput == nil || len(w.signingInput) == 0 {
+				// we have to do presign first.
+				w.presignInput = w.request.PresignInput
+				w.presignOutputs = make([]*presign.LocalPresignData, w.batchSize)
+				w.curRound = message.Presign1
+				nextJobType = wTypes.EcdsaPresign
+
+				jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
+			} else {
+				w.curRound = message.Sign1
+				nextJobType = wTypes.EcdsaSigning
+				jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessage, w.signingInput[i], w, w.jobTimeout)
+			}
 
 		default:
 			// If job type is not correct, kill the whole worker.
@@ -254,7 +277,7 @@ func (w *DefaultWorker) executeWork() error {
 		}
 	}
 
-	for _, job := range w.jobs {
+	for _, job := range jobs {
 		if err := job.Start(); err != nil {
 			// If job cannot start, kill the whole worker.
 			w.callback.OnWorkFailed(w.request)
@@ -262,10 +285,20 @@ func (w *DefaultWorker) executeWork() error {
 		}
 	}
 
+	w.jobsLock.Lock()
+	w.jobs = jobs
+	w.jobsLock.Unlock()
+
+	w.curJobType.Store(nextJobType)
+
 	// Mark execution started.
 	w.isExecutionStarted.Store(true)
 
 	msgCache := w.preExecutionCache.PopAllMessages(w.workId)
+	if len(msgCache) > 0 {
+		utils.LogInfo(w.workId, "Cache size =", len(msgCache))
+	}
+
 	for _, msg := range msgCache {
 		if msg.Type == common.TssMessage_UPDATE_MESSAGES {
 			if err := w.ProcessNewMessage(msg); err != nil {
@@ -375,6 +408,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	}
 
 	// Do all message validation first before processing.
+	// TODO: Add more validation here.
 	msgs := make([]tss.ParsedMessage, w.batchSize)
 	for i := range w.jobs {
 		fromString := tssMsg.From
@@ -397,19 +431,35 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		msgs[i] = msg
 	}
 
+	round, _ := message.GetMsgRound(msgs[0].Content())
+	// If this is are signing worker (with presign) and we are in still in the presigning phase but
+	// this update mesasge is for signing round, we have to catch this message.
+	if w.jobType == types.EcdsaSigning && w.curJobType.Load() != types.EcdsaSigning && round == message.Sign1 {
+		w.preExecutionCache.AddMessage(tssMsg)
+		return nil
+	}
+
 	// Now update all messages
-	for i := range w.jobs {
-		go func(id int) {
+	w.jobsLock.RLock()
+	jobs := w.jobs
+	w.jobsLock.RUnlock()
+
+	for i, j := range jobs {
+		go func(id int, job *Job) {
 			round, err := message.GetMsgRound(msgs[id].Content())
 			if err != nil {
 				utils.LogError("error when getting round %w", err)
 				// If we cannot get msg round, blame the sender
 				w.blameMgr.AddCulpritByRound(w.workId, w.curRound, []*tss.PartyID{msgs[id].GetFrom()})
+				return
 			}
 
 			w.blameMgr.AddSender(w.workId, round, tssMsg.From)
 
-			if err := w.jobs[id].processMessage(msgs[id]); err != nil {
+			// If this is a signing worker (with presign step) and this message is a signing message
+			// while we are waiting for the last presign message, add the signing message to cache.
+
+			if err := job.processMessage(msgs[id]); err != nil {
 				// Message can be from bad actor/corrupted. Save the culprits, and ignore.
 				utils.LogError("cannot process message error", err)
 				if round > 0 {
@@ -418,7 +468,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 					w.blameMgr.AddCulpritByRound(w.workId, atomic.LoadUint32(&w.curRound), err.Culprits())
 				}
 			}
-		}(i)
+		}(i, j)
 	}
 
 	return nil
@@ -464,8 +514,17 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		utils.LogVerbose(w.GetWorkId(), "Done!")
-		w.callback.OnWorkPresignFinished(w.request, w.pIDs, w.presignOutputs)
+		utils.LogVerbose(w.GetWorkId(), "Presign Done!")
+
+		// If this is a signing request, we have to do signing after generating presign input
+		if w.jobType == types.EcdsaSigning {
+			w.signingInput = w.presignOutputs
+
+			w.executeWork(types.EcdsaSigning)
+		} else {
+			// This is purely presign request. Make a callback after finish
+			w.callback.OnWorkPresignFinished(w.request, w.pIDs, w.presignOutputs)
+		}
 	}
 }
 
@@ -490,7 +549,7 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		utils.LogVerbose(w.GetWorkId(), "Done!")
+		utils.LogVerbose(w.GetWorkId(), "Signing Done!")
 		w.callback.OnWorkSigningFinished(w.request, w.signingOutputs)
 	}
 }
