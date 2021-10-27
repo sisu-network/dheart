@@ -65,7 +65,6 @@ func TestSqlDatabase_LoadKeygenData(t *testing.T) {
 	})
 
 	chain := "chain-0"
-	workId := "work0"
 
 	data := keygen.LocalPartySaveData{
 		Ks: []*big.Int{big.NewInt(10)},
@@ -75,8 +74,8 @@ func TestSqlDatabase_LoadKeygenData(t *testing.T) {
 	assert.NoError(t, err)
 
 	rows := sqlmock.NewRows([]string{"keygen_output"}).AddRow(json)
-	mock.ExpectQuery("SELECT keygen_output FROM keygen WHERE chain=\\? AND work_id=\\? AND batch_index=0").
-		WithArgs(chain, workId).
+	mock.ExpectQuery("SELECT keygen_output FROM keygen WHERE chain=\\? AND batch_index=0").
+		WithArgs(chain).
 		WillReturnRows(rows).
 		WillReturnError(nil)
 
