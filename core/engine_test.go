@@ -114,7 +114,7 @@ func TestEngineJobTimeout(t *testing.T) {
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
 			getMokDbForAvailManager(presignIds, pidStrings),
 			&helper.MockEngineCallback{
-				OnWorkFailedFunc: func(chain string, workType types.WorkType, culprits []*tss.PartyID) {
+				OnWorkFailedFunc: func(request *types.WorkRequest, culprits []*tss.PartyID) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
