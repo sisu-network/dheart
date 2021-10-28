@@ -11,6 +11,7 @@ import (
 	common "github.com/sisu-network/dheart/common"
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/types"
+	"github.com/sisu-network/dheart/utils"
 )
 
 type TssApi struct {
@@ -22,6 +23,10 @@ func NewTssApi(heart *core.Heart) *TssApi {
 	return &TssApi{
 		heart: heart,
 	}
+}
+
+func (api *TssApi) Init() {
+
 }
 
 func (api *TssApi) Version() string {
@@ -45,9 +50,7 @@ func (api *TssApi) KeyGen(keygenId string, chain string, keyWrappers []types.Pub
 		}
 	}
 
-	go api.heart.Keygen(keygenId, chain, pubKeys)
-
-	return nil
+	return api.heart.Keygen(keygenId, chain, pubKeys)
 }
 
 func (api *TssApi) SignEthTx(chainSymbol string, tx *etypes.Transaction) {
@@ -65,5 +68,38 @@ func (api *TssApi) Setup(configs []common.ChainConfig) error {
 }
 
 func (api *TssApi) SetPrivKey(encodedKey string, keyType string) error {
-	return api.heart.SetPrivKey(encodedKey, keyType)
+	utils.LogInfo("Setting private key, key type =", keyType)
+	err := api.heart.SetPrivKey(encodedKey, keyType)
+	utils.LogVerbose("Done setting private key, err = ", err)
+
+	return err
+}
+
+func (api *TssApi) getPubkeysFromWrapper(keyWrappers []types.PubKeyWrapper) ([]ctypes.PubKey, error) {
+	pubKeys := make([]ctypes.PubKey, len(keyWrappers))
+
+	for i, wrapper := range keyWrappers {
+		keyType := wrapper.KeyType
+		switch keyType {
+		case "ed25519":
+			pubKeys[i] = &ed25519.PubKey{Key: wrapper.Key}
+		case "secp256k1":
+			pubKeys[i] = &secp256k1.PubKey{Key: wrapper.Key}
+		default:
+			return make([]ctypes.PubKey, 0), fmt.Errorf("unknown key type %s", keyType)
+		}
+	}
+
+	return pubKeys, nil
+}
+
+func (api *TssApi) KeySign(req *types.KeysignRequest, keyWrappers []types.PubKeyWrapper) error {
+	pubKeys, err := api.getPubkeysFromWrapper(keyWrappers)
+	if err != nil {
+		return err
+	}
+
+	api.heart.Keysign(req, pubKeys)
+
+	return nil
 }

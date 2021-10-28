@@ -12,6 +12,8 @@ import (
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/tss"
+
+	libCommon "github.com/sisu-network/tss-lib/common"
 )
 
 type EngineCallback struct {
@@ -38,12 +40,10 @@ func (cb *EngineCallback) OnWorkPresignFinished(result *htypes.PresignResult) {
 	cb.presignDataCh <- result
 }
 
-func (cb *EngineCallback) OnWorkSigningFinished(result *htypes.KeysignResult) {
-	cb.signingDataCh <- result
+func (cb *EngineCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
 }
 
-func (cb *EngineCallback) OnWorkFailed(chain string, workType types.WorkType, culprit []*tss.PartyID) {
-
+func (cb *EngineCallback) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {
 }
 
 func getSortedPartyIds(n int) tss.SortedPartyIDs {
@@ -104,7 +104,7 @@ func main() {
 
 	// Add request
 	workId := "keygen0"
-	request := types.NewKeygenRequest(workId, n, pids, *helper.LoadPreparams(index), n-1)
+	request := types.NewKeygenRequest("eth", workId, n, pids, helper.LoadPreparams(index), n-1)
 	err = engine.AddRequest(request)
 	if err != nil {
 		panic(err)

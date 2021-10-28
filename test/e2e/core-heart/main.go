@@ -9,6 +9,7 @@ import (
 
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 
+	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/run"
@@ -47,8 +48,8 @@ func getEncrypted(privKey []byte) []byte {
 
 func main() {
 	var index, n int
-	flag.IntVar(&index, "index", 0, "listening port")
-	flag.IntVar(&n, "n", 0, "listening port")
+	flag.IntVar(&index, "index", 0, "node index")
+	flag.IntVar(&n, "n", 0, "Total nodes")
 	flag.Parse()
 
 	if n == 0 {
@@ -78,9 +79,21 @@ func main() {
 	cfg.Connection = conConfig
 
 	encryptedKey := getEncrypted(privKey)
-	heart := run.GetHeart(cfg, mockClient)
 
-	err := heart.SetPrivKey(hex.EncodeToString(encryptedKey), "secp256k1")
+	aesKey, err := hex.DecodeString(os.Getenv("AES_KEY_HEX"))
+	if err != nil {
+		panic(err)
+	}
+
+	heartConfig := config.HeartConfig{
+		Db:         dbConfig,
+		AesKey:     aesKey,
+		Connection: cfg.Connection,
+	}
+
+	heart := core.NewHeart(heartConfig, mockClient)
+
+	err = heart.SetPrivKey(hex.EncodeToString(encryptedKey), "secp256k1")
 	if err != nil {
 		panic(err)
 	}

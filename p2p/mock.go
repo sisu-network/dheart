@@ -10,6 +10,7 @@ import (
 	maddr "github.com/multiformats/go-multiaddr"
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
+	"github.com/sisu-network/dheart/utils"
 )
 
 const (
@@ -120,7 +121,7 @@ func GetMockConnectionConfig(n, index int) (ConnectionsConfig, []byte) {
 	peerIds := GetMockPeers(n)
 
 	privateKey := GetPrivateKeyBytes(index)
-	peers := make([]maddr.Multiaddr, 0)
+	peers := make([]string, n)
 
 	// create peers
 	for i := 0; i < n; i++ {
@@ -131,18 +132,14 @@ func GetMockConnectionConfig(n, index int) (ConnectionsConfig, []byte) {
 		port := TEST_PORT_BASE * (i + 1)
 		peerId := peerIds[i]
 
-		peer, err := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, peerId))
-		if err != nil {
-			panic(err)
-		}
-		peers = append(peers, peer)
+		peers[i] = fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, peerId)
+		utils.LogInfo("peers[i] =", i, peers[i])
 	}
 
 	return ConnectionsConfig{
-		Port:               TEST_PORT_BASE * (index + 1),
-		Rendezvous:         "rendezvous",
-		Protocol:           TSSProtocolID,
-		BootstrapPeerAddrs: peers,
-		HostId:             peerIds[index].String(),
+		Port:           TEST_PORT_BASE * (index + 1),
+		Rendezvous:     "rendezvous",
+		Protocol:       TSSProtocolID,
+		BootstrapPeers: peers,
 	}, privateKey
 }

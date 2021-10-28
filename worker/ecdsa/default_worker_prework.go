@@ -10,6 +10,7 @@ import (
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -139,7 +140,7 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 
 func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyID) {
 	if w.availableParties.getLength() < w.request.N {
-		return false, nil, nil
+		return false, nil, make([]*tss.PartyID, 0)
 	}
 
 	if w.request.IsSigning() {
@@ -148,13 +149,15 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 		if len(presignIds) == w.batchSize {
 			// Announce this as success and return
 			return true, presignIds, selectedPids
+		} else {
+			// We have to do presign + signing ƒrom online nodes since we cannot find appropriate presign data.
+			parties := w.availableParties.getPartyList(w.request.N)
+			return true, nil, parties
 		}
 	} else {
-		// Keygen or presign works.
+		// presign works.
 		return true, nil, w.availableParties.getPartyList(w.request.N)
 	}
-
-	return false, nil, nil
 }
 
 // Finalize work as a leader and start execution.
@@ -174,11 +177,17 @@ func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selec
 	msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, true, presignIds, w.pIDs)
 	go w.dispatcher.BroadcastMessage(w.pIDs, msg)
 
+	workType := w.jobType
 	if w.request.IsSigning() {
-		w.signingInput = w.callback.GetPresignOutputs(presignIds)
+		if presignIds != nil && len(presignIds) > 0 {
+			w.signingInput = w.callback.GetPresignOutputs(presignIds)
+		} else {
+			w.signingInput = nil
+			workType = types.EcdsaPresign
+		}
 	}
 
-	if err := w.executeWork(); err != nil {
+	if err := w.executeWork(workType); err != nil {
 		utils.LogError("Error when executing work", err)
 	}
 }
@@ -249,12 +258,18 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 		w.pIDsMap = pidsToMap(w.pIDs)
 
 		if join {
+			workType := w.jobType
 			if w.request.IsSigning() {
-				w.signingInput = w.callback.GetPresignOutputs(msg.PresignIds)
+				if msg.PresignIds != nil && len(msg.PresignIds) > 0 {
+					w.signingInput = w.callback.GetPresignOutputs(msg.PresignIds)
+				} else {
+					w.signingInput = nil
+					workType = types.EcdsaPresign
+				}
 			}
 
 			// We are one of the participants, execute the work
-			if err := w.executeWork(); err != nil {
+			if err := w.executeWork(workType); err != nil {
 				utils.LogError("Error when executing work", err)
 			}
 		} else {

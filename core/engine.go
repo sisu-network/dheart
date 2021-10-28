@@ -37,9 +37,9 @@ type EngineCallback interface {
 
 	OnWorkPresignFinished(result *htypes.PresignResult)
 
-	OnWorkSigningFinished(result *htypes.KeysignResult)
+	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData)
 
-	OnWorkFailed(chain string, workType types.WorkType, culprits []*tss.PartyID)
+	OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID)
 }
 
 // An Engine is a main component for TSS signing. It takes the following roles:
@@ -107,7 +107,7 @@ func (engine *Engine) WithPresignTimeout(timeout time.Duration) *Engine {
 func (engine *Engine) Init() {
 	err := engine.presignsManager.Load()
 	if err != nil {
-		panic("Cannot load presign")
+		panic(err)
 	}
 }
 
@@ -195,6 +195,7 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
 }
 
 func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
+	utils.LogInfo("Keygen finished for chain", request.Chain)
 	// Save to database
 	if err := engine.db.SaveKeygenData(request.Chain, request.WorkId, request.AllParties, output); err != nil {
 		utils.LogError("error when saving keygen data", err)
@@ -212,6 +213,8 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 }
 
 func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+	utils.LogInfo("Presign finished for chain", request.Chain)
+
 	if err := engine.db.SavePresignData(request.Chain, request.WorkId, pids, data); err != nil {
 		utils.LogError("error when saving presign data", err)
 	}
@@ -228,13 +231,9 @@ func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*
 }
 
 func (engine *Engine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
-	// TODO: save output.
+	utils.LogInfo("Signing finished for chain", request.Chain)
 
-	result := htypes.KeysignResult{
-		Success: true,
-	}
-
-	engine.callback.OnWorkSigningFinished(&result)
+	engine.callback.OnWorkSigningFinished(request, data)
 
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
@@ -403,7 +402,7 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 	}
 
 	culprits := worker.GetCulprits()
-	go engine.callback.OnWorkFailed(request.Chain, request.WorkType, culprits)
+	go engine.callback.OnWorkFailed(request, culprits)
 	worker.Stop()
 }
 

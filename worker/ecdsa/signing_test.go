@@ -115,7 +115,79 @@ func TestSigningEndToEnd(t *testing.T) {
 	runAllWorkers(workers, outCh, done)
 
 	// Verify signature
-	verifySignature(t, signingMsg, outputs, wrapper)
+	verifySignature(t, signingMsg, outputs, wrapper.Outputs[0][0].ECDSAPub.X(), wrapper.Outputs[0][0].ECDSAPub.Y())
+}
+
+func TestSigning_PresignAndSign(t *testing.T) {
+	n := 4
+	batchSize := 1
+
+	// Batch should have the same set of party ids.
+	pIDs := helper.GetTestPartyIds(n)
+	presignInputs := helper.LoadKeygenSavedData(pIDs)
+	outCh := make(chan *common.TssMessage)
+	workers := make([]worker.Worker, n)
+	done := make(chan bool)
+	finishedWorkerCount := 0
+	signingMsg := "This is a test"
+
+	outputs := make([][]*libCommon.SignatureData, len(pIDs)) // n * batchSize
+	outputLock := &sync.Mutex{}
+
+	for i := 0; i < n; i++ {
+		request := &types.WorkRequest{
+			WorkId:       "Signing0",
+			WorkType:     types.EcdsaSigning,
+			BatchSize:    batchSize,
+			PresignInput: presignInputs[i],
+			AllParties:   helper.CopySortedPartyIds(pIDs),
+			Threshold:    len(pIDs) - 1,
+			Message:      signingMsg,
+			N:            n,
+		}
+
+		workerIndex := i
+
+		worker := NewSigningWorker(
+			batchSize,
+			request,
+			pIDs[i],
+			helper.NewTestDispatcher(outCh, 0, 0),
+			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
+			&helper.MockWorkerCallback{
+				OnWorkSigningFinishedFunc: func(request *types.WorkRequest, data []*libCommon.SignatureData) {
+					outputLock.Lock()
+					defer outputLock.Unlock()
+
+					outputs[workerIndex] = data
+					finishedWorkerCount += 1
+					if finishedWorkerCount == n {
+						done <- true
+					}
+				},
+
+				GetAvailablePresignsFunc: func(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
+					return nil, nil
+				},
+
+				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
+					return nil
+				},
+			},
+			10*time.Minute,
+		)
+
+		workers[i] = worker
+	}
+
+	// Start all workers
+	startAllWorkers(workers)
+
+	// Run all workers
+	runAllWorkers(workers, outCh, done)
+
+	// Verify signature
+	verifySignature(t, signingMsg, outputs, nil, nil)
 }
 
 func TestSigning_PreExecutionTimeout(t *testing.T) {
@@ -194,6 +266,8 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 			N:          n,
 		}
 
+		workerIndex := i
+
 		worker := NewSigningWorker(
 			batchSize,
 			request,
@@ -205,6 +279,14 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 					if n := atomic.AddUint32(&numFailedWorkers, 1); n == 4 {
 						done <- true
 					}
+				},
+
+				GetAvailablePresignsFunc: func(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
+					return make([]string, batchSize), pids
+				},
+
+				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
+					return wrapper.Outputs[workerIndex]
 				},
 			},
 			time.Second,
@@ -222,7 +304,8 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 	assert.EqualValues(t, 4, numFailedWorkers)
 }
 
-func verifySignature(t *testing.T, msg string, outputs [][]*libCommon.SignatureData, wrapper *helper.PresignDataWrapper) {
+// func verifySignature(t *testing.T, msg string, outputs [][]*libCommon.SignatureData, wrapper *helper.PresignDataWrapper) {
+func verifySignature(t *testing.T, msg string, outputs [][]*libCommon.SignatureData, pubX, pubY *big.Int) {
 	// Loop every single element in the batch
 	for j := range outputs[0] {
 		// Verify all workers have the same signature.
@@ -231,18 +314,18 @@ func verifySignature(t *testing.T, msg string, outputs [][]*libCommon.SignatureD
 			assert.Equal(t, outputs[i][j].S, outputs[0][j].S)
 		}
 
-		pubX := wrapper.Outputs[0][0].ECDSAPub.X()
-		pubY := wrapper.Outputs[0][0].ECDSAPub.Y()
-		R := new(big.Int).SetBytes(outputs[0][j].R)
-		S := new(big.Int).SetBytes(outputs[0][j].S)
+		if pubX != nil && pubY != nil {
+			R := new(big.Int).SetBytes(outputs[0][j].R)
+			S := new(big.Int).SetBytes(outputs[0][j].S)
 
-		// Verify that the signature is valid
-		pk := ecdsa.PublicKey{
-			Curve: tss.EC(),
-			X:     pubX,
-			Y:     pubY,
+			// Verify that the signature is valid
+			pk := ecdsa.PublicKey{
+				Curve: tss.EC(),
+				X:     pubX,
+				Y:     pubY,
+			}
+			ok := ecdsa.Verify(&pk, []byte(msg), R, S)
+			assert.True(t, ok, "ecdsa verify must pass")
 		}
-		ok := ecdsa.Verify(&pk, []byte(msg), R, S)
-		assert.True(t, ok, "ecdsa verify must pass")
 	}
 }

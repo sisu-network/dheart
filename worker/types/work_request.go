@@ -28,31 +28,32 @@ type WorkRequest struct {
 	Message string
 }
 
-func NewKeygenRequest(workId string, n int, PIDs tss.SortedPartyIDs, keygenInput keygen.LocalPreParams, threshold int) *WorkRequest {
-	request := baseRequest(EcdsaKeygen, workId, n, PIDs)
-	request.KeygenInput = &keygenInput
+func NewKeygenRequest(chain, workId string, n int, PIDs tss.SortedPartyIDs, keygenInput *keygen.LocalPreParams, threshold int) *WorkRequest {
+	request := baseRequest(EcdsaKeygen, chain, workId, n, PIDs)
+	request.KeygenInput = keygenInput
 	request.Threshold = threshold
 
 	return request
 }
 
-func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInput keygen.LocalPartySaveData, forcedPresign bool) *WorkRequest {
-	request := baseRequest(EcdsaPresign, workId, n, PIDs)
+func NewPresignRequest(chain, workId string, n int, PIDs tss.SortedPartyIDs, presignInput keygen.LocalPartySaveData, forcedPresign bool) *WorkRequest {
+	request := baseRequest(EcdsaPresign, chain, workId, n, PIDs)
 	request.PresignInput = &presignInput
 	request.ForcedPresign = forcedPresign
 
 	return request
 }
 
-func NewSigningRequets(workId string, n int, PIDs tss.SortedPartyIDs, message string) *WorkRequest {
-	request := baseRequest(EcdsaSigning, workId, n, PIDs)
+func NewSigningRequets(chain, workId string, n int, PIDs tss.SortedPartyIDs, message string) *WorkRequest {
+	request := baseRequest(EcdsaSigning, chain, workId, n, PIDs)
 	request.Message = message
 
 	return request
 }
 
-func baseRequest(workType WorkType, workdId string, n int, pIDs tss.SortedPartyIDs) *WorkRequest {
+func baseRequest(workType WorkType, chain, workdId string, n int, pIDs tss.SortedPartyIDs) *WorkRequest {
 	return &WorkRequest{
+		Chain:      chain,
 		AllParties: pIDs,
 		WorkType:   workType,
 		WorkId:     workdId,
@@ -63,13 +64,18 @@ func baseRequest(workType WorkType, workdId string, n int, pIDs tss.SortedPartyI
 func (request *WorkRequest) Validate() error {
 	switch request.WorkType {
 	case EcdsaKeygen:
-		if request.KeygenInput == nil {
-			return errors.New("Keygen input could not be nil for keygen task")
-		}
 	case EcdsaPresign:
 		if request.PresignInput == nil {
 			return errors.New("Presign input could not be nil for presign task")
 		}
+	case EcdsaSigning:
+		if request.PresignInput == nil {
+			return errors.New("Presign input could not be nil for signing task")
+		}
+		if request.Message == "" {
+			return errors.New("Signing message could not be empty")
+		}
+
 	case EddsaKeygen:
 	case EddsaPresign:
 	case EddsaSigning:

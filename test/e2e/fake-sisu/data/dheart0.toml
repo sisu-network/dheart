@@ -1,0 +1,24 @@
+# This is a TOML config file.
+# For more information, see https://github.com/toml-lang/toml
+
+home-dir = "/root/"
+use-on-memory = false
+sisu-server-url = "http://host.docker.internal:25456"
+port = 5678
+
+###############################################################################
+###                        Database Configuration                           ###
+###############################################################################
+[db]
+  host = "host.docker.internal"
+  port = 3306
+  username = "root"
+  password = "password"
+  schema = "dheart0"
+  migration-path = "file://db/migrations/"
+[connection]
+  host = "0.0.0.0"
+  port = 28300
+  rendezvous = "rendezvous"
+  peers = ["/dns/dheart1/tcp/28300/p2p/16Uiu2HAmU1oJ2Wqc91foPEvVuGzFNQ3QZWecgS2Y5tw3jRKmq1Wp"]
+

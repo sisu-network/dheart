@@ -32,13 +32,12 @@ type P2PMessage struct {
 }
 
 type ConnectionsConfig struct {
-	HostId             string
-	Port               int
-	Rendezvous         string
-	Protocol           protocol.ID
-	BootstrapPeers     string
-	BootstrapPeerAddrs []maddr.Multiaddr
-	PrivateKeyType     string
+	Host           string `toml:"host"`
+	Port           int    `toml:"port"`
+	Rendezvous     string `toml:"rendezvous"`
+	Protocol       protocol.ID
+	BootstrapPeers []string `toml:"peers"`
+	PrivateKeyType string
 }
 
 type P2PDataListener interface {
@@ -58,6 +57,7 @@ type ConnectionManager interface {
 
 // DefaultConnectionManager implements ConnectionManager interface.
 type DefaultConnectionManager struct {
+	config           ConnectionsConfig
 	myNetworkId      peer.ID
 	host             host.Host
 	port             int
@@ -66,31 +66,45 @@ type DefaultConnectionManager struct {
 	connections      map[peer.ID]*Connection
 	listenerLock     sync.RWMutex
 	protocolListener map[protocol.ID]P2PDataListener
-	hostId           string
 	statusManager    StatusManager
 }
 
 func NewConnectionManager(config ConnectionsConfig) ConnectionManager {
 	return &DefaultConnectionManager{
-		port:             config.Port,
+		config:           config,
 		rendezvous:       config.Rendezvous,
-		bootstrapPeers:   config.BootstrapPeerAddrs,
-		hostId:           config.HostId,
 		connections:      make(map[peer.ID]*Connection),
 		protocolListener: make(map[protocol.ID]P2PDataListener),
 	}
 }
 
 func (cm *DefaultConnectionManager) Start(privKeyBytes []byte) error {
+	utils.LogInfo("Starting connection manager. Config =", cm.connections)
+
 	ctx := context.Background()
 	p2pPriKey, err := crypto.UnmarshalSecp256k1PrivateKey(privKeyBytes)
 	if err != nil {
 		return err
 	}
 
-	listenAddr, err := maddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cm.port))
+	selfUrl := fmt.Sprintf("/ip4/%s/tcp/%d", cm.config.Host, cm.config.Port)
+	utils.LogInfo("selfUrl = ", selfUrl)
+
+	listenAddr, err := maddr.NewMultiaddr(selfUrl)
 	if err != nil {
 		return err
+	}
+
+	// Initialize peers
+	utils.LogInfo("cm.config.BootstrapPeers = ", cm.config.BootstrapPeers)
+	cm.bootstrapPeers = make([]maddr.Multiaddr, len(cm.config.BootstrapPeers))
+	for i, peerString := range cm.config.BootstrapPeers {
+		peer, err := maddr.NewMultiaddr(peerString)
+		if err != nil {
+			return err
+		}
+
+		cm.bootstrapPeers[i] = peer
 	}
 
 	host, err := libp2p.New(ctx,
@@ -102,6 +116,8 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte) error {
 		return err
 	}
 	cm.host = host
+
+	utils.LogInfo("My address = ", host.Addrs(), host.ID())
 
 	// Set stream handlers
 	host.SetStreamHandler(TSSProtocolID, cm.handleStream)
@@ -171,14 +187,6 @@ func (cm *DefaultConnectionManager) handleStream(stream network.Stream) {
 					FromPeerId: peerIDString,
 					Data:       dataBuf,
 				})
-
-				// // Update status manager
-				// peerId, err := peer.Decode(peerIDString)
-				// if err == nil {
-				// 	cm.statusManager.UpdatePeerStatus(peerId, STATUS_CONNECTED)
-				// } else {
-				// 	utils.LogError(err)
-				// }
 			}(peerIDString, dataBuf)
 		}
 	}
@@ -210,6 +218,7 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 	}
 
 	// Attempts to connect to every bootstrapped peers.
+	utils.LogInfo("Trying to create connections with peers...")
 	wg := &sync.WaitGroup{}
 	for _, peerAddr := range cm.bootstrapPeers {
 		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
@@ -221,7 +230,7 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 			// Retry 5 times at max.
 			for i := 0; i < 5; i++ {
 				if err := cm.host.Connect(ctx, *peerinfo); err != nil {
-					utils.LogWarn("Error while connecting to node %q: %-v", peerinfo, err)
+					utils.LogWarn(fmt.Sprintf("Error while connecting to node %q: %-v", peerinfo, err))
 					time.Sleep(time.Second * 3)
 				} else {
 					utils.LogInfo("Connection established with bootstrap node: %q", *peerinfo)
@@ -257,11 +266,6 @@ func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protoc
 	}
 
 	err := conn.writeToStream(msg, protocolId)
-	if err != nil {
-		cm.statusManager.UpdatePeerStatus(pID, STATUS_DISCONNECTED)
-	} else {
-		cm.statusManager.UpdatePeerStatus(pID, STATUS_CONNECTED)
-	}
 
 	return err
 }

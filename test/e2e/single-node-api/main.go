@@ -98,7 +98,7 @@ func main() {
 
 	api := server.NewSingleNodeApi(mockSisuClient, mockStore)
 	api.Init()
-	api.KeySign(request)
+	api.KeySign(request, nil)
 
 	signature := <-done
 	if signature == nil {

@@ -154,8 +154,8 @@ func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*presign.
 type MockEngineCallback struct {
 	OnWorkKeygenFinishedFunc  func(result *dtypes.KeygenResult)
 	OnWorkPresignFinishedFunc func(result *dtypes.PresignResult)
-	OnWorkSigningFinishedFunc func(result *dtypes.KeysignResult)
-	OnWorkFailedFunc          func(chain string, workType types.WorkType, culprits []*tss.PartyID)
+	OnWorkSigningFinishedFunc func(request *types.WorkRequest, data []*libCommon.SignatureData)
+	OnWorkFailedFunc          func(request *types.WorkRequest, culprits []*tss.PartyID)
 }
 
 func (cb *MockEngineCallback) OnWorkKeygenFinished(result *dtypes.KeygenResult) {
@@ -170,15 +170,15 @@ func (cb *MockEngineCallback) OnWorkPresignFinished(result *dtypes.PresignResult
 	}
 }
 
-func (cb *MockEngineCallback) OnWorkSigningFinished(result *dtypes.KeysignResult) {
+func (cb *MockEngineCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
 	if cb.OnWorkSigningFinishedFunc != nil {
-		cb.OnWorkSigningFinishedFunc(result)
+		cb.OnWorkSigningFinishedFunc(request, data)
 	}
 }
 
-func (cb *MockEngineCallback) OnWorkFailed(chain string, workType types.WorkType, culprits []*tss.PartyID) {
+func (cb *MockEngineCallback) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {
 	if cb.OnWorkFailedFunc != nil {
-		cb.OnWorkFailedFunc(chain, workType, culprits)
+		cb.OnWorkFailedFunc(request, culprits)
 	}
 }
 
@@ -236,7 +236,7 @@ func (m *MockDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresign
 	return nil, nil
 }
 
-func (m *MockDatabase) LoadKeygenData(chain, workId string) (*keygen.LocalPartySaveData, error) {
+func (m *MockDatabase) LoadKeygenData(chain string) (*keygen.LocalPartySaveData, error) {
 	return nil, nil
 }
 

@@ -39,7 +39,7 @@ func testInsertingKeygenData(database db.Database) {
 	}
 
 	// Read data and do sanity check
-	loaded, err := database.LoadKeygenData(chain, workId)
+	loaded, err := database.LoadKeygenData(chain)
 	if err != nil {
 		panic(err)
 	}
