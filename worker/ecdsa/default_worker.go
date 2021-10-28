@@ -231,27 +231,8 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 // TODO: handle error when this executeWork fails.
 // Start actual execution of the work.
 func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
-	if workType == wTypes.EcdsaKeygen {
-		// Check if we have generated preparams
-		var err error
-		preparams, err := w.db.LoadPreparams(w.request.Chain)
-		if err == db.ErrNotFound {
-			preparams, err = keygen.GeneratePreParams(60 * time.Second)
-			if err != nil {
-				utils.LogError("Cannot generate preparams. err = ", err)
-				return err
-			}
-
-			err = w.db.SavePreparams(w.request.Chain, preparams)
-			if err != nil {
-				return err
-			}
-
-			w.keygenInput = preparams
-		} else if err == nil {
-			w.keygenInput = preparams
-		} else {
-			utils.LogError("Failed to get preparams, err =", err)
+	if workType == wTypes.EcdsaKeygen && w.request.KeygenInput == nil {
+		if err := w.loadPreparams(); err != nil {
 			return err
 		}
 	}
@@ -333,6 +314,33 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 				utils.LogError("Error when processing new message", err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func (w *DefaultWorker) loadPreparams() error {
+	// Check if we have generated preparams
+	var err error
+	preparams, err := w.db.LoadPreparams(w.request.Chain)
+	if err == db.ErrNotFound {
+		preparams, err = keygen.GeneratePreParams(60 * time.Second)
+		if err != nil {
+			utils.LogError("Cannot generate preparams. err = ", err)
+			return err
+		}
+
+		err = w.db.SavePreparams(w.request.Chain, preparams)
+		if err != nil {
+			return err
+		}
+
+		w.keygenInput = preparams
+	} else if err == nil {
+		w.keygenInput = preparams
+	} else {
+		utils.LogError("Failed to get preparams, err =", err)
+		return err
 	}
 
 	return nil

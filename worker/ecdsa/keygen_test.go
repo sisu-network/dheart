@@ -91,7 +91,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	}
 
 	// Save final outputs. Uncomment this line when you want to save keygen output to fixtures.
-	assert.NoError(t, helper.SaveKeygenOutput(finalOutput))
+	// assert.NoError(t, helper.SaveKeygenOutput(finalOutput))
 }
 
 func TestKeygenTimeout(t *testing.T) {
