@@ -228,8 +228,34 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 	return nil
 }
 
+// TODO: handle error when this executeWork fails.
 // Start actual execution of the work.
 func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
+	if workType == wTypes.EcdsaKeygen {
+		// Check if we have generated preparams
+		var err error
+		preparams, err := w.db.LoadPreparams(w.request.Chain)
+		if err == db.ErrNotFound {
+			preparams, err = keygen.GeneratePreParams(60 * time.Second)
+			if err != nil {
+				utils.LogError("Cannot generate preparams. err = ", err)
+				return err
+			}
+
+			err = w.db.SavePreparams(w.request.Chain, preparams)
+			if err != nil {
+				return err
+			}
+
+			w.keygenInput = preparams
+		} else if err == nil {
+			w.keygenInput = preparams
+		} else {
+			utils.LogError("Failed to get preparams, err =", err)
+			return err
+		}
+	}
+
 	utils.LogInfo("Executing work type", wTypes.WorkTypeStrings[workType])
 	p2pCtx := tss.NewPeerContext(w.pIDs)
 
@@ -279,9 +305,10 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 
 	for _, job := range jobs {
 		if err := job.Start(); err != nil {
+			utils.LogError("error when starting job", err)
 			// If job cannot start, kill the whole worker.
 			w.callback.OnWorkFailed(w.request)
-			return fmt.Errorf("error when starting job %w", err)
+			return err
 		}
 	}
 

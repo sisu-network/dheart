@@ -1,6 +1,7 @@
 package ecdsa
 
 import (
+	"crypto/elliptic"
 	"fmt"
 	"math/big"
 	"time"
@@ -111,7 +112,7 @@ func NewSigningJob(
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan libCommon.SignatureData, len(pIDs))
 
-	msgInt := new(big.Int).SetBytes([]byte(msg))
+	msgInt := hashToInt([]byte(msg), tss.EC())
 	party := signing.NewLocalParty(msgInt, params, signingInput, outCh, endCh)
 
 	return &Job{
@@ -123,6 +124,21 @@ func NewSigningJob(
 		callback:     callback,
 		timeOut:      timeOut,
 	}
+}
+
+func hashToInt(hash []byte, c elliptic.Curve) *big.Int {
+	orderBits := c.Params().N.BitLen()
+	orderBytes := (orderBits + 7) / 8
+	if len(hash) > orderBytes {
+		hash = hash[:orderBytes]
+	}
+
+	ret := new(big.Int).SetBytes(hash)
+	excess := len(hash)*8 - orderBits
+	if excess > 0 {
+		ret.Rsh(ret, uint(excess))
+	}
+	return ret
 }
 
 func (job *Job) Start() error {

@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -19,6 +20,10 @@ import (
 const (
 	PresignStatusNotUsed = "not_used"
 	PresignStatusUsed    = "used"
+)
+
+var (
+	ErrNotFound = errors.New("not found")
 )
 
 type Database interface {
@@ -154,7 +159,7 @@ func (d *SqlDatabase) LoadPreparams(chain string) (*keygen.LocalPreParams, error
 	}
 
 	if !rows.Next() {
-		return nil, fmt.Errorf("there is no preparams")
+		return nil, ErrNotFound
 	}
 
 	var bz []byte

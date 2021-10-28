@@ -10,9 +10,9 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/sisu-network/dheart/client"
 	"github.com/sisu-network/dheart/core/config"
-	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/server"
 	"github.com/sisu-network/dheart/store"
+	"github.com/sisu-network/dheart/utils"
 )
 
 func LoadConfigEnv(filenames ...string) {
@@ -22,15 +22,10 @@ func LoadConfigEnv(filenames ...string) {
 	}
 }
 
-func getConnectionConfig(cfg config.HeartConfig) p2p.ConnectionsConfig {
-	var connectionConfig p2p.ConnectionsConfig
-	connectionConfig.Port = cfg.Port
-
-	return connectionConfig
-}
-
 func SetupApiServer() {
 	homeDir := os.Getenv("HOME_DIR")
+	utils.LogInfo("homeDir = ", homeDir)
+
 	if _, err := os.Stat(homeDir); os.IsNotExist(err) {
 		err := os.MkdirAll(homeDir, os.ModePerm)
 		if err != nil {
@@ -60,7 +55,7 @@ func SetupApiServer() {
 	serverApi.Init()
 	handler.RegisterName("tss", serverApi)
 
-	s := server.NewServer(handler, "0.0.0.0", 5678)
+	s := server.NewServer(handler, "0.0.0.0", uint16(cfg.Port))
 
 	go c.TryDial()
 	go s.Run()

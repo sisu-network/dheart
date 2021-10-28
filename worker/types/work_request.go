@@ -28,9 +28,9 @@ type WorkRequest struct {
 	Message string
 }
 
-func NewKeygenRequest(chain, workId string, n int, PIDs tss.SortedPartyIDs, keygenInput keygen.LocalPreParams, threshold int) *WorkRequest {
+func NewKeygenRequest(chain, workId string, n int, PIDs tss.SortedPartyIDs, keygenInput *keygen.LocalPreParams, threshold int) *WorkRequest {
 	request := baseRequest(EcdsaKeygen, chain, workId, n, PIDs)
-	request.KeygenInput = &keygenInput
+	request.KeygenInput = keygenInput
 	request.Threshold = threshold
 
 	return request
@@ -64,9 +64,6 @@ func baseRequest(workType WorkType, chain, workdId string, n int, pIDs tss.Sorte
 func (request *WorkRequest) Validate() error {
 	switch request.WorkType {
 	case EcdsaKeygen:
-		if request.KeygenInput == nil {
-			return errors.New("Keygen input could not be nil for keygen task")
-		}
 	case EcdsaPresign:
 		if request.PresignInput == nil {
 			return errors.New("Presign input could not be nil for presign task")

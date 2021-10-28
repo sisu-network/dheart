@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/hex"
 	"flag"
@@ -49,8 +50,8 @@ func resetDb(index int) {
 	}
 	defer database.Close()
 
-	database.Exec("DROP TABLE keygen")
-	database.Exec("DROP TABLE presign")
+	database.Exec("TRUNCATE TABLE keygen")
+	database.Exec("TRUNCATE TABLE presign")
 }
 
 func createNodes(index int, n int, keygenCh chan *types.KeygenResult, keysignCh chan *types.KeysignResult) *MockSisuNode {
@@ -107,11 +108,13 @@ func setPrivateKeys(nodes []*MockSisuNode) {
 	}
 
 	for i := 0; i < n; i++ {
-		encrypt, err := utils.AESDEncrypt(nodes[i].privKey.Bytes(), []byte(aesKey))
-		if err != nil {
-			panic(err)
-		}
-		nodes[i].client.SetPrivKey(hex.EncodeToString(encrypt), "secp256k1")
+		go func(index int) {
+			encrypt, err := utils.AESDEncrypt(nodes[index].privKey.Bytes(), []byte(aesKey))
+			if err != nil {
+				panic(err)
+			}
+			nodes[index].client.SetPrivKey(hex.EncodeToString(encrypt), "secp256k1")
+		}(i)
 
 		wg.Done()
 	}
@@ -121,14 +124,20 @@ func setPrivateKeys(nodes []*MockSisuNode) {
 	time.Sleep(time.Second)
 }
 
-func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs []chan *types.KeygenResult) *types.KeygenResult {
+func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs []chan *types.KeygenResult) []byte {
 	n := len(nodes)
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
 
+	utils.LogInfo("Sending keygen.....")
+
 	for i := 0; i < n; i++ {
-		nodes[i].client.KeyGen("Keygen0", TEST_CHAIN, tendermintPubKeys)
+		go func(index int) {
+			nodes[index].client.KeyGen("Keygen0", TEST_CHAIN, tendermintPubKeys)
+		}(i)
 	}
+
+	utils.LogInfo("Waiting for keygen result")
 
 	results := make([]*types.KeygenResult, n)
 	for i := 0; i < n; i++ {
@@ -143,10 +152,10 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 	utils.LogInfo("Done keygen!")
 	time.Sleep(time.Second)
 
-	return results[0]
+	return results[0].PubKeyBytes
 }
 
-func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignChs []chan *types.KeysignResult) {
+func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignChs []chan *types.KeysignResult, signature []byte) {
 	n := len(nodes)
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
@@ -181,6 +190,20 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 	wg.Wait()
 
 	// Verify signing result.
+	// Check that if all signatures are the same.
+	for i := 0; i < n; i++ {
+		match := bytes.Equal(results[i].Signature, results[0].Signature)
+		if !match {
+			panic("Signatures do not match")
+		}
+	}
+
+	signedTx, err := tx.WithSignature(etypes.NewEIP2930Signer(big.NewInt(1)), results[0].Signature)
+	if err != nil {
+		panic(err)
+	}
+
+	_ = signedTx
 }
 
 func main() {
@@ -219,10 +242,10 @@ func main() {
 	// Set private keys
 	setPrivateKeys(nodes)
 
-	keygen(nodes, tendermintPubKeys, keygenChs)
+	signature := keygen(nodes, tendermintPubKeys, keygenChs)
 	utils.LogInfo("All keygen tasks finished")
 
 	// Test keysign.
-	keysign(nodes, tendermintPubKeys, keysignChs)
+	keysign(nodes, tendermintPubKeys, keysignChs, signature)
 	utils.LogInfo("Finished all keysign!")
 }

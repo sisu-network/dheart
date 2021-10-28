@@ -4,7 +4,7 @@
 home-dir = "/root/"
 use-on-memory = false
 sisu-server-url = "http://host.docker.internal:25457"
-port = 28300
+port = 5678
 
 ###############################################################################
 ###                        Database Configuration                           ###
@@ -17,6 +17,7 @@ port = 28300
   schema = "dheart1"
   migration-path = "file://db/migrations/"
 [connection]
+  host = "0.0.0.0"
   port = 28300
   rendezvous = "rendezvous"
   peers = ["/dns/dheart0/tcp/28300/p2p/16Uiu2HAmAdMooaRjvKX9owraEtZt4sgDxDrpKgmQcvDofyHPqkmH"]

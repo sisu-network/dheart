@@ -1,13 +1,15 @@
 package core
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"time"
 
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
+	htypes "github.com/sisu-network/dheart/types"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
@@ -15,11 +17,15 @@ import (
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
-	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
+	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
+)
+
+const (
+	TX_CACHE_SIZE = 2048
 )
 
 // The dragon heart of this component.
@@ -32,13 +38,18 @@ type Heart struct {
 
 	privateKey ctypes.PrivKey
 	aesKey     []byte
+
+	requestCache *lru.Cache
+
+	requestMap map[string]interface{}
 }
 
 func NewHeart(config config.HeartConfig, client client.Client) *Heart {
 	return &Heart{
-		config: config,
-		aesKey: config.AesKey,
-		client: client,
+		config:     config,
+		aesKey:     config.AesKey,
+		client:     client,
+		requestMap: make(map[string]interface{}),
 	}
 }
 
@@ -49,18 +60,24 @@ func (h *Heart) Start() error {
 		return err
 	}
 
+	// Cache
+	requestCache, err := lru.New(TX_CACHE_SIZE)
+	if err != nil {
+		return err
+	}
+	h.requestCache = requestCache
+
 	// Connection manager
 	h.cm = p2p.NewConnectionManager(h.config.Connection)
 
 	// Engine
 	myNode := NewNode(h.privateKey.PubKey())
-
 	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey)
 	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
 	h.engine.Init()
 
 	// Start connection manager.
-	err := h.cm.Start(h.privateKey.Bytes())
+	err = h.cm.Start(h.privateKey.Bytes())
 	if err != nil {
 		utils.LogError("Cannot start connection manager. err =", err)
 		return err
@@ -88,12 +105,41 @@ func (h *Heart) OnWorkPresignFinished(result *htypes.PresignResult) {
 	h.client.PostPresignResult(result)
 }
 
-func (h *Heart) OnWorkSigningFinished(result *htypes.KeysignResult) {
+func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+	requestKey := h.getKey("keysign", request.Chain, request.WorkId)
+
+	value, ok := h.requestCache.Get(requestKey)
+	if !ok {
+		utils.LogCritical("Cannot find client request. requestKey =", requestKey)
+		h.OnWorkFailed(request, make([]*tss.PartyID, 0))
+		return
+	}
+	clientRequest := value.(*htypes.KeysignRequest)
+
+	// TODO: handle multiple tx here.
+	signature := data[0].Signature
+	signature = append(signature, data[0].SignatureRecovery[0])
+
+	result := &htypes.KeysignResult{
+		Id:             clientRequest.Id,
+		Success:        true,
+		OutChain:       clientRequest.OutChain,
+		OutBlockHeight: clientRequest.OutBlockHeight,
+		OutHash:        clientRequest.OutHash,
+		OutBytes:       clientRequest.OutBytes,
+		Signature:      signature, // TODO: Support multi tx per request on Sisu
+	}
+
+	h.requestCache.Remove(requestKey)
+
 	h.client.PostKeysignResult(result)
 }
 
-func (h *Heart) OnWorkFailed(chain string, workType types.WorkType, culprits []*tss.PartyID) {
-	switch workType {
+func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {
+	h.requestCache.Remove(h.getKey("keysign", request.Chain, request.WorkId))
+
+	chain := request.Chain
+	switch request.WorkType {
 	case types.EcdsaKeygen, types.EddsaKeygen:
 		result := htypes.KeygenResult{
 			Chain:    chain,
@@ -159,7 +205,7 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 	return nil
 }
 
-func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) {
+func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) error {
 	// TODO: Check if our pubkey is one of the pubkeys.
 
 	n := len(tPubKeys)
@@ -172,25 +218,18 @@ func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) 
 		pids[i] = node.PartyId
 	}
 
-	preparams, err := h.db.LoadPreparams(chain)
-	if err != nil {
-		utils.LogError("Cannot load preparams. Err =", err)
-		utils.LogInfo("Generating preparams...")
-		preparams, err = h.generatePreparams(chain)
-		if err != nil {
-			// TODO Broadcast failure to Sisu using client.
-			utils.LogError("Failed to generate preparams, err =", err)
-			return
-		}
-	}
-
 	h.engine.AddNodes(nodes)
 
-	request := types.NewKeygenRequest(chain, workId, len(tPubKeys), pids, *preparams, n-1)
-	h.engine.AddRequest(request)
+	request := types.NewKeygenRequest(chain, workId, len(tPubKeys), pids, nil, n-1)
+	return h.engine.AddRequest(request)
 }
 
-func (h *Heart) Keysign(tx []byte, block int64, chain string, tPubKeys []ctypes.PubKey) error {
+func (h *Heart) getKey(requestType, chain, workdId string) string {
+	return fmt.Sprintf("%s__%s__%s", requestType, chain, workdId)
+}
+
+// func (h *Heart) Keysign(tx []byte, block int64, chain string, tPubKeys []ctypes.PubKey) error {
+func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) error {
 	n := len(tPubKeys)
 
 	nodes := NewNodes(tPubKeys)
@@ -203,17 +242,20 @@ func (h *Heart) Keysign(tx []byte, block int64, chain string, tPubKeys []ctypes.
 	h.engine.AddNodes(nodes)
 
 	// TODO: Find unique workId
-	hash := sha256.Sum256(tx)
-	workId := hex.EncodeToString(hash[:])
-	request := types.NewSigningRequets(chain, workId, len(tPubKeys), sorted, string(tx))
+	workId := req.OutChain + req.OutHash
+	request := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.OutBytes))
 
-	presignInput, err := h.db.LoadKeygenData(chain)
+	presignInput, err := h.db.LoadKeygenData(req.OutChain)
 	if err != nil {
 		return err
 	}
 
 	request.PresignInput = presignInput
-	return h.engine.AddRequest(request)
+	err = h.engine.AddRequest(request)
+
+	h.requestCache.Add(h.getKey("keysign", req.OutChain, workId), req)
+
+	return err
 }
 
 // --- End of Server API  /

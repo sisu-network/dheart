@@ -32,6 +32,7 @@ type P2PMessage struct {
 }
 
 type ConnectionsConfig struct {
+	Host           string `toml:"host"`
 	Port           int    `toml:"port"`
 	Rendezvous     string `toml:"rendezvous"`
 	Protocol       protocol.ID
@@ -71,7 +72,6 @@ type DefaultConnectionManager struct {
 func NewConnectionManager(config ConnectionsConfig) ConnectionManager {
 	return &DefaultConnectionManager{
 		config:           config,
-		port:             config.Port,
 		rendezvous:       config.Rendezvous,
 		connections:      make(map[peer.ID]*Connection),
 		protocolListener: make(map[protocol.ID]P2PDataListener),
@@ -87,7 +87,7 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte) error {
 		return err
 	}
 
-	selfUrl := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", cm.port)
+	selfUrl := fmt.Sprintf("/ip4/%s/tcp/%d", cm.config.Host, cm.config.Port)
 	utils.LogInfo("selfUrl = ", selfUrl)
 
 	listenAddr, err := maddr.NewMultiaddr(selfUrl)
@@ -266,11 +266,6 @@ func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protoc
 	}
 
 	err := conn.writeToStream(msg, protocolId)
-	if err != nil {
-		cm.statusManager.UpdatePeerStatus(pID, STATUS_DISCONNECTED)
-	} else {
-		cm.statusManager.UpdatePeerStatus(pID, STATUS_CONNECTED)
-	}
 
 	return err
 }

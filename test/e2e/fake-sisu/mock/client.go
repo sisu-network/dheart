@@ -34,7 +34,7 @@ func (c *DheartClient) SetPrivKey(encodedKey string, keyType string) error {
 	var result string
 	err := c.client.CallContext(context.Background(), &result, "tss_setPrivKey", encodedKey, keyType)
 	if err != nil {
-		utils.LogError("Cannot do handshare with dheart, err = ", err)
+		utils.LogError("Cannot do set private key with dheart, err = ", err)
 		return err
 	}
 

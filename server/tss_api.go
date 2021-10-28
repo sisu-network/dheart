@@ -11,6 +11,7 @@ import (
 	common "github.com/sisu-network/dheart/common"
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/types"
+	"github.com/sisu-network/dheart/utils"
 )
 
 type TssApi struct {
@@ -49,9 +50,7 @@ func (api *TssApi) KeyGen(keygenId string, chain string, keyWrappers []types.Pub
 		}
 	}
 
-	go api.heart.Keygen(keygenId, chain, pubKeys)
-
-	return nil
+	return api.heart.Keygen(keygenId, chain, pubKeys)
 }
 
 func (api *TssApi) SignEthTx(chainSymbol string, tx *etypes.Transaction) {
@@ -69,7 +68,11 @@ func (api *TssApi) Setup(configs []common.ChainConfig) error {
 }
 
 func (api *TssApi) SetPrivKey(encodedKey string, keyType string) error {
-	return api.heart.SetPrivKey(encodedKey, keyType)
+	utils.LogInfo("Setting private key, key type =", keyType)
+	err := api.heart.SetPrivKey(encodedKey, keyType)
+	utils.LogVerbose("Done setting private key, err = ", err)
+
+	return err
 }
 
 func (api *TssApi) getPubkeysFromWrapper(keyWrappers []types.PubKeyWrapper) ([]ctypes.PubKey, error) {
@@ -96,7 +99,7 @@ func (api *TssApi) KeySign(req *types.KeysignRequest, keyWrappers []types.PubKey
 		return err
 	}
 
-	api.heart.Keysign(req.OutBytes, req.OutBlockHeight, req.OutChain, pubKeys)
+	api.heart.Keysign(req, pubKeys)
 
 	return nil
 }
