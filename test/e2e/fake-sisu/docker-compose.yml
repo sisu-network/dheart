@@ -9,9 +9,6 @@ services:
     restart: on-failure
     volumes:
       - ./data/dheart0.toml:/root/dheart.toml
-    networks:
-      dheart_net:
-        ipv4_address: 192.170.10.2
   dheart1:
     image: dheart
     expose:
@@ -21,14 +18,3 @@ services:
     restart: on-failure
     volumes:
       - ./data/dheart1.toml:/root/dheart.toml
-    networks:
-      dheart_net:
-        ipv4_address: 192.170.10.3
-
-networks:
-  dheart_net:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 192.170.10.0/16

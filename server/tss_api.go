@@ -38,9 +38,13 @@ func (api *TssApi) KeyGen(keygenId string, chain string, keyWrappers []types.Pub
 		return fmt.Errorf("invalid keys array cannot be empty")
 	}
 
+	utils.LogInfo("There is a keygen request", keygenId, chain)
+
 	pubKeys := make([]ctypes.PubKey, len(keyWrappers))
 
 	for i, wrapper := range keyWrappers {
+		fmt.Println(i, " ", wrapper.KeyType, len(wrapper.Key))
+
 		keyType := wrapper.KeyType
 		switch keyType {
 		case "ed25519":

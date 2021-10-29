@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"time"
@@ -77,7 +78,7 @@ func (h *Heart) Start() error {
 	h.engine.Init()
 
 	// Start connection manager.
-	err = h.cm.Start(h.privateKey.Bytes())
+	err = h.cm.Start(h.privateKey.Bytes(), h.privateKey.Type())
 	if err != nil {
 		utils.LogError("Cannot start connection manager. err =", err)
 		return err
@@ -170,10 +171,6 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 // SetPrivKey receives encrypted private key from Sisu, decrypts it and start the engine,
 // network communication, etc.
 func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
-	if h.privateKey != nil {
-		return fmt.Errorf("The private key has been set!")
-	}
-
 	encrypted, err := hex.DecodeString(encodedKey)
 	if err != nil {
 		utils.LogError("Failed to decode string, err =", err)
@@ -186,20 +183,27 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 		return err
 	}
 
-	if h.privateKey == nil {
-		switch keyType {
-		case "ed25519":
-			h.privateKey = &ed25519.PrivKey{Key: decrypted}
-		case "secp256k1":
-			h.privateKey = &secp256k1.PrivKey{Key: decrypted}
-		default:
-			return fmt.Errorf("Unsupported key type: %s", keyType)
+	if h.privateKey != nil {
+		if bytes.Compare(decrypted, h.privateKey.Bytes()) != 0 {
+			return fmt.Errorf("The private key has been set!")
 		}
 
-		err := h.Start()
-		if err != nil {
-			utils.LogError("Failed to start heart, err =", err)
-		}
+		utils.LogInfo("Private key is the same as before. Do nothing")
+		return nil
+	}
+
+	switch keyType {
+	case "ed25519":
+		h.privateKey = &ed25519.PrivKey{Key: decrypted}
+	case "secp256k1":
+		h.privateKey = &secp256k1.PrivKey{Key: decrypted}
+	default:
+		return fmt.Errorf("Unsupported key type: %s", keyType)
+	}
+
+	err = h.Start()
+	if err != nil {
+		utils.LogError("Failed to start heart, err =", err)
 	}
 
 	return nil

@@ -24,7 +24,7 @@ func getPublicKeys(n int) []ctypes.PubKey {
 	pubKeys := make([]ctypes.PubKey, n)
 
 	for i := 0; i < n; i++ {
-		privKey := &secp256k1.PrivKey{Key: p2p.GetPrivateKeyBytes(i)}
+		privKey := &secp256k1.PrivKey{Key: p2p.GetPrivateKeyBytes(i, "secp256k1")}
 		pubKeys[i] = privKey.PubKey()
 	}
 
@@ -75,7 +75,7 @@ func main() {
 		Db:          dbConfig,
 	}
 
-	conConfig, privKey := p2p.GetMockConnectionConfig(n, index)
+	conConfig, privKey := p2p.GetMockSecp256k1Config(n, index)
 	cfg.Connection = conConfig
 
 	encryptedKey := getEncrypted(privKey)

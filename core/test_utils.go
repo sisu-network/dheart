@@ -34,7 +34,7 @@ func NewMockConnectionManager(fromPeerString string, msgCh chan *p2pDataWrapper)
 	}
 }
 
-func (mock *MockConnectionManager) Start(privKeyBytes []byte) error {
+func (mock *MockConnectionManager) Start(privKeyBytes []byte, keyType string) error {
 	return nil
 }
 

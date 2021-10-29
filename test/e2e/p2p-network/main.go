@@ -40,14 +40,14 @@ func main() {
 
 	n = 2
 
-	config, privateKey := p2p.GetMockConnectionConfig(n, index)
+	config, privateKey := p2p.GetMockSecp256k1Config(n, index)
 	cm := p2p.NewConnectionManager(config)
 
 	dataChan := make(chan *p2p.P2PMessage)
 
 	cm.AddListener(p2p.TSSProtocolID, NewSimpleListener(dataChan))
 
-	err := cm.Start(privateKey)
+	err := cm.Start(privateKey, "secp256k1")
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +55,7 @@ func main() {
 	time.Sleep(time.Second * 4)
 
 	go func() {
-		peerIds := p2p.GetMockPeers(n)
+		peerIds := p2p.GetMockPeers(n, "secp256k1")
 		// Send a message to peers
 		for i := range peerIds {
 			if i == index {

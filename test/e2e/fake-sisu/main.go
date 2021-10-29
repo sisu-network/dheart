@@ -17,7 +17,7 @@ import (
 	etypes "github.com/ethereum/go-ethereum/core/types"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/joho/godotenv"
-	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
+	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/test/e2e/fake-sisu/mock"
@@ -32,7 +32,7 @@ const (
 type MockSisuNode struct {
 	server  *mock.Server
 	client  *mock.DheartClient
-	privKey *secp256k1.PrivKey
+	privKey ctypes.PrivKey
 }
 
 func loadConfigEnv(filenames ...string) {
@@ -68,9 +68,9 @@ func createNodes(index int, n int, keygenCh chan *types.KeygenResult, keysignCh 
 		panic(err)
 	}
 
-	_, privKeyBytes := p2p.GetMockConnectionConfig(n, index)
+	_, privKeyBytes := p2p.GetMockConnectionConfig(n, index, "ed25519")
 
-	privKey := &secp256k1.PrivKey{}
+	privKey := &ed25519.PrivKey{}
 	err = privKey.UnmarshalAmino(privKeyBytes)
 	if err != nil {
 		panic(err)
@@ -113,7 +113,7 @@ func setPrivateKeys(nodes []*MockSisuNode) {
 			if err != nil {
 				panic(err)
 			}
-			nodes[index].client.SetPrivKey(hex.EncodeToString(encrypt), "secp256k1")
+			nodes[index].client.SetPrivKey(hex.EncodeToString(encrypt), nodes[index].privKey.Type())
 		}(i)
 
 		wg.Done()
