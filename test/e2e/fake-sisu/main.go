@@ -15,6 +15,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/joho/godotenv"
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
@@ -151,6 +152,35 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 	wg.Wait()
 	utils.LogInfo("Done keygen!")
 	time.Sleep(time.Second)
+
+	// Sanity check the results
+	// Address should not be empty
+	if results[0].Address == "" {
+		panic(fmt.Sprintf("Address cannot be empty"))
+	}
+
+	// Pubkeybytes should be valid
+	pubkeyBytes := results[0].PubKeyBytes
+	_, err := crypto.UnmarshalPubkey(pubkeyBytes)
+	if err != nil {
+		utils.LogError("Failed to unmarshal pubkey")
+		panic(err)
+	}
+
+	// Everyone must have the same address, pubkey bytes
+	for i := range results {
+		if !results[i].Success {
+			panic(fmt.Sprintf("Node %d failed to generate result", i))
+		}
+		if results[i].Address != results[0].Address {
+			panic(fmt.Sprintf("Node %d has different address %s", i, results[i].Address))
+		}
+		if bytes.Compare(results[i].PubKeyBytes, results[0].PubKeyBytes) != 0 {
+			panic(fmt.Sprintf("Node %d has different pubkey bytes", i))
+		}
+	}
+
+	utils.LogInfo("Address = ", results[0].Address)
 
 	return results[0].PubKeyBytes
 }

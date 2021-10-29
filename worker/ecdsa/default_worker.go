@@ -324,7 +324,11 @@ func (w *DefaultWorker) loadPreparams() error {
 	var err error
 	preparams, err := w.db.LoadPreparams(w.request.Chain)
 	if err == db.ErrNotFound {
-		preparams, err = keygen.GeneratePreParams(60 * time.Second)
+		timeout := 60 * 5 * time.Second // 5 minutes
+		utils.LogInfo("Generating preparams for chain", w.request.Chain, " timeout =", timeout)
+		start := time.Now()
+		preparams, err = keygen.GeneratePreParams(timeout)
+		utils.LogInfo("Generating time = ", time.Now().Sub(start))
 		if err != nil {
 			utils.LogError("Cannot generate preparams. err = ", err)
 			return err

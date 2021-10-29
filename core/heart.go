@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"time"
 
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
@@ -21,7 +20,6 @@ import (
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -263,18 +261,3 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 }
 
 // --- End of Server API  /
-
-func (h *Heart) generatePreparams(chain string) (*keygen.LocalPreParams, error) {
-	preparams, err := keygen.GeneratePreParams(60 * time.Second)
-	if err != nil {
-		utils.LogError("Cannot generate preparams. err = ", err)
-		return nil, err
-	}
-
-	err = h.db.SavePreparams(chain, preparams)
-	if err != nil {
-		utils.LogError("Failed to save to db. err =", err)
-	}
-
-	return preparams, nil
-}

@@ -1,11 +1,13 @@
 package core
 
 import (
+	cryptoec "crypto/ecdsa"
 	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
@@ -201,10 +203,21 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 		utils.LogError("error when saving keygen data", err)
 	}
 
+	pkX, pkY := output[0].ECDSAPub.X(), output[0].ECDSAPub.Y()
+	publicKeyECDSA := cryptoec.PublicKey{
+		Curve: tss.EC(),
+		X:     pkX,
+		Y:     pkY,
+	}
+	address := crypto.PubkeyToAddress(publicKeyECDSA).Hex()
+	publicKeyBytes := crypto.FromECDSAPub(&publicKeyECDSA)
+
 	// Make a callback and start next work.
 	result := htypes.KeygenResult{
-		Chain:   request.Chain,
-		Success: true,
+		Chain:       request.Chain,
+		PubKeyBytes: publicKeyBytes,
+		Success:     true,
+		Address:     address,
 	}
 
 	engine.callback.OnWorkKeygenFinished(&result)
