@@ -14,11 +14,4 @@ func main() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
-
-// 	keys := make([]string, 15)
-// 	for _ = range keys {
-// 		privKey := p2p.GeneratePrivateKey("ed25519")
-// 		fmt.Printf(`"%s",
-// `, hex.EncodeToString(privKey.Bytes()))
-	// }
 }
