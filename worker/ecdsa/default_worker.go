@@ -240,7 +240,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 	utils.LogInfo("Executing work type", wTypes.WorkTypeStrings[workType])
 	p2pCtx := tss.NewPeerContext(w.pIDs)
 
-	// Assign the correct
+	// Assign the correct index for our pid.
 	for _, p := range w.pIDs {
 		if w.myPid.Id == p.Id {
 			w.myPid.Index = p.Index
@@ -250,6 +250,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.threshold)
 
 	jobs := make([]*Job, w.batchSize)
+	utils.LogInfo("batchSize = ", w.batchSize)
 	nextJobType := w.jobType
 	// Creates all jobs
 	for i := range jobs {

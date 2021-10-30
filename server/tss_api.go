@@ -43,8 +43,6 @@ func (api *TssApi) KeyGen(keygenId string, chain string, keyWrappers []types.Pub
 	pubKeys := make([]ctypes.PubKey, len(keyWrappers))
 
 	for i, wrapper := range keyWrappers {
-		fmt.Println(i, " ", wrapper.KeyType, len(wrapper.Key))
-
 		keyType := wrapper.KeyType
 		switch keyType {
 		case "ed25519":

@@ -220,9 +220,10 @@ func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) 
 		pids[i] = node.PartyId
 	}
 
+	sorted := tss.SortPartyIDs(pids)
 	h.engine.AddNodes(nodes)
 
-	request := types.NewKeygenRequest(chain, workId, len(tPubKeys), pids, nil, n-1)
+	request := types.NewKeygenRequest(chain, workId, len(tPubKeys), sorted, nil, n-1)
 	return h.engine.AddRequest(request)
 }
 
