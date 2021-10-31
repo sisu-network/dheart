@@ -8,6 +8,7 @@ require (
 	github.com/deckarep/golang-set v1.7.1
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/ethereum/go-ethereum v1.10.3
+	github.com/fatih/color v1.13.0 // indirect
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/golang-migrate/migrate v3.5.4+incompatible
 	github.com/golang/protobuf v1.5.2
