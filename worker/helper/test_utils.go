@@ -12,7 +12,6 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
-	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	dtypes "github.com/sisu-network/dheart/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
@@ -73,27 +72,6 @@ type MockWorkerCallback struct {
 	presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
 	signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData)
 }
-
-// func NewTestKeygenCallback(workerIndex int, keygenCallback func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)) *MockWorkerCallback {
-// 	return &MockWorkerCallback{
-// 		workerIndex:    workerIndex,
-// 		keygenCallback: keygenCallback,
-// 	}
-// }
-
-// func NewTestPresignCallback(workerIndex int, presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)) *MockWorkerCallback {
-// 	return &MockWorkerCallback{
-// 		workerIndex:     workerIndex,
-// 		presignCallback: presignCallback,
-// 	}
-// }
-
-// func NewTestSigningCallback(workerIndex int, signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData)) *MockWorkerCallback {
-// 	return &MockWorkerCallback{
-// 		workerIndex:     workerIndex,
-// 		signingCallback: signingCallback,
-// 	}
-// }
 
 func (cb *MockWorkerCallback) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
 	if cb.GetUnavailablePresignsFunc != nil {
@@ -290,10 +268,6 @@ func (d *TestDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.Ts
 }
 
 //---/
-
-func GeneratePrivateKey() ctypes.PrivKey {
-	return secp256k1.GenPrivKey()
-}
 
 func GetTestPartyIds(n int) tss.SortedPartyIDs {
 	if n > len(PRIVATE_KEY_HEX) {

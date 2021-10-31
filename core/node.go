@@ -18,7 +18,18 @@ type Node struct {
 }
 
 func NewNode(pubKey ctypes.PubKey) *Node {
-	p2pPubKey, err := crypto.UnmarshalSecp256k1PublicKey(pubKey.Bytes())
+	var p2pPubKey crypto.PubKey
+	var err error
+	switch pubKey.Type() {
+	case "ed25519":
+		p2pPubKey, err = crypto.UnmarshalEd25519PublicKey(pubKey.Bytes())
+	case "secp256k1":
+		p2pPubKey, err = crypto.UnmarshalSecp256k1PublicKey(pubKey.Bytes())
+	default:
+		utils.LogError("Unsupported pub key type", pubKey.Type())
+		return nil
+	}
+
 	if err != nil {
 		utils.LogError(err)
 		return nil

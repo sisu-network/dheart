@@ -46,7 +46,7 @@ type P2PDataListener interface {
 
 type ConnectionManager interface {
 	// Starts this connection manager using private key as identity of the node.
-	Start(privKeyBytes []byte) error
+	Start(privKeyBytes []byte, keyType string) error
 
 	// Sends an array of byte to a particular peer.
 	WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error
@@ -78,11 +78,20 @@ func NewConnectionManager(config ConnectionsConfig) ConnectionManager {
 	}
 }
 
-func (cm *DefaultConnectionManager) Start(privKeyBytes []byte) error {
+func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) error {
 	utils.LogInfo("Starting connection manager. Config =", cm.connections)
+	utils.LogInfo("keyType = ", keyType)
 
 	ctx := context.Background()
-	p2pPriKey, err := crypto.UnmarshalSecp256k1PrivateKey(privKeyBytes)
+	var p2pPriKey crypto.PrivKey
+	var err error
+	switch keyType {
+	case "secp256k1":
+		p2pPriKey, err = crypto.UnmarshalSecp256k1PrivateKey(privKeyBytes)
+	case "ed25519":
+		p2pPriKey, err = crypto.UnmarshalEd25519PrivateKey(privKeyBytes)
+	}
+
 	if err != nil {
 		return err
 	}

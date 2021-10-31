@@ -47,7 +47,7 @@ func (cb *EngineCallback) OnWorkFailed(request *types.WorkRequest, culprits []*t
 }
 
 func getSortedPartyIds(n int) tss.SortedPartyIDs {
-	keys := p2p.GetAllPrivateKeys(n)
+	keys := p2p.GetAllSecp256k1PrivateKeys(n)
 	partyIds := make([]*tss.PartyID, n)
 
 	// Creates list of party ids
@@ -68,19 +68,19 @@ func main() {
 
 	n = 2
 
-	config, privateKey := p2p.GetMockConnectionConfig(n, index)
+	config, privateKey := p2p.GetMockSecp256k1Config(n, index)
 	cm := p2p.NewConnectionManager(config)
-	err := cm.Start(privateKey)
+	err := cm.Start(privateKey, "secp256k1")
 	if err != nil {
 		panic(err)
 	}
 
 	pids := make([]*tss.PartyID, n)
-	allKeys := p2p.GetAllPrivateKeys(n)
+	allKeys := p2p.GetAllSecp256k1PrivateKeys(n)
 	nodes := make([]*core.Node, n)
 
 	// Add nodes
-	privKeys := p2p.GetAllPrivateKeys(n)
+	privKeys := p2p.GetAllSecp256k1PrivateKeys(n)
 	for i := 0; i < n; i++ {
 		pubKey := privKeys[i].PubKey()
 		node := core.NewNode(pubKey)

@@ -1,9 +1,9 @@
 package core
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
-	"time"
 
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
@@ -20,7 +20,6 @@ import (
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -77,7 +76,7 @@ func (h *Heart) Start() error {
 	h.engine.Init()
 
 	// Start connection manager.
-	err = h.cm.Start(h.privateKey.Bytes())
+	err = h.cm.Start(h.privateKey.Bytes(), h.privateKey.Type())
 	if err != nil {
 		utils.LogError("Cannot start connection manager. err =", err)
 		return err
@@ -170,10 +169,6 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 // SetPrivKey receives encrypted private key from Sisu, decrypts it and start the engine,
 // network communication, etc.
 func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
-	if h.privateKey != nil {
-		return fmt.Errorf("The private key has been set!")
-	}
-
 	encrypted, err := hex.DecodeString(encodedKey)
 	if err != nil {
 		utils.LogError("Failed to decode string, err =", err)
@@ -186,20 +181,27 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 		return err
 	}
 
-	if h.privateKey == nil {
-		switch keyType {
-		case "ed25519":
-			h.privateKey = &ed25519.PrivKey{Key: decrypted}
-		case "secp256k1":
-			h.privateKey = &secp256k1.PrivKey{Key: decrypted}
-		default:
-			return fmt.Errorf("Unsupported key type: %s", keyType)
+	if h.privateKey != nil {
+		if bytes.Compare(decrypted, h.privateKey.Bytes()) != 0 {
+			return fmt.Errorf("The private key has been set!")
 		}
 
-		err := h.Start()
-		if err != nil {
-			utils.LogError("Failed to start heart, err =", err)
-		}
+		utils.LogInfo("Private key is the same as before. Do nothing")
+		return nil
+	}
+
+	switch keyType {
+	case "ed25519":
+		h.privateKey = &ed25519.PrivKey{Key: decrypted}
+	case "secp256k1":
+		h.privateKey = &secp256k1.PrivKey{Key: decrypted}
+	default:
+		return fmt.Errorf("Unsupported key type: %s", keyType)
+	}
+
+	err = h.Start()
+	if err != nil {
+		utils.LogError("Failed to start heart, err =", err)
 	}
 
 	return nil
@@ -218,9 +220,10 @@ func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) 
 		pids[i] = node.PartyId
 	}
 
+	sorted := tss.SortPartyIDs(pids)
 	h.engine.AddNodes(nodes)
 
-	request := types.NewKeygenRequest(chain, workId, len(tPubKeys), pids, nil, n-1)
+	request := types.NewKeygenRequest(chain, workId, len(tPubKeys), sorted, nil, n-1)
 	return h.engine.AddRequest(request)
 }
 
@@ -259,18 +262,3 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 }
 
 // --- End of Server API  /
-
-func (h *Heart) generatePreparams(chain string) (*keygen.LocalPreParams, error) {
-	preparams, err := keygen.GeneratePreParams(60 * time.Second)
-	if err != nil {
-		utils.LogError("Cannot generate preparams. err = ", err)
-		return nil, err
-	}
-
-	err = h.db.SavePreparams(chain, preparams)
-	if err != nil {
-		utils.LogError("Failed to save to db. err =", err)
-	}
-
-	return preparams, nil
-}

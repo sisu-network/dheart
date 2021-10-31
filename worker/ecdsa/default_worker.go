@@ -240,7 +240,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 	utils.LogInfo("Executing work type", wTypes.WorkTypeStrings[workType])
 	p2pCtx := tss.NewPeerContext(w.pIDs)
 
-	// Assign the correct
+	// Assign the correct index for our pid.
 	for _, p := range w.pIDs {
 		if w.myPid.Id == p.Id {
 			w.myPid.Index = p.Index
@@ -250,6 +250,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.threshold)
 
 	jobs := make([]*Job, w.batchSize)
+	utils.LogInfo("batchSize = ", w.batchSize)
 	nextJobType := w.jobType
 	// Creates all jobs
 	for i := range jobs {
@@ -324,7 +325,11 @@ func (w *DefaultWorker) loadPreparams() error {
 	var err error
 	preparams, err := w.db.LoadPreparams(w.request.Chain)
 	if err == db.ErrNotFound {
-		preparams, err = keygen.GeneratePreParams(60 * time.Second)
+		timeout := 60 * 5 * time.Second // 5 minutes
+		utils.LogInfo("Generating preparams for chain", w.request.Chain, " timeout =", timeout)
+		start := time.Now()
+		preparams, err = keygen.GeneratePreParams(timeout)
+		utils.LogInfo("Generating time = ", time.Now().Sub(start))
 		if err != nil {
 			utils.LogError("Cannot generate preparams. err = ", err)
 			return err
