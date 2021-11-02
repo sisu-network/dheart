@@ -1,6 +1,7 @@
 package ecdsa
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
@@ -9,8 +10,12 @@ import (
 	"testing"
 	"time"
 
+	ecommon "github.com/ethereum/go-ethereum/common"
+	etypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
@@ -47,6 +52,20 @@ func mockDbForSigning(pids []*tss.PartyID, WorkId string, batchSize int) db.Data
 	}
 }
 
+func generateEthTx() *etypes.Transaction {
+	nonce := 0
+
+	value := big.NewInt(1000000000000000000) // in wei (1 eth)
+	gasLimit := uint64(21000)                // in units
+	gasPrice := big.NewInt(50)
+
+	toAddress := ecommon.HexToAddress("0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d")
+	var data []byte
+	tx := etypes.NewTransaction(uint64(nonce), toAddress, value, gasLimit, gasPrice, data)
+
+	return tx
+}
+
 func TestSigningEndToEnd(t *testing.T) {
 	wrapper := helper.LoadPresignSavedData(0)
 	n := len(wrapper.Outputs)
@@ -58,7 +77,11 @@ func TestSigningEndToEnd(t *testing.T) {
 	workers := make([]worker.Worker, n)
 	done := make(chan bool)
 	finishedWorkerCount := 0
-	signingMsg := "This is a test"
+	ethTx := generateEthTx()
+	signer := etypes.NewEIP2930Signer(big.NewInt(1))
+	hash := signer.Hash(ethTx)
+	hashBytes := hash[:]
+	signingMsg := string(hashBytes)
 
 	outputs := make([][]*libCommon.SignatureData, len(pIDs)) // n * batchSize
 	outputLock := &sync.Mutex{}
@@ -116,6 +139,9 @@ func TestSigningEndToEnd(t *testing.T) {
 
 	// Verify signature
 	verifySignature(t, signingMsg, outputs, wrapper.Outputs[0][0].ECDSAPub.X(), wrapper.Outputs[0][0].ECDSAPub.Y())
+
+	// Verify that this ETH transaction is correctly signed
+	verifyEthSignature(t, hashBytes, outputs[0][0], wrapper.Outputs[0][0])
 }
 
 func TestSigning_PresignAndSign(t *testing.T) {
@@ -328,4 +354,31 @@ func verifySignature(t *testing.T, msg string, outputs [][]*libCommon.SignatureD
 			assert.True(t, ok, "ecdsa verify must pass")
 		}
 	}
+}
+
+func verifyEthSignature(t *testing.T, hash []byte, output *libCommon.SignatureData, presignData *presign.LocalPresignData) {
+	signature := output.Signature
+	signature = append(signature, output.SignatureRecovery[0])
+
+	sigPublicKey, err := crypto.Ecrecover(hash, signature)
+	if err != nil {
+		t.Fail()
+	}
+
+	publicKeyECDSA := ecdsa.PublicKey{
+		Curve: tss.EC(),
+		X:     presignData.ECDSAPub.X(),
+		Y:     presignData.ECDSAPub.Y(),
+	}
+	publicKeyBytes := crypto.FromECDSAPub(&publicKeyECDSA)
+
+	if bytes.Compare(sigPublicKey, publicKeyBytes) != 0 {
+		panic("Pubkey does not match")
+	}
+
+	matches := bytes.Equal(sigPublicKey, publicKeyBytes)
+	if !matches {
+		panic("Reconstructed pubkey does not match pubkey")
+	}
+	utils.LogInfo("ETH signature is correct")
 }
