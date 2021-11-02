@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"flag"
@@ -16,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/joho/godotenv"
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
@@ -125,7 +127,7 @@ func setPrivateKeys(nodes []*MockSisuNode) {
 	time.Sleep(time.Second)
 }
 
-func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs []chan *types.KeygenResult) []byte {
+func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs []chan *types.KeygenResult) *types.KeygenResult {
 	n := len(nodes)
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
@@ -182,19 +184,19 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 
 	utils.LogInfo("Address = ", results[0].Address)
 
-	return results[0].PubKeyBytes
+	return results[0]
 }
 
-func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignChs []chan *types.KeysignResult, signature []byte) {
+func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignChs []chan *types.KeysignResult, publicKeyBytes []byte, chainId *big.Int) *etypes.Transaction {
 	n := len(nodes)
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
 
 	tx := generateEthTx()
-	bz, err := tx.MarshalBinary()
-	if err != nil {
-		panic(err)
-	}
+	signer := etypes.NewEIP2930Signer(big.NewInt(1))
+
+	hash := signer.Hash(tx)
+	hashBytes := hash[:]
 
 	for i := 0; i < n; i++ {
 		request := &types.KeysignRequest{
@@ -202,7 +204,7 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 			OutChain:       TEST_CHAIN,
 			OutHash:        "Hash0",
 			OutBlockHeight: 123,
-			OutBytes:       bz,
+			OutBytes:       hashBytes,
 		}
 		nodes[i].client.KeySign(request, tendermintPubKeys)
 	}
@@ -228,12 +230,70 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 		}
 	}
 
-	signedTx, err := tx.WithSignature(etypes.NewEIP2930Signer(big.NewInt(1)), results[0].Signature)
+	sigPublicKey, err := crypto.Ecrecover(hashBytes, results[0].Signature)
+	matches := bytes.Equal(sigPublicKey, publicKeyBytes)
+	if !matches {
+		panic("Reconstructed pubkey does not match pubkey")
+	} else {
+		utils.LogInfo("Signature matched")
+	}
+
+	signedTx, err := tx.WithSignature(signer, results[0].Signature)
 	if err != nil {
 		panic(err)
 	}
 
-	_ = signedTx
+	return signedTx
+}
+
+// deploy a signed tx to a local ganache cli
+func deploySignedTx(keygenResult *types.KeygenResult, tx *etypes.Transaction) {
+	blockTime := time.Second * 3
+	ethCl, err := ethclient.Dial("http://0.0.0.0:7545")
+	if err != nil {
+		panic(err)
+	}
+
+	var beforeTxBalance *big.Int
+
+	for {
+		balance, err := ethCl.BalanceAt(context.Background(), common.HexToAddress(keygenResult.Address), nil)
+		if err != nil {
+			panic(err)
+		}
+		time.Sleep(blockTime)
+		if balance.Cmp(big.NewInt(0)) != 0 {
+			beforeTxBalance = balance
+			break
+		}
+		utils.LogInfo("Balance is 0. Keep waiting...")
+	}
+
+	err = ethCl.SendTransaction(context.Background(), tx)
+	if err != nil {
+		panic(err)
+	}
+
+	utils.LogInfo("A transaction is dispatched")
+	time.Sleep(2 * blockTime)
+
+	afterTxBalance, err := ethCl.BalanceAt(context.Background(), common.HexToAddress(keygenResult.Address), nil)
+	if err != nil {
+		panic(err)
+	}
+
+	utils.LogInfo("beforeTxBalance = ", beforeTxBalance)
+	utils.LogInfo("afterTxBalance = ", afterTxBalance)
+
+	if afterTxBalance.Cmp(beforeTxBalance) == 0 {
+		utils.LogError("Before and after balance are the same", beforeTxBalance, afterTxBalance)
+		panic("sender account does not change. The tx likely failed")
+	}
+
+	_, _, err = ethCl.TransactionByHash(context.Background(), tx.Hash())
+	if err != nil {
+		panic(err)
+	}
 }
 
 func main() {
@@ -272,10 +332,12 @@ func main() {
 	// Set private keys
 	setPrivateKeys(nodes)
 
-	signature := keygen(nodes, tendermintPubKeys, keygenChs)
+	keygenResult := keygen(nodes, tendermintPubKeys, keygenChs)
 	utils.LogInfo("All keygen tasks finished")
 
 	// Test keysign.
-	keysign(nodes, tendermintPubKeys, keysignChs, signature)
+	signedTx := keysign(nodes, tendermintPubKeys, keysignChs, keygenResult.PubKeyBytes, big.NewInt(1))
 	utils.LogInfo("Finished all keysign!")
+
+	deploySignedTx(keygenResult, signedTx)
 }

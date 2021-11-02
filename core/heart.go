@@ -117,7 +117,9 @@ func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCom
 
 	// TODO: handle multiple tx here.
 	signature := data[0].Signature
-	signature = append(signature, data[0].SignatureRecovery[0])
+	if utils.IsETHBasedChain(request.Chain) {
+		signature = append(signature, data[0].SignatureRecovery[0])
+	}
 
 	result := &htypes.KeysignResult{
 		Id:             clientRequest.Id,

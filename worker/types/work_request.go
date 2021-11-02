@@ -57,6 +57,7 @@ func baseRequest(workType WorkType, chain, workdId string, n int, pIDs tss.Sorte
 		AllParties: pIDs,
 		WorkType:   workType,
 		WorkId:     workdId,
+		BatchSize:  1, // TODO: Support real batching
 		N:          n,
 	}
 }

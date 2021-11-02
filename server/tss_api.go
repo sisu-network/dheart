@@ -7,7 +7,6 @@ import (
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 
-	etypes "github.com/ethereum/go-ethereum/core/types"
 	common "github.com/sisu-network/dheart/common"
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/types"
@@ -53,9 +52,6 @@ func (api *TssApi) KeyGen(keygenId string, chain string, keyWrappers []types.Pub
 	}
 
 	return api.heart.Keygen(keygenId, chain, pubKeys)
-}
-
-func (api *TssApi) SignEthTx(chainSymbol string, tx *etypes.Transaction) {
 }
 
 // This function should only call one during the entire process cycle. If the caller wants to
