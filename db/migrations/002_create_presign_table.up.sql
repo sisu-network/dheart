@@ -1,4 +1,4 @@
-CREATE TABLE presign(
+CREATE TABLE IF NOT EXISTS presign(
   presign_id VARCHAR(256),
   chain VARCHAR(256),
   work_id VARCHAR(256),

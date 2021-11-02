@@ -3,6 +3,7 @@
 
 home-dir = "/root/"
 use-on-memory = false
+shortcut-preparams = true
 sisu-server-url = "http://host.docker.internal:25457"
 port = 5678
 

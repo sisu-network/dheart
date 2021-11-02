@@ -11,6 +11,7 @@ const defaultConfigTemplate = `# This is a TOML config file.
 
 home-dir = "{{ .HomeDir }}"
 use-on-memory = {{ .UseOnMemory }}
+shortcut-preparams = {{ .ShortcutPreparams }}
 sisu-server-url = "{{ .SisuServerUrl }}"
 port = {{ .Port }}
 

@@ -43,6 +43,8 @@ func SetupApiServer() {
 		panic(err)
 	}
 
+	cfg.AesKey = aesKey
+
 	store, err := store.NewStore(filepath.Join(homeDir, "/apidb"), aesKey)
 	if err != nil {
 		panic(err)

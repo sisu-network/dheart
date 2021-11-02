@@ -15,10 +15,11 @@ type DbConfig struct {
 }
 
 type HeartConfig struct {
-	HomeDir       string `toml:"home-dir"`
-	UseOnMemory   bool   `toml:"use-on-memory"`
-	SisuServerUrl string `toml:"sisu-server-url"`
-	Port          int    `toml:"port"`
+	HomeDir           string `toml:"home-dir"`
+	UseOnMemory       bool   `toml:"use-on-memory"`
+	ShortcutPreparams bool   `toml:"shortcut-preparams"`
+	SisuServerUrl     string `toml:"sisu-server-url"`
+	Port              int    `toml:"port"`
 
 	Db         DbConfig              `toml:"db"`
 	Connection p2p.ConnectionsConfig `toml:"connection"`

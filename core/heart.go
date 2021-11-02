@@ -59,6 +59,11 @@ func (h *Heart) Start() error {
 		return err
 	}
 
+	if h.config.ShortcutPreparams {
+		// Save precomputed preparams in the db. Only use this in local dev mode to speed up dev time.
+		preloadPreparams(h.db, h.config)
+	}
+
 	// Cache
 	requestCache, err := lru.New(TX_CACHE_SIZE)
 	if err != nil {

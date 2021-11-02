@@ -1,4 +1,4 @@
-CREATE TABLE keygen(
+CREATE TABLE IF NOT EXISTS keygen(
   chain VARCHAR(256),
   work_id VARCHAR(256),
   batch_index INTEGER,
