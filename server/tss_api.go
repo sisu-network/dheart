@@ -92,8 +92,11 @@ func (api *TssApi) getPubkeysFromWrapper(keyWrappers []types.PubKeyWrapper) ([]c
 }
 
 func (api *TssApi) KeySign(req *types.KeysignRequest, keyWrappers []types.PubKeyWrapper) error {
+	utils.LogInfo("There is keysign request for chain", req.OutChain)
+
 	pubKeys, err := api.getPubkeysFromWrapper(keyWrappers)
 	if err != nil {
+		utils.LogError("Failed to get pubkey, err =", err)
 		return err
 	}
 

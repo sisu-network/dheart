@@ -194,7 +194,6 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 
 	tx := generateEthTx()
 	signer := etypes.NewEIP2930Signer(big.NewInt(1))
-
 	hash := signer.Hash(tx)
 	hashBytes := hash[:]
 
@@ -231,6 +230,9 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 	}
 
 	sigPublicKey, err := crypto.Ecrecover(hashBytes, results[0].Signature)
+	if err != nil {
+		panic(err)
+	}
 	matches := bytes.Equal(sigPublicKey, publicKeyBytes)
 	if !matches {
 		panic("Reconstructed pubkey does not match pubkey")
