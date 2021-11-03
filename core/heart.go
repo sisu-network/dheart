@@ -132,7 +132,7 @@ func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCom
 		OutChain:       clientRequest.OutChain,
 		OutBlockHeight: clientRequest.OutBlockHeight,
 		OutHash:        clientRequest.OutHash,
-		OutBytes:       clientRequest.OutBytes,
+		BytesToSign:    clientRequest.BytesToSign,
 		Signature:      signature, // TODO: Support multi tx per request on Sisu
 	}
 
@@ -253,7 +253,7 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 
 	// TODO: Find unique workId
 	workId := req.OutChain + req.OutHash
-	request := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.OutBytes))
+	request := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.BytesToSign))
 
 	presignInput, err := h.db.LoadKeygenData(req.OutChain)
 	if err != nil {

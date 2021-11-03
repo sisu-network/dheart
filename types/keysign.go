@@ -7,7 +7,7 @@ type KeysignRequest struct {
 	OutChain       string
 	OutHash        string
 	OutBlockHeight int64
-	OutBytes       []byte
+	BytesToSign    []byte
 }
 
 type KeysignResult struct {
@@ -19,8 +19,8 @@ type KeysignResult struct {
 	OutHash        string
 	OutBlockHeight int64
 
-	OutBytes  []byte
-	Signature []byte
+	BytesToSign []byte
+	Signature   []byte
 
 	Culprits []*tss.PartyID
 }

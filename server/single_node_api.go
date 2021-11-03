@@ -156,7 +156,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 
 	utils.LogDebug("Signing transaction for chain", req.OutChain)
 	if utils.IsETHBasedChain(req.OutChain) {
-		signature, err = api.keySignEth(req.OutChain, req.OutBytes)
+		signature, err = api.keySignEth(req.OutChain, req.BytesToSign)
 	} else {
 		return fmt.Errorf("Unknown chain: %s", req.OutChain)
 	}
@@ -173,7 +173,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 				OutChain:       req.OutChain,
 				OutBlockHeight: req.OutBlockHeight,
 				OutHash:        req.OutHash,
-				OutBytes:       req.OutBytes,
+				BytesToSign:    req.BytesToSign,
 				Signature:      signature,
 			}
 
@@ -189,7 +189,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 			OutChain:       req.OutChain,
 			OutBlockHeight: req.OutBlockHeight,
 			OutHash:        req.OutHash,
-			OutBytes:       req.OutBytes,
+			BytesToSign:    req.BytesToSign,
 			Signature:      signature,
 		})
 	}
@@ -214,7 +214,7 @@ func (api *SingleNodeApi) deployToChain(result *types.KeysignResult) {
 	}
 
 	tx := &eTypes.Transaction{}
-	tx.UnmarshalBinary(result.OutBytes)
+	tx.UnmarshalBinary(result.BytesToSign)
 
 	signedTx, err := tx.WithSignature(eTypes.NewEIP155Signer(chainId), result.Signature)
 	if err != nil {

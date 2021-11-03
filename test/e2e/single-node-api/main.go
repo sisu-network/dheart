@@ -53,9 +53,9 @@ func main() {
 	}
 
 	request := &types.KeysignRequest{
-		OutChain: "eth",
-		OutHash:  "",
-		OutBytes: bz,
+		OutChain:    "eth",
+		OutHash:     "",
+		BytesToSign: bz,
 	}
 
 	done := make(chan []byte)
