@@ -129,22 +129,13 @@ func (api *SingleNodeApi) keyGenEth(chain string) error {
 	return api.store.PutEncrypted(api.getKeygenKey(chain), encoded)
 }
 
-func (api *SingleNodeApi) keySignEth(chain string, serialized []byte) ([]byte, error) {
+func (api *SingleNodeApi) keySignEth(chain string, bytesToSign []byte) ([]byte, error) {
 	if api.ethKeys[chain] == nil {
 		return nil, fmt.Errorf("There is no private key for this chain")
 	}
 
 	privateKey := api.ethKeys[chain]
-	tx := &eTypes.Transaction{}
-	err := tx.UnmarshalBinary(serialized)
-	if err != nil {
-		utils.LogError("Cannot unmarshall ETH tx.")
-		return nil, err
-	}
-
-	signer := eTypes.NewEIP2930Signer(api.chainIds[chain])
-	h := signer.Hash(tx)
-	sig, err := crypto.Sign(h[:], privateKey)
+	sig, err := crypto.Sign(bytesToSign, privateKey)
 
 	return sig, err
 }

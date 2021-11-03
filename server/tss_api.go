@@ -93,6 +93,7 @@ func (api *TssApi) getPubkeysFromWrapper(keyWrappers []types.PubKeyWrapper) ([]c
 
 func (api *TssApi) KeySign(req *types.KeysignRequest, keyWrappers []types.PubKeyWrapper) error {
 	utils.LogInfo("There is keysign request for chain", req.OutChain)
+	utils.LogInfo("BytesTosign length = ", len(req.BytesToSign))
 
 	pubKeys, err := api.getPubkeysFromWrapper(keyWrappers)
 	if err != nil {
@@ -100,7 +101,10 @@ func (api *TssApi) KeySign(req *types.KeysignRequest, keyWrappers []types.PubKey
 		return err
 	}
 
-	api.heart.Keysign(req, pubKeys)
+	err = api.heart.Keysign(req, pubKeys)
+	if err != nil {
+		utils.LogError("Cannot do keysign, err =", err)
+	}
 
-	return nil
+	return err
 }
