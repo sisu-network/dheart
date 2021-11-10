@@ -28,7 +28,7 @@ port = {{ .Port }}
   host = "0.0.0.0"
   port = 28300
   rendezvous = "rendezvous"
-  peers = [{{ .Connection.BootstrapPeers }}]
+  peers = {{ .Connection.BootstrapPeers }}
 `
 
 var configTemplate *template.Template
