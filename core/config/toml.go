@@ -24,6 +24,11 @@ port = {{ .Port }}
 	username = "{{ .Db.Username }}"
 	password = "{{ .Db.Password }}"
 	schema = "{{ .Db.Schema }}"
+[connection]
+  host = "0.0.0.0"
+  port = 28300
+  rendezvous = "rendezvous"
+  peers = [{{ .BootstrapPeers }}]
 `
 
 var configTemplate *template.Template
