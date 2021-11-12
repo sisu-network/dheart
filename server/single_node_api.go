@@ -16,6 +16,7 @@ import (
 	"github.com/sisu-network/dheart/utils"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+	libchain "github.com/sisu-network/lib/chain"
 )
 
 const (
@@ -76,7 +77,7 @@ func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types
 	utils.LogInfo("keygen: chain = ", chain)
 	var err error
 
-	if utils.IsETHBasedChain(chain) {
+	if libchain.IsETHBasedChain(chain) {
 		err = api.keyGenEth(chain)
 	} else {
 		return fmt.Errorf("Unknown chain: %s", chain)
@@ -146,7 +147,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 	var signature []byte
 
 	utils.LogDebug("Signing transaction for chain", req.OutChain)
-	if utils.IsETHBasedChain(req.OutChain) {
+	if libchain.IsETHBasedChain(req.OutChain) {
 		signature, err = api.keySignEth(req.OutChain, req.BytesToSign)
 	} else {
 		return fmt.Errorf("Unknown chain: %s", req.OutChain)

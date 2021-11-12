@@ -19,6 +19,7 @@ import (
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
+	libchain "github.com/sisu-network/lib/chain"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/tss"
 )
@@ -122,7 +123,7 @@ func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCom
 
 	// TODO: handle multiple tx here.
 	signature := data[0].Signature
-	if utils.IsETHBasedChain(request.Chain) {
+	if libchain.IsETHBasedChain(request.Chain) {
 		signature = append(signature, data[0].SignatureRecovery[0])
 	}
 
