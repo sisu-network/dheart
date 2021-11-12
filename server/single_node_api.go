@@ -43,7 +43,7 @@ func NewSingleNodeApi(c client.Client, store store.Store) *SingleNodeApi {
 // Initializes private keys used for dheart
 func (api *SingleNodeApi) Init() {
 	// Initialized keygens
-	for chain, _ := range libchain.GetSupportedEthChains() {
+	for chain := range libchain.GetSupportedEthChains() {
 		bz, err := api.store.GetEncrypted([]byte(api.getKeygenKey(chain)))
 		if err != nil {
 			continue
