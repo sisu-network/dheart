@@ -1073,8 +1073,8 @@ github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/sisu-network/cosmos-sdk v0.42.1-fork004 h1:4vIvJfjtB1Iot+eC0tguh1+4K1paWA0se5WQyXx/pW8=
 github.com/sisu-network/cosmos-sdk v0.42.1-fork004/go.mod h1:V7tLgqu3o53fQoINKdDjdwVCWzRaJNNHfJktlElkyc8=
-github.com/sisu-network/lib v0.0.1-alpha2 h1:aJSMPzM2j6uyKjWeRwd/tzaRFZb2ADtQ1q6iQe3wb9g=
-github.com/sisu-network/lib v0.0.1-alpha2/go.mod h1:c2FVqTuz7ZHALdW+gyq8qG1crabzi3sYf+8TTujv07E=
+github.com/sisu-network/lib v0.0.1-alpha4 h1:pfI0SBtQtHWp6s32lanBLb8gJYYb77zhCmrU7qklf6w=
+github.com/sisu-network/lib v0.0.1-alpha4/go.mod h1:IVs0irBgW1BkGlJ83XTOwWbNxuYHon+xv7m2sdNDss4=
 github.com/sisu-network/tendermint v0.34.8-fork005 h1:tUOrEC2n19+uLxH3wtuMr86MGti4/Pt+ALGBe4TTw3o=
 github.com/sisu-network/tendermint v0.34.8-fork005/go.mod h1:SMrIOwxrc88H8ats26WQ6jk+kZLsLeVhMAHivOkmXIs=
 github.com/sisu-network/tss-lib v0.1.1 h1:wGMZyLxpIaQB+2N0ckZkV/eiFBslkl5KLGOhJBNUjVQ=
