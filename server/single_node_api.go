@@ -10,10 +10,8 @@ import (
 	eTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sisu-network/dheart/client"
-	"github.com/sisu-network/dheart/common"
 	"github.com/sisu-network/dheart/store"
 	"github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/lib/log"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -27,33 +25,31 @@ const (
 // This is a mock API to use for single localhost node. It does not have TSS signing round and
 // generates a private key instead.
 type SingleNodeApi struct {
-	keyMap   map[string]interface{}
-	store    store.Store
-	ethKeys  map[string]*ecdsa.PrivateKey
-	chainIds map[string]*big.Int
-	c        client.Client
+	keyMap  map[string]interface{}
+	store   store.Store
+	ethKeys map[string]*ecdsa.PrivateKey
+	c       client.Client
 }
 
 func NewSingleNodeApi(c client.Client, store store.Store) *SingleNodeApi {
 	return &SingleNodeApi{
-		keyMap:   make(map[string]interface{}),
-		ethKeys:  make(map[string]*ecdsa.PrivateKey),
-		c:        c,
-		store:    store,
-		chainIds: make(map[string]*big.Int),
+		keyMap:  make(map[string]interface{}),
+		ethKeys: make(map[string]*ecdsa.PrivateKey),
+		c:       c,
+		store:   store,
 	}
 }
 
 // Initializes private keys used for dheart
 func (api *SingleNodeApi) Init() {
 	// Initialized keygens
-	for _, chain := range common.SUPPORTED_CHAINS {
+	for chain, _ := range libchain.GetSupportedEthChains() {
 		bz, err := api.store.GetEncrypted([]byte(api.getKeygenKey(chain)))
 		if err != nil {
 			continue
 		}
 
-		if utils.IsEcDSA(chain) {
+		if libchain.IsETHBasedChain(chain) {
 			privKey, err := crypto.ToECDSA(bz)
 			if err != nil {
 				panic(err)
@@ -62,8 +58,6 @@ func (api *SingleNodeApi) Init() {
 			api.ethKeys[chain] = privKey
 		}
 	}
-
-	api.chainIds = common.SUPPORTED_CHAINS_ID_MAP
 }
 
 // Empty function for checking health only.

@@ -9,13 +9,8 @@ import (
 	"io"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/sisu-network/dheart/common"
 	"github.com/sisu-network/lib/log"
 )
-
-func IsEcDSA(chain string) bool {
-	return chain == common.CHAIN_ETH || chain == common.CHAIN_SISU_ETH
-}
 
 func AESDecrypt(encrypted []byte, key []byte) ([]byte, error) {
 	c, err := aes.NewCipher(key)
