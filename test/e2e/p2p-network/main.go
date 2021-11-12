@@ -7,7 +7,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/sisu-network/dheart/p2p"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 )
 
 type SimpleListener struct {
@@ -21,8 +21,8 @@ func NewSimpleListener(dataChan chan *p2p.P2PMessage) *SimpleListener {
 }
 
 func (listener *SimpleListener) OnNetworkMessage(message *p2p.P2PMessage) {
-	utils.LogVerbose("There is a new message from", message.FromPeerId)
-	utils.LogVerbose(string(message.Data))
+	log.Verbose("There is a new message from", message.FromPeerId)
+	log.Verbose(string(message.Data))
 }
 
 func initialize() {
@@ -62,7 +62,7 @@ func main() {
 				continue
 			}
 
-			utils.LogVerbose("Sending a message to peer", peerIds[i])
+			log.Verbose("Sending a message to peer", peerIds[i])
 
 			err = cm.WriteToStream(peerIds[i], p2p.TSSProtocolID, []byte(fmt.Sprintf("Hello from index %d", index)))
 			if err != nil {
@@ -73,6 +73,6 @@ func main() {
 
 	select {
 	case msg := <-dataChan:
-		utils.LogVerbose("Message =", string(msg.Data))
+		log.Verbose("Message =", string(msg.Data))
 	}
 }

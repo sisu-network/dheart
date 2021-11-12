@@ -7,7 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -26,18 +26,18 @@ func NewNode(pubKey ctypes.PubKey) *Node {
 	case "secp256k1":
 		p2pPubKey, err = crypto.UnmarshalSecp256k1PublicKey(pubKey.Bytes())
 	default:
-		utils.LogError("Unsupported pub key type", pubKey.Type())
+		log.Error("Unsupported pub key type", pubKey.Type())
 		return nil
 	}
 
 	if err != nil {
-		utils.LogError(err)
+		log.Error(err)
 		return nil
 	}
 
 	peerId, err := peer.IDFromPublicKey(p2pPubKey)
 	if err != nil {
-		utils.LogError("Cannot convert pubkey to peerId")
+		log.Error("Cannot convert pubkey to peerId")
 		return nil
 	}
 

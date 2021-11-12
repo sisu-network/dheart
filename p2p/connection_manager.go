@@ -16,7 +16,7 @@ import (
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	maddr "github.com/multiformats/go-multiaddr"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 )
 
 const (
@@ -79,8 +79,8 @@ func NewConnectionManager(config ConnectionsConfig) ConnectionManager {
 }
 
 func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) error {
-	utils.LogInfo("Starting connection manager. Config =", cm.connections)
-	utils.LogInfo("keyType = ", keyType)
+	log.Info("Starting connection manager. Config =", cm.connections)
+	log.Info("keyType = ", keyType)
 
 	ctx := context.Background()
 	var p2pPriKey crypto.PrivKey
@@ -97,7 +97,7 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) e
 	}
 
 	selfUrl := fmt.Sprintf("/ip4/%s/tcp/%d", cm.config.Host, cm.config.Port)
-	utils.LogInfo("selfUrl = ", selfUrl)
+	log.Info("selfUrl = ", selfUrl)
 
 	listenAddr, err := maddr.NewMultiaddr(selfUrl)
 	if err != nil {
@@ -105,7 +105,7 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) e
 	}
 
 	// Initialize peers
-	utils.LogInfo("cm.config.BootstrapPeers = ", cm.config.BootstrapPeers)
+	log.Info("cm.config.BootstrapPeers = ", cm.config.BootstrapPeers)
 	cm.bootstrapPeers = make([]maddr.Multiaddr, len(cm.config.BootstrapPeers))
 	for i, peerString := range cm.config.BootstrapPeers {
 		peer, err := maddr.NewMultiaddr(peerString)
@@ -121,12 +121,12 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) e
 		libp2p.Identity(p2pPriKey),
 	)
 	if err != nil {
-		utils.LogCritical("Failed to get Peer ID from private key. err = ", err)
+		log.Critical("Failed to get Peer ID from private key. err = ", err)
 		return err
 	}
 	cm.host = host
 
-	utils.LogInfo("My address = ", host.Addrs(), host.ID())
+	log.Info("My address = ", host.Addrs(), host.ID())
 
 	// Set stream handlers
 	host.SetStreamHandler(TSSProtocolID, cm.handleStream)
@@ -134,7 +134,7 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) e
 
 	// Advertise this node and discover other nodes
 	if err := cm.discover(ctx, host); err != nil {
-		utils.LogCritical("Failed to advertise and discover other nodes. err = ", err)
+		log.Critical("Failed to advertise and discover other nodes. err = ", err)
 		return err
 	}
 
@@ -180,7 +180,7 @@ func (cm *DefaultConnectionManager) handleStream(stream network.Stream) {
 		dataBuf, err := ReadStreamWithBuffer(stream)
 
 		if err != nil {
-			utils.LogWarn(err)
+			log.Warn(err)
 			// TODO: handle retry here.
 			return
 		}
@@ -213,7 +213,7 @@ func (cm *DefaultConnectionManager) discover(ctx context.Context, host host.Host
 
 	routingDiscovery := discovery.NewRoutingDiscovery(kademliaDHT)
 	discovery.Advertise(ctx, routingDiscovery, cm.rendezvous)
-	utils.LogInfo("Successfully announced!")
+	log.Info("Successfully announced!")
 
 	return nil
 }
@@ -227,7 +227,7 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 	}
 
 	// Attempts to connect to every bootstrapped peers.
-	utils.LogInfo("Trying to create connections with peers...")
+	log.Info("Trying to create connections with peers...")
 	wg := &sync.WaitGroup{}
 	for _, peerAddr := range cm.bootstrapPeers {
 		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
@@ -239,10 +239,10 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 			// Retry 5 times at max.
 			for i := 0; i < 5; i++ {
 				if err := cm.host.Connect(ctx, *peerinfo); err != nil {
-					utils.LogWarn(fmt.Sprintf("Error while connecting to node %q: %-v", peerinfo, err))
+					log.Warn(fmt.Sprintf("Error while connecting to node %q: %-v", peerinfo, err))
 					time.Sleep(time.Second * 3)
 				} else {
-					utils.LogInfo("Connection established with bootstrap node: %q", *peerinfo)
+					log.Info("Connection established with bootstrap node: %q", *peerinfo)
 					break
 				}
 			}

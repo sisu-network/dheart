@@ -11,7 +11,7 @@ import (
 	"github.com/golang-migrate/migrate/database/mysql"
 	_ "github.com/golang-migrate/migrate/source/file"
 	"github.com/sisu-network/dheart/core/config"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
@@ -77,7 +77,7 @@ func (d *SqlDatabase) Connect() error {
 	password := d.config.Password
 	schema := d.config.Schema
 
-	utils.LogInfo("Schema = ", schema)
+	log.Info("Schema = ", schema)
 
 	// Connect to the db
 	database, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/", username, password, host, d.config.Port))
@@ -96,7 +96,7 @@ func (d *SqlDatabase) Connect() error {
 	}
 
 	d.db = database
-	utils.LogInfo("Db is connected successfully")
+	log.Info("Db is connected successfully")
 	return nil
 }
 
@@ -106,7 +106,7 @@ func (d *SqlDatabase) DoMigration() error {
 		return err
 	}
 
-	utils.LogInfo("Migration path =", d.config.MigrationPath)
+	log.Info("Migration path =", d.config.MigrationPath)
 
 	m, err := migrate.NewWithDatabaseInstance(
 		d.config.MigrationPath,
@@ -127,13 +127,13 @@ func (d *SqlDatabase) DoMigration() error {
 func (d *SqlDatabase) Init() error {
 	err := d.Connect()
 	if err != nil {
-		utils.LogError("Failed to connect to DB. Err =", err)
+		log.Error("Failed to connect to DB. Err =", err)
 		return err
 	}
 
 	err = d.DoMigration()
 	if err != nil {
-		utils.LogError("Cannot do migration. Err =", err)
+		log.Error("Cannot do migration. Err =", err)
 		return err
 	}
 
@@ -225,16 +225,16 @@ func (d *SqlDatabase) LoadKeygenData(chain string) (*keygen.LocalPartySaveData, 
 		var bz []byte
 
 		if err := rows.Scan(&bz); err != nil {
-			utils.LogError("Cannot scan row", err)
+			log.Error("Cannot scan row", err)
 			return nil, err
 		}
 
 		if err := json.Unmarshal(bz, result); err != nil {
-			utils.LogError("Cannot unmarshal result", err)
+			log.Error("Cannot unmarshal result", err)
 			return nil, err
 		}
 	} else {
-		utils.LogVerbose("There is no such keygen output for ", chain)
+		log.Verbose("There is no such keygen output for ", chain)
 	}
 
 	return result, nil
@@ -291,7 +291,7 @@ func (d *SqlDatabase) GetAvailablePresignShortForm() ([]string, []string, error)
 	for rows.Next() {
 		var presignId, pid string
 		if err := rows.Scan(&presignId, &pid); err != nil {
-			utils.LogError("cannot scan row", err)
+			log.Error("cannot scan row", err)
 			return nil, nil, err
 		}
 
@@ -336,13 +336,13 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 	for rows.Next() {
 		var bz []byte
 		if err := rows.Scan(&bz); err != nil {
-			utils.LogError("Cannot unmarshall data", err)
+			log.Error("Cannot unmarshall data", err)
 			return nil, err
 		}
 
 		data := presign.LocalPresignData{}
 		if err := json.Unmarshal(bz, &data); err != nil {
-			utils.LogError("Cannot unmarshall data", err)
+			log.Error("Cannot unmarshall data", err)
 			return nil, err
 		}
 

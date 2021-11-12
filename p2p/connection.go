@@ -10,7 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	maddr "github.com/multiformats/go-multiaddr"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 )
 
 const (
@@ -66,7 +66,7 @@ func (con *Connection) createStream(protocolId protocol.ID) (network.Stream, err
 	stream, err := (*con.host).NewStream(ctx, con.peerId, protocolId)
 
 	if err != nil {
-		utils.LogWarn(err)
+		log.Warn(err)
 		return nil, fmt.Errorf("fail to create new stream to peer: %s, %w", con.peerId, err)
 	}
 	return stream, nil
@@ -77,7 +77,7 @@ func (con *Connection) writeToStream(msg []byte, protocolId protocol.ID) error {
 	if stream == nil {
 		newStream, err := con.createStream(protocolId)
 		if err != nil {
-			utils.LogWarn("Cannot create a new stream", err)
+			log.Warn("Cannot create a new stream", err)
 			return err
 		}
 

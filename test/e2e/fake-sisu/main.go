@@ -13,6 +13,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/sisu-network/lib/log"
 
 	"github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
@@ -123,7 +124,7 @@ func setPrivateKeys(nodes []*MockSisuNode) {
 	}
 
 	wg.Wait()
-	utils.LogInfo("Done Setting private key!")
+	log.Info("Done Setting private key!")
 	time.Sleep(time.Second)
 }
 
@@ -132,7 +133,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
 
-	utils.LogInfo("Sending keygen.....")
+	log.Info("Sending keygen.....")
 
 	for i := 0; i < n; i++ {
 		go func(index int) {
@@ -140,7 +141,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 		}(i)
 	}
 
-	utils.LogInfo("Waiting for keygen result")
+	log.Info("Waiting for keygen result")
 
 	results := make([]*types.KeygenResult, n)
 	for i := 0; i < n; i++ {
@@ -152,7 +153,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 	}
 
 	wg.Wait()
-	utils.LogInfo("Done keygen!")
+	log.Info("Done keygen!")
 	time.Sleep(time.Second)
 
 	// Sanity check the results
@@ -165,7 +166,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 	pubkeyBytes := results[0].PubKeyBytes
 	_, err := crypto.UnmarshalPubkey(pubkeyBytes)
 	if err != nil {
-		utils.LogError("Failed to unmarshal pubkey")
+		log.Error("Failed to unmarshal pubkey")
 		panic(err)
 	}
 
@@ -182,7 +183,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 		}
 	}
 
-	utils.LogInfo("Address = ", results[0].Address)
+	log.Info("Address = ", results[0].Address)
 
 	return results[0]
 }
@@ -237,7 +238,7 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 	if !matches {
 		panic("Reconstructed pubkey does not match pubkey")
 	} else {
-		utils.LogInfo("Signature matched")
+		log.Info("Signature matched")
 	}
 
 	signedTx, err := tx.WithSignature(signer, results[0].Signature)
@@ -268,7 +269,7 @@ func deploySignedTx(keygenResult *types.KeygenResult, tx *etypes.Transaction) {
 			beforeTxBalance = balance
 			break
 		}
-		utils.LogInfo("Balance is 0. Keep waiting...")
+		log.Info("Balance is 0. Keep waiting...")
 	}
 
 	err = ethCl.SendTransaction(context.Background(), tx)
@@ -276,7 +277,7 @@ func deploySignedTx(keygenResult *types.KeygenResult, tx *etypes.Transaction) {
 		panic(err)
 	}
 
-	utils.LogInfo("A transaction is dispatched")
+	log.Info("A transaction is dispatched")
 	time.Sleep(2 * blockTime)
 
 	afterTxBalance, err := ethCl.BalanceAt(context.Background(), common.HexToAddress(keygenResult.Address), nil)
@@ -284,11 +285,11 @@ func deploySignedTx(keygenResult *types.KeygenResult, tx *etypes.Transaction) {
 		panic(err)
 	}
 
-	utils.LogInfo("beforeTxBalance = ", beforeTxBalance)
-	utils.LogInfo("afterTxBalance = ", afterTxBalance)
+	log.Info("beforeTxBalance = ", beforeTxBalance)
+	log.Info("afterTxBalance = ", afterTxBalance)
 
 	if afterTxBalance.Cmp(beforeTxBalance) == 0 {
-		utils.LogError("Before and after balance are the same", beforeTxBalance, afterTxBalance)
+		log.Error("Before and after balance are the same", beforeTxBalance, afterTxBalance)
 		panic("sender account does not change. The tx likely failed")
 	}
 
@@ -335,11 +336,11 @@ func main() {
 	setPrivateKeys(nodes)
 
 	keygenResult := keygen(nodes, tendermintPubKeys, keygenChs)
-	utils.LogInfo("All keygen tasks finished")
+	log.Info("All keygen tasks finished")
 
 	// Test keysign.
 	signedTx := keysign(nodes, tendermintPubKeys, keysignChs, keygenResult.PubKeyBytes, big.NewInt(1))
-	utils.LogInfo("Finished all keysign!")
+	log.Info("Finished all keysign!")
 
 	deploySignedTx(keygenResult, signedTx)
 }

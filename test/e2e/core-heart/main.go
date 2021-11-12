@@ -8,6 +8,7 @@ import (
 	"time"
 
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
+	"github.com/sisu-network/lib/log"
 
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/core/config"
@@ -104,6 +105,6 @@ func main() {
 	case <-time.After(time.Second * 30):
 		panic("Time out")
 	case <-done:
-		utils.LogVerbose("core-heart Test passed")
+		log.Verbose("core-heart Test passed")
 	}
 }

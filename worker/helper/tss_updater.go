@@ -1,7 +1,7 @@
 package helper
 
 import (
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -13,18 +13,18 @@ func SharedPartyUpdater(party tss.Party, msg tss.Message) *tss.Error {
 
 	bz, _, err := msg.WireBytes()
 	if err != nil {
-		utils.LogError("error when start party updater", err)
+		log.Error("error when start party updater", err)
 		return party.WrapError(err)
 	}
 
 	pMsg, err := tss.ParseWireMessage(bz, msg.GetFrom(), msg.IsBroadcast())
 	if err != nil {
-		utils.LogError("error when start party updater", err)
+		log.Error("error when start party updater", err)
 		return party.WrapError(err)
 	}
 
 	if _, err := party.Update(pMsg); err != nil {
-		utils.LogError("error when start party updater", err)
+		log.Error("error when start party updater", err)
 		return party.WrapError(err)
 	}
 

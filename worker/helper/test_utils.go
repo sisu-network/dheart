@@ -13,13 +13,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dtypes "github.com/sisu-network/dheart/types"
+	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -288,13 +288,13 @@ func GetTestPartyIds(n int) tss.SortedPartyIDs {
 		// Convert to p2p pubkey to get peer id.
 		p2pPubKey, err := crypto.UnmarshalSecp256k1PublicKey(pubKey.Bytes())
 		if err != nil {
-			utils.LogError(err)
+			log.Error(err)
 			return nil
 		}
 
 		peerId, err := peer.IDFromPublicKey(p2pPubKey)
 		if err != nil {
-			utils.LogError(err)
+			log.Error(err)
 			return nil
 		}
 

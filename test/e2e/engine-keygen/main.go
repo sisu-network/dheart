@@ -8,9 +8,9 @@ import (
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/p2p"
 	htypes "github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 
 	libCommon "github.com/sisu-network/tss-lib/common"
@@ -112,6 +112,6 @@ func main() {
 
 	select {
 	case result := <-outCh:
-		utils.LogInfo("Result ", result)
+		log.Info("Result ", result)
 	}
 }

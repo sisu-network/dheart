@@ -6,11 +6,11 @@ import (
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
+	"github.com/sisu-network/lib/log"
 
 	common "github.com/sisu-network/dheart/common"
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/utils"
 )
 
 type TssApi struct {
@@ -37,7 +37,7 @@ func (api *TssApi) KeyGen(keygenId string, chain string, keyWrappers []types.Pub
 		return fmt.Errorf("invalid keys array cannot be empty")
 	}
 
-	utils.LogInfo("There is a keygen request", keygenId, chain)
+	log.Info("There is a keygen request", keygenId, chain)
 
 	pubKeys := make([]ctypes.PubKey, len(keyWrappers))
 
@@ -66,9 +66,9 @@ func (api *TssApi) Setup(configs []common.ChainConfig) error {
 }
 
 func (api *TssApi) SetPrivKey(encodedKey string, keyType string) error {
-	utils.LogInfo("Setting private key, key type =", keyType)
+	log.Info("Setting private key, key type =", keyType)
 	err := api.heart.SetPrivKey(encodedKey, keyType)
-	utils.LogVerbose("Done setting private key, err = ", err)
+	log.Verbose("Done setting private key, err = ", err)
 
 	return err
 }
@@ -92,18 +92,18 @@ func (api *TssApi) getPubkeysFromWrapper(keyWrappers []types.PubKeyWrapper) ([]c
 }
 
 func (api *TssApi) KeySign(req *types.KeysignRequest, keyWrappers []types.PubKeyWrapper) error {
-	utils.LogInfo("There is keysign request for chain", req.OutChain)
-	utils.LogInfo("BytesTosign length = ", len(req.BytesToSign))
+	log.Info("There is keysign request for chain", req.OutChain)
+	log.Info("BytesTosign length = ", len(req.BytesToSign))
 
 	pubKeys, err := api.getPubkeysFromWrapper(keyWrappers)
 	if err != nil {
-		utils.LogError("Failed to get pubkey, err =", err)
+		log.Error("Failed to get pubkey, err =", err)
 		return err
 	}
 
 	err = api.heart.Keysign(req, pubKeys)
 	if err != nil {
-		utils.LogError("Cannot do keysign, err =", err)
+		log.Error("Cannot do keysign, err =", err)
 	}
 
 	return err

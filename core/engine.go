@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
+	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
 	"github.com/sisu-network/dheart/core/signer"
@@ -18,7 +19,6 @@ import (
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/ecdsa"
 	"github.com/sisu-network/dheart/worker/types"
@@ -124,7 +124,7 @@ func (engine *Engine) AddNodes(nodes []*Node) {
 
 func (engine *Engine) AddRequest(request *types.WorkRequest) error {
 	if err := request.Validate(); err != nil {
-		utils.LogError(err)
+		log.Error(err)
 		return err
 	}
 
@@ -166,10 +166,10 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 	engine.workLock.Unlock()
 
 	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId)
-	utils.LogInfo("Starting a work with id", request.WorkId, "with cache size", len(cachedMsgs))
+	log.Info("Starting a work with id", request.WorkId, "with cache size", len(cachedMsgs))
 
 	if err := w.Start(cachedMsgs); err != nil {
-		utils.LogError("Cannot start work error", err)
+		log.Error("Cannot start work error", err)
 	}
 }
 
@@ -197,10 +197,10 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
 }
 
 func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
-	utils.LogInfo("Keygen finished for chain", request.Chain)
+	log.Info("Keygen finished for chain", request.Chain)
 	// Save to database
 	if err := engine.db.SaveKeygenData(request.Chain, request.WorkId, request.AllParties, output); err != nil {
-		utils.LogError("error when saving keygen data", err)
+		log.Error("error when saving keygen data", err)
 	}
 
 	pkX, pkY := output[0].ECDSAPub.X(), output[0].ECDSAPub.Y()
@@ -226,10 +226,10 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 }
 
 func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
-	utils.LogInfo("Presign finished for chain", request.Chain)
+	log.Info("Presign finished for chain", request.Chain)
 
 	if err := engine.db.SavePresignData(request.Chain, request.WorkId, pids, data); err != nil {
-		utils.LogError("error when saving presign data", err)
+		log.Error("error when saving presign data", err)
 	}
 
 	result := htypes.PresignResult{
@@ -244,7 +244,7 @@ func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*
 }
 
 func (engine *Engine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
-	utils.LogInfo("Signing finished for chain", request.Chain)
+	log.Info("Signing finished for chain", request.Chain)
 
 	engine.callback.OnWorkSigningFinished(request, data)
 
@@ -299,7 +299,7 @@ func (engine *Engine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.T
 
 	bz, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
-		utils.LogError("Cannot get signed message", err)
+		log.Error("Cannot get signed message", err)
 		return
 	}
 
@@ -314,7 +314,7 @@ func (engine *Engine) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMe
 
 	bz, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
-		utils.LogError("Cannot get signed message", err)
+		log.Error("Cannot get signed message", err)
 		return
 	}
 
@@ -335,7 +335,7 @@ func (engine *Engine) sendData(data []byte, pIDs []*tss.PartyID) {
 		node := engine.getNodeFromPeerId(pid.Id)
 
 		if node == nil {
-			utils.LogError("Cannot find node with party key", pid.Id)
+			log.Error("Cannot find node with party key", pid.Id)
 			return
 		}
 
@@ -383,7 +383,7 @@ func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
 
 	signedMessage := &common.SignedMessage{}
 	if err := json.Unmarshal(message.Data, signedMessage); err != nil {
-		utils.LogError("Error when unmarshal p2p message", err)
+		log.Error("Error when unmarshal p2p message", err)
 		return
 	}
 
@@ -393,7 +393,7 @@ func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
 	}
 
 	if err := engine.ProcessNewMessage(tssMessage); err != nil {
-		utils.LogError("Error when process new message", err)
+		log.Error("Error when process new message", err)
 	}
 }
 
@@ -410,7 +410,7 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 
 	engine.startNextWork()
 	if worker == nil {
-		utils.LogError("Worker " + request.WorkId + " does not exist.")
+		log.Error("Worker " + request.WorkId + " does not exist.")
 		return
 	}
 
@@ -430,7 +430,7 @@ func (engine *Engine) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyI
 func (engine *Engine) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {
 	loaded, err := engine.db.LoadPresign(presignIds)
 	if err != nil {
-		utils.LogError("Cannot load presign, err =", err)
+		log.Error("Cannot load presign, err =", err)
 		return make([]*presign.LocalPresignData, 0)
 	}
 

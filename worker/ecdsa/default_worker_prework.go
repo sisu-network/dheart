@@ -7,10 +7,10 @@ import (
 
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -83,7 +83,7 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 
 		w.blameMgr.AddPreExecutionCulprit(append(culprits, w.myPid))
 
-		utils.LogError("Leader: error while waiting for member response", err)
+		log.Error("Leader: error while waiting for member response", err)
 		w.leaderFinalized(false, nil, nil)
 		w.callback.OnWorkFailed(w.request)
 		return
@@ -123,7 +123,7 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 
 			if party == nil {
 				// Message can be from bad actor, continue to execute.
-				utils.LogError("Cannot find party from", tssMsg.From)
+				log.Error("Cannot find party from", tssMsg.From)
 				continue
 			}
 
@@ -188,7 +188,7 @@ func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selec
 	}
 
 	if err := w.executeWork(workType); err != nil {
-		utils.LogError("Error when executing work", err)
+		log.Error("Error when executing work", err)
 	}
 }
 
@@ -198,7 +198,7 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 	// Check in the cache to see if the leader has sent a message to this node regarding the participants.
 	for _, msg := range cachedMsgs {
 		if msg.Type == common.TssMessage_PRE_EXEC_OUTPUT {
-			utils.LogVerbose("We have received participant list of work", w.workId)
+			log.Verbose("We have received participant list of work", w.workId)
 			w.memberFinalized(msg.PreExecOutputMessage)
 			return
 		}
@@ -212,7 +212,7 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 	select {
 	case <-time.After(LeaderWaitTime):
 		// TODO: Report as failure here.
-		utils.LogError("member: leader wait timed out.")
+		log.Error("member: leader wait timed out.")
 		// Blame leader
 		w.blameMgr.AddPreExecutionCulprit([]*tss.PartyID{leader})
 		w.callback.OnWorkFailed(w.request)
@@ -270,7 +270,7 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 
 			// We are one of the participants, execute the work
 			if err := w.executeWork(workType); err != nil {
-				utils.LogError("Error when executing work", err)
+				log.Error("Error when executing work", err)
 			}
 		} else {
 			// We are not in the participant list. Terminate this work. Nothing else to do.

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
+	"github.com/sisu-network/lib/log"
 )
 
 func GetPresignWorkId(workType types.WorkType, nodes []*Node) string {
@@ -18,7 +18,7 @@ func GetPresignWorkId(workType types.WorkType, nodes []*Node) string {
 	case types.EddsaPresign:
 		prefix = "eddsa_presign"
 	default:
-		utils.LogCritical("Invalid presign work type")
+		log.Critical("Invalid presign work type")
 		return ""
 	}
 
@@ -40,7 +40,7 @@ func GetKeysignWorkId(workType types.WorkType, txs [][]byte, block int64, chain 
 	case types.EddsaSigning:
 		prefix = "eddsa_signing"
 	default:
-		utils.LogCritical("Invalid keygen work type, workType =", workType)
+		log.Critical("Invalid keygen work type, workType =", workType)
 		return ""
 	}
 

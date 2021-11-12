@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sisu-network/dheart/common"
+	"github.com/sisu-network/lib/log"
 )
 
 func IsEcDSA(chain string) bool {
@@ -84,7 +85,7 @@ func GetSigWithRecoveryId(hash []byte, sig []byte, publicKey []byte) []byte {
 		}
 	}
 
-	LogCritical("cannot find recovery id value", hex.EncodeToString(hash), hex.EncodeToString(sig), hex.EncodeToString(publicKey))
+	log.Critical("cannot find recovery id value", hex.EncodeToString(hash), hex.EncodeToString(sig), hex.EncodeToString(publicKey))
 
 	return nil
 }

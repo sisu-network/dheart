@@ -6,7 +6,7 @@ import (
 
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -152,7 +152,7 @@ func (m *AvailPresignManager) updateUsage(pidsString string, aps []*common.Avail
 	// 1. This presign set has been used, remove them from presignsInUse set.
 	arr := m.inUse[pidsString]
 	if arr == nil {
-		utils.LogError("Cannot find presign in use set with pids", pidsString)
+		log.Error("Cannot find presign in use set with pids", pidsString)
 		m.lock.Unlock()
 		return
 	}
@@ -197,7 +197,7 @@ func (m *AvailPresignManager) updateUsage(pidsString string, aps []*common.Avail
 
 		err := m.db.UpdatePresignStatus(presignIds)
 		if err != nil {
-			utils.LogError("Failed to update presign staus, err =", err)
+			log.Error("Failed to update presign staus, err =", err)
 		}
 	}
 }

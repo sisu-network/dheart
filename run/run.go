@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/sisu-network/lib/log"
 
 	"github.com/joho/godotenv"
 	"github.com/sisu-network/dheart/client"
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/server"
 	"github.com/sisu-network/dheart/store"
-	"github.com/sisu-network/dheart/utils"
 )
 
 func LoadConfigEnv(filenames ...string) {
@@ -24,7 +24,7 @@ func LoadConfigEnv(filenames ...string) {
 
 func SetupApiServer() {
 	homeDir := os.Getenv("HOME_DIR")
-	utils.LogInfo("homeDir = ", homeDir)
+	log.Info("homeDir = ", homeDir)
 
 	if _, err := os.Stat(homeDir); os.IsNotExist(err) {
 		err := os.MkdirAll(homeDir, os.ModePerm)

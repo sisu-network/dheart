@@ -11,11 +11,11 @@ import (
 	"github.com/sisu-network/dheart/blame"
 	"github.com/sisu-network/dheart/core/message"
 	"github.com/sisu-network/dheart/db"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/interfaces"
 	"github.com/sisu-network/dheart/worker/types"
+	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -217,7 +217,7 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 		w.pIDsMap = pidsToMap(w.pIDs)
 		go func() {
 			if err := w.executeWork(w.jobType); err != nil {
-				utils.LogError("Error when executing work", err)
+				log.Error("Error when executing work", err)
 				return
 			}
 		}()
@@ -237,7 +237,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 		}
 	}
 
-	utils.LogInfo("Executing work type", wTypes.WorkTypeStrings[workType])
+	log.Info("Executing work type", wTypes.WorkTypeStrings[workType])
 	p2pCtx := tss.NewPeerContext(w.pIDs)
 
 	// Assign the correct index for our pid.
@@ -250,7 +250,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.threshold)
 
 	jobs := make([]*Job, w.batchSize)
-	utils.LogInfo("batchSize = ", w.batchSize)
+	log.Info("batchSize = ", w.batchSize)
 	nextJobType := w.jobType
 	// Creates all jobs
 	for i := range jobs {
@@ -287,7 +287,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 
 	for _, job := range jobs {
 		if err := job.Start(); err != nil {
-			utils.LogError("error when starting job", err)
+			log.Error("error when starting job", err)
 			// If job cannot start, kill the whole worker.
 			w.callback.OnWorkFailed(w.request)
 			return err
@@ -305,14 +305,14 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 
 	msgCache := w.preExecutionCache.PopAllMessages(w.workId)
 	if len(msgCache) > 0 {
-		utils.LogInfo(w.workId, "Cache size =", len(msgCache))
+		log.Info(w.workId, "Cache size =", len(msgCache))
 	}
 
 	for _, msg := range msgCache {
 		if msg.Type == common.TssMessage_UPDATE_MESSAGES {
 			if err := w.ProcessNewMessage(msg); err != nil {
 				// Message can be corrupted or from bad actor, continue to execute.
-				utils.LogError("Error when processing new message", err)
+				log.Error("Error when processing new message", err)
 			}
 		}
 	}
@@ -326,12 +326,12 @@ func (w *DefaultWorker) loadPreparams() error {
 	preparams, err := w.db.LoadPreparams(w.request.Chain)
 	if err == db.ErrNotFound {
 		timeout := 60 * 5 * time.Second // 5 minutes
-		utils.LogInfo("Generating preparams for chain", w.request.Chain, " timeout =", timeout)
+		log.Info("Generating preparams for chain", w.request.Chain, " timeout =", timeout)
 		start := time.Now()
 		preparams, err = keygen.GeneratePreParams(timeout)
-		utils.LogInfo("Generating time = ", time.Now().Sub(start))
+		log.Info("Generating time = ", time.Now().Sub(start))
 		if err != nil {
-			utils.LogError("Cannot generate preparams. err = ", err)
+			log.Error("Cannot generate preparams. err = ", err)
 			return err
 		}
 
@@ -344,7 +344,7 @@ func (w *DefaultWorker) loadPreparams() error {
 	} else if err == nil {
 		w.keygenInput = preparams
 	} else {
-		utils.LogError("Failed to get preparams, err =", err)
+		log.Error("Failed to get preparams, err =", err)
 		return err
 	}
 
@@ -381,7 +381,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 
 		tssMsg, err := common.NewTssMessage(w.myPid.Id, to, w.workId, list, msg.Type())
 		if err != nil {
-			utils.LogCritical("Cannot build TSS message, err", err)
+			log.Critical("Cannot build TSS message, err", err)
 			return
 		}
 
@@ -488,7 +488,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		go func(id int, job *Job) {
 			round, err := message.GetMsgRound(msgs[id].Content())
 			if err != nil {
-				utils.LogError("error when getting round %w", err)
+				log.Error("error when getting round %w", err)
 				// If we cannot get msg round, blame the sender
 				w.blameMgr.AddCulpritByRound(w.workId, w.curRound, []*tss.PartyID{msgs[id].GetFrom()})
 				return
@@ -501,7 +501,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 
 			if err := job.processMessage(msgs[id]); err != nil {
 				// Message can be from bad actor/corrupted. Save the culprits, and ignore.
-				utils.LogError("cannot process message error", err)
+				log.Error("cannot process message error", err)
 				if round > 0 {
 					w.blameMgr.AddCulpritByRound(w.workId, round, err.Culprits())
 				} else {
@@ -532,7 +532,7 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		utils.LogVerbose(w.GetWorkId(), "Done!")
+		log.Verbose(w.GetWorkId(), "Done!")
 		w.callback.OnWorkKeygenFinished(w.request, w.keygenOutputs)
 	}
 }
@@ -554,7 +554,7 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		utils.LogVerbose(w.GetWorkId(), "Presign Done!")
+		log.Verbose(w.GetWorkId(), "Presign Done!")
 
 		// If this is a signing request, we have to do signing after generating presign input
 		if w.jobType == types.EcdsaSigning {
@@ -589,7 +589,7 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		utils.LogVerbose(w.GetWorkId(), "Signing Done!")
+		log.Verbose(w.GetWorkId(), "Signing Done!")
 		w.callback.OnWorkSigningFinished(w.request, w.signingOutputs)
 	}
 }

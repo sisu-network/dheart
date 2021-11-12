@@ -14,6 +14,7 @@ import (
 	"github.com/sisu-network/dheart/store"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	libchain "github.com/sisu-network/lib/chain"
@@ -74,7 +75,7 @@ func (api *SingleNodeApi) Version() string {
 }
 
 func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types.PubKeyWrapper) error {
-	utils.LogInfo("keygen: chain = ", chain)
+	log.Info("keygen: chain = ", chain)
 	var err error
 
 	if libchain.IsETHBasedChain(chain) {
@@ -83,7 +84,7 @@ func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types
 		return fmt.Errorf("Unknown chain: %s", chain)
 	}
 
-	utils.LogInfo("err = ", err)
+	log.Info("err = ", err)
 	pubKey := api.ethKeys[chain].Public()
 	publicKeyECDSA, _ := pubKey.(*ecdsa.PublicKey)
 	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
@@ -93,7 +94,7 @@ func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types
 		// Add some delay to mock TSS gen delay before sending back to Sisu server
 		go func() {
 			time.Sleep(time.Second * 3)
-			utils.LogInfo("Sending keygen to Sisu")
+			log.Info("Sending keygen to Sisu")
 
 			result := types.KeygenResult{
 				Chain:       chain,
@@ -102,11 +103,11 @@ func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types
 				Address:     address,
 			}
 			if err := api.c.PostKeygenResult(&result); err != nil {
-				utils.LogError("Error while broadcasting KeygenResult", err)
+				log.Error("Error while broadcasting KeygenResult", err)
 			}
 		}()
 	} else {
-		utils.LogError(err)
+		log.Error(err)
 	}
 
 	return err
@@ -118,7 +119,7 @@ func (api *SingleNodeApi) getKeygenKey(chain string) []byte {
 
 // Key generation for ETH based chains
 func (api *SingleNodeApi) keyGenEth(chain string) error {
-	utils.LogInfo("Keygen for chain", chain)
+	log.Info("Keygen for chain", chain)
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
 		return err
@@ -146,7 +147,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 	var err error
 	var signature []byte
 
-	utils.LogDebug("Signing transaction for chain", req.OutChain)
+	log.Debug("Signing transaction for chain", req.OutChain)
 	if libchain.IsETHBasedChain(req.OutChain) {
 		signature, err = api.keySignEth(req.OutChain, req.BytesToSign)
 	} else {
@@ -157,7 +158,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 		// Add some delay to mock TSS gen delay before sending back to Sisu server
 		go func() {
 			time.Sleep(time.Second * 3)
-			utils.LogInfo("Sending Keysign to Sisu")
+			log.Info("Sending Keysign to Sisu")
 
 			result := &types.KeysignResult{
 				Id:             req.Id,
@@ -173,7 +174,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 			api.c.PostKeysignResult(result)
 		}()
 	} else {
-		utils.LogError("Cannot do key gen. Err =", err)
+		log.Error("Cannot do key gen. Err =", err)
 		api.c.PostKeysignResult(&types.KeysignResult{
 			Id:             req.Id,
 			Success:        false,
@@ -195,7 +196,7 @@ func (api *SingleNodeApi) SetPrivKey(encodedKey string, keyType string) error {
 
 // Used for debugging only.
 func (api *SingleNodeApi) deployToChain(result *types.KeysignResult) {
-	utils.LogInfo("Deploying to chain", result.OutChain)
+	log.Info("Deploying to chain", result.OutChain)
 
 	chainId := big.NewInt(1)
 	rpcEndpoint := "http://localhost:7545"
@@ -210,20 +211,20 @@ func (api *SingleNodeApi) deployToChain(result *types.KeysignResult) {
 
 	signedTx, err := tx.WithSignature(eTypes.NewEIP155Signer(chainId), result.Signature)
 	if err != nil {
-		utils.LogError("cannot set signatuer for tx, err =", err)
+		log.Error("cannot set signatuer for tx, err =", err)
 		return
 	}
 
 	client, err := ethclient.Dial(rpcEndpoint)
 	if err != nil {
-		utils.LogError("Cannot dial chain", result.OutChain, "at endpoint", rpcEndpoint)
+		log.Error("Cannot dial chain", result.OutChain, "at endpoint", rpcEndpoint)
 		// TODO: Add retry mechanism here.
 		return
 	}
 
 	if err := client.SendTransaction(context.Background(), signedTx); err != nil {
-		utils.LogError("cannot dispatch tx, err =", err)
+		log.Error("cannot dispatch tx, err =", err)
 	} else {
-		utils.LogDebug("Deployment succeeded")
+		log.Debug("Deployment succeeded")
 	}
 }

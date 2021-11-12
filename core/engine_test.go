@@ -9,15 +9,15 @@ import (
 
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/require"
 )
 
 func TestEngineDelayStart(t *testing.T) {
-	utils.LogVerbose("Running test with tss works starting at different time.")
+	log.Verbose("Running test with tss works starting at different time.")
 	n := 4
 
 	privKeys, nodes, pIDs, savedData := getEngineTestData(n)
@@ -82,7 +82,7 @@ func TestEngineDelayStart(t *testing.T) {
 }
 
 func TestEngineJobTimeout(t *testing.T) {
-	utils.LogVerbose("Running test with tss works starting at different time.")
+	log.Verbose("Running test with tss works starting at different time.")
 	n := 4
 
 	privKeys, nodes, pIDs, savedData := getEngineTestData(n)

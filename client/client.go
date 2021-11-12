@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 )
 
 const (
@@ -38,10 +38,10 @@ func NewClient(url string) Client {
 }
 
 func (c *DefaultClient) TryDial() {
-	utils.LogInfo("Trying to dial Sisu server, url = ", c.url)
+	log.Info("Trying to dial Sisu server, url = ", c.url)
 
 	for {
-		utils.LogInfo("Dialing...", c.url)
+		log.Info("Dialing...", c.url)
 		var err error
 		c.client, err = rpc.DialContext(context.Background(), c.url)
 		if err == nil {
@@ -49,20 +49,20 @@ func (c *DefaultClient) TryDial() {
 				break
 			}
 		} else {
-			utils.LogError("Cannot dial, err = ", err)
+			log.Error("Cannot dial, err = ", err)
 		}
 
 		time.Sleep(RetryTime)
 	}
 
-	utils.LogInfo("Sisu server is connected")
+	log.Info("Sisu server is connected")
 }
 
 func (c *DefaultClient) CheckHealth() error {
 	var result interface{}
 	err := c.client.CallContext(context.Background(), &result, "tss_checkHealth")
 	if err != nil {
-		utils.LogError("Cannot check dheart health, err = ", err)
+		log.Error("Cannot check dheart health, err = ", err)
 		return err
 	}
 
@@ -70,13 +70,13 @@ func (c *DefaultClient) CheckHealth() error {
 }
 
 func (c *DefaultClient) PostKeygenResult(result *types.KeygenResult) error {
-	utils.LogDebug("Sending keygen result to sisu server")
+	log.Debug("Sending keygen result to sisu server")
 
 	var r interface{}
 	err := c.client.CallContext(context.Background(), &r, "tss_keygenResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
-		utils.LogError("Cannot post keygen result, err = ", err)
+		log.Error("Cannot post keygen result, err = ", err)
 		return err
 	}
 
@@ -84,13 +84,13 @@ func (c *DefaultClient) PostKeygenResult(result *types.KeygenResult) error {
 }
 
 func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
-	utils.LogDebug("Sending presign result to sisu server")
+	log.Debug("Sending presign result to sisu server")
 
 	var r interface{}
 	err := c.client.CallContext(context.Background(), &r, "tss_presignResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
-		utils.LogError("Cannot post presign result, err = ", err)
+		log.Error("Cannot post presign result, err = ", err)
 		return err
 	}
 
@@ -98,13 +98,13 @@ func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
 }
 
 func (c *DefaultClient) PostKeysignResult(result *types.KeysignResult) error {
-	utils.LogDebug("Sending keysign result to sisu server")
+	log.Debug("Sending keysign result to sisu server")
 
 	var r interface{}
 	err := c.client.CallContext(context.Background(), &r, "tss_keysignResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
-		utils.LogError("Cannot post keysign result, err = ", err)
+		log.Error("Cannot post keysign result, err = ", err)
 		return err
 	}
 

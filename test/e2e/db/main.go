@@ -6,7 +6,7 @@ import (
 
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
@@ -95,7 +95,7 @@ func testInsertingPresignData(database db.Database) {
 		panic(err)
 	}
 
-	utils.LogVerbose("Test passed")
+	log.Verbose("Test passed")
 }
 
 func main() {

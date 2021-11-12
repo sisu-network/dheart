@@ -15,10 +15,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
+	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
@@ -380,5 +380,5 @@ func verifyEthSignature(t *testing.T, hash []byte, output *libCommon.SignatureDa
 	if !matches {
 		panic("Reconstructed pubkey does not match pubkey")
 	}
-	utils.LogInfo("ETH signature is correct")
+	log.Info("ETH signature is correct")
 }

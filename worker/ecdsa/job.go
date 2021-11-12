@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -167,7 +167,7 @@ func (job *Job) startListening() {
 			return
 
 		case <-job.closeCh:
-			utils.LogWarn("job closed")
+			log.Warn("job closed")
 			return
 
 		case msg := <-outCh:

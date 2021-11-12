@@ -11,7 +11,7 @@ import (
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 )
 
 const (
@@ -199,7 +199,7 @@ func GetMockConnectionConfig(n, index int, keyType string) (ConnectionsConfig, [
 		peerId := peerIds[i]
 
 		peers[i] = fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, peerId)
-		utils.LogInfo("peers[i] =", i, peers[i])
+		log.Info("peers[i] =", i, peers[i])
 	}
 
 	return ConnectionsConfig{

@@ -5,7 +5,7 @@ import (
 
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 )
 
@@ -25,7 +25,7 @@ func preloadPreparams(db db.Database, cfg config.HeartConfig) {
 	chains := []string{"eth", "sisu-eth"}
 
 	for i, chain := range chains {
-		utils.LogInfo("Importing preparams into db for chain", chain)
+		log.Info("Importing preparams into db for chain", chain)
 
 		index := i
 		switch cfg.Db.Schema {

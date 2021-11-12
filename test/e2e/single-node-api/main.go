@@ -5,8 +5,9 @@ import (
 	"crypto/elliptic"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"math/big"
+
+	"github.com/sisu-network/lib/log"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -14,7 +15,6 @@ import (
 	"github.com/sisu-network/dheart/server"
 	"github.com/sisu-network/dheart/test/mock"
 	"github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
@@ -34,7 +34,7 @@ func main() {
 	fromAddress := common.HexToAddress("0xbeF23B2AC7857748fEA1f499BE8227c5fD07E70c")
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	toAddress := common.HexToAddress("0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d")
@@ -42,7 +42,7 @@ func main() {
 	gasLimit := uint64(21000)
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	var data []byte
 
@@ -81,7 +81,7 @@ func main() {
 				panic("signature verification failed")
 			}
 
-			utils.LogInfo("Signature is correct")
+			log.Info("Signature is correct")
 			done <- result.Signature
 
 			return nil
@@ -120,7 +120,7 @@ func main() {
 		panic(err)
 	}
 
-	utils.LogInfo("balance = ", balance)
+	log.Info("balance = ", balance)
 
-	utils.LogInfo("Test passed")
+	log.Info("Test passed")
 }

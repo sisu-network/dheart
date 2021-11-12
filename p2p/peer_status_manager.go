@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 )
 
 var (
@@ -98,7 +98,7 @@ func (m *DefaultStatusManager) OnNetworkMessage(message *P2PMessage) {
 	peerIdString := message.FromPeerId
 	peerId, err := peer.IDFromString(peerIdString)
 	if err != nil {
-		utils.LogError("Cannot parse peer id string", peerIdString, "err =", err)
+		log.Error("Cannot parse peer id string", peerIdString, "err =", err)
 		return
 	}
 

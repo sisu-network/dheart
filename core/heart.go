@@ -20,6 +20,7 @@ import (
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
 	libchain "github.com/sisu-network/lib/chain"
+	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/tss"
 )
@@ -54,7 +55,7 @@ func NewHeart(config config.HeartConfig, client client.Client) *Heart {
 }
 
 func (h *Heart) Start() error {
-	utils.LogInfo("Starting heart")
+	log.Info("Starting heart")
 	// Create db
 	if err := h.createDb(); err != nil {
 		return err
@@ -84,10 +85,10 @@ func (h *Heart) Start() error {
 	// Start connection manager.
 	err = h.cm.Start(h.privateKey.Bytes(), h.privateKey.Type())
 	if err != nil {
-		utils.LogError("Cannot start connection manager. err =", err)
+		log.Error("Cannot start connection manager. err =", err)
 		return err
 	} else {
-		utils.LogError("Connected manager started!")
+		log.Error("Connected manager started!")
 	}
 
 	return nil
@@ -115,7 +116,7 @@ func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCom
 
 	value, ok := h.requestCache.Get(requestKey)
 	if !ok {
-		utils.LogCritical("Cannot find client request. requestKey =", requestKey)
+		log.Critical("Cannot find client request. requestKey =", requestKey)
 		h.OnWorkFailed(request, make([]*tss.PartyID, 0))
 		return
 	}
@@ -179,13 +180,13 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 	encrypted, err := hex.DecodeString(encodedKey)
 	if err != nil {
-		utils.LogError("Failed to decode string, err =", err)
+		log.Error("Failed to decode string, err =", err)
 		return err
 	}
 
 	decrypted, err := utils.AESDecrypt(encrypted, h.aesKey)
 	if err != nil {
-		utils.LogError("Failed to decrypt key, err =", err)
+		log.Error("Failed to decrypt key, err =", err)
 		return err
 	}
 
@@ -194,7 +195,7 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 			return fmt.Errorf("The private key has been set!")
 		}
 
-		utils.LogInfo("Private key is the same as before. Do nothing")
+		log.Info("Private key is the same as before. Do nothing")
 		return nil
 	}
 
@@ -209,7 +210,7 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 
 	err = h.Start()
 	if err != nil {
-		utils.LogError("Failed to start heart, err =", err)
+		log.Error("Failed to start heart, err =", err)
 	}
 
 	return nil

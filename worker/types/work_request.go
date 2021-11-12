@@ -3,7 +3,7 @@ package types
 import (
 	"errors"
 
-	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 )
@@ -107,7 +107,7 @@ func (request *WorkRequest) GetPriority() int {
 		return 60
 	}
 
-	utils.LogCritical("Unknown work type", request.WorkType)
+	log.Critical("Unknown work type", request.WorkType)
 
 	return -1
 }
