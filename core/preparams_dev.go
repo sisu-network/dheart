@@ -22,7 +22,7 @@ var (
 )
 
 func preloadPreparams(db db.Database, cfg config.HeartConfig) {
-	chains := []string{"eth", "sisu-eth"}
+	chains := []string{"eth-sisu-local", "ganache1", "ganache2"}
 
 	for i, chain := range chains {
 		log.Info("Importing preparams into db for chain", chain)
