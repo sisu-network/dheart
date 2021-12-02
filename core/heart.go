@@ -216,7 +216,7 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 	return nil
 }
 
-func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) error {
+func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey) error {
 	// TODO: Check if our pubkey is one of the pubkeys.
 
 	n := len(tPubKeys)
@@ -232,7 +232,7 @@ func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) 
 	sorted := tss.SortPartyIDs(pids)
 	h.engine.AddNodes(nodes)
 
-	request := types.NewKeygenRequest(chain, workId, len(tPubKeys), sorted, nil, n-1)
+	request := types.NewKeygenRequest(keyType, workId, len(tPubKeys), sorted, nil, n-1)
 	return h.engine.AddRequest(request)
 }
 
