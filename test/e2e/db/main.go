@@ -10,6 +10,8 @@ import (
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
+
+	libchain "github.com/sisu-network/lib/chain"
 )
 
 func testInsertingKeygenData(database db.Database) {
@@ -39,7 +41,7 @@ func testInsertingKeygenData(database db.Database) {
 	}
 
 	// Read data and do sanity check
-	loaded, err := database.LoadKeygenData(chain)
+	loaded, err := database.LoadKeygenData(libchain.GetKeyTypeForChain(chain))
 	if err != nil {
 		panic(err)
 	}

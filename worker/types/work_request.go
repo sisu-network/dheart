@@ -18,6 +18,7 @@ type WorkRequest struct {
 	BatchSize     int
 
 	// Used only for keygen, presign & signing
+	KeygenType  string
 	KeygenInput *keygen.LocalPreParams
 	Threshold   int
 
@@ -33,6 +34,7 @@ func NewKeygenRequest(keyType, workId string, n int, PIDs tss.SortedPartyIDs, ke
 	request := baseRequest(EcdsaKeygen, workId, n, PIDs)
 	request.KeygenInput = keygenInput
 	request.Threshold = threshold
+	request.KeygenType = keyType
 
 	return request
 }

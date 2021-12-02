@@ -104,7 +104,7 @@ func main() {
 
 	// Add request
 	workId := "keygen0"
-	request := types.NewKeygenRequest("eth", workId, n, pids, helper.LoadPreparams(index), n-1)
+	request := types.NewKeygenRequest("ecdsa", workId, n, pids, helper.LoadPreparams(index), n-1)
 	err = engine.AddRequest(request)
 	if err != nil {
 		panic(err)

@@ -62,6 +62,7 @@ func (h *Heart) Start() error {
 	}
 
 	if h.config.ShortcutPreparams {
+		log.Info("Loading preloaded preparams (we must be in dev mode)")
 		// Save precomputed preparams in the db. Only use this in local dev mode to speed up dev time.
 		preloadPreparams(h.db, h.config)
 	}
@@ -257,7 +258,7 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	workId := req.OutChain + req.OutHash
 	request := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.BytesToSign))
 
-	presignInput, err := h.db.LoadKeygenData(req.OutChain)
+	presignInput, err := h.db.LoadKeygenData(libchain.GetKeyTypeForChain(req.OutChain))
 	if err != nil {
 		return err
 	}

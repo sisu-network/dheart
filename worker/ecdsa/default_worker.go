@@ -323,7 +323,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 func (w *DefaultWorker) loadPreparams() error {
 	// Check if we have generated preparams
 	var err error
-	preparams, err := w.db.LoadPreparams(w.request.Chain)
+	preparams, err := w.db.LoadPreparams()
 	if err == db.ErrNotFound {
 		timeout := 60 * 5 * time.Second // 5 minutes
 		log.Info("Generating preparams for chain", w.request.Chain, " timeout =", timeout)
@@ -335,7 +335,7 @@ func (w *DefaultWorker) loadPreparams() error {
 			return err
 		}
 
-		err = w.db.SavePreparams(w.request.Chain, preparams)
+		err = w.db.SavePreparams(preparams)
 		if err != nil {
 			return err
 		}

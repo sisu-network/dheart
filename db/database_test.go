@@ -11,6 +11,8 @@ import (
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
+
+	libchain "github.com/sisu-network/lib/chain"
 )
 
 func TestSqlDatabase_SaveKeygenData(t *testing.T) {
@@ -79,7 +81,7 @@ func TestSqlDatabase_LoadKeygenData(t *testing.T) {
 		WillReturnRows(rows).
 		WillReturnError(nil)
 
-	got, err := sqlDatabase.LoadKeygenData(chain)
+	got, err := sqlDatabase.LoadKeygenData(libchain.GetKeyTypeForChain(chain))
 	assert.NoError(t, err)
 	assert.EqualValues(t, data, *got)
 
@@ -197,7 +199,7 @@ func TestSqlDatabase_SavePreparams(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1)).
 		WillReturnError(nil)
 
-	assert.NoError(t, sqlDatabase.SavePreparams(chain, &preparams))
+	assert.NoError(t, sqlDatabase.SavePreparams(&preparams))
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -229,7 +231,7 @@ func TestSqlDatabase_LoadPreparams(t *testing.T) {
 		WillReturnRows(rows).
 		WillReturnError(nil)
 
-	got, err := sqlDatabase.LoadPreparams(chain)
+	got, err := sqlDatabase.LoadPreparams()
 	assert.NoError(t, err)
 	assert.EqualValues(t, preparams, *got)
 

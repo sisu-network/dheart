@@ -5,7 +5,6 @@ import (
 
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
-	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 )
 
@@ -26,26 +25,22 @@ var (
 )
 
 func preloadPreparams(db db.Database, cfg config.HeartConfig) {
-	chains := []string{"eth-sisu-local", "ganache1", "ganache2", "eth-ropsten"}
-
-	for i, chain := range chains {
-		log.Info("Importing preparams into db for chain", chain)
-
-		index := i
-		switch cfg.Db.Schema {
-		case "dheart1":
-			index += len(chains)
-		case "dheart2":
-			index += 2 * len(chains)
-		case "eth-ropsten":
-			index += 3 * len(chains)
-		}
-
-		preparams := &keygen.LocalPreParams{}
-		err := json.Unmarshal([]byte(Preparams[index]), preparams)
-		if err != nil {
-			panic(err)
-		}
-		db.SavePreparams(chain, preparams)
+	var index int
+	switch cfg.Db.Schema {
+	case "dheart0":
+		index = 0
+	case "dheart1":
+		index = 1
+	case "dheart2":
+		index = 2
+	case "eth-ropsten":
+		index = 3
 	}
+
+	preparams := &keygen.LocalPreParams{}
+	err := json.Unmarshal([]byte(Preparams[index]), preparams)
+	if err != nil {
+		panic(err)
+	}
+	db.SavePreparams(preparams)
 }
