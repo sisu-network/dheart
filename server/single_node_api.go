@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -25,38 +26,27 @@ const (
 // This is a mock API to use for single localhost node. It does not have TSS signing round and
 // generates a private key instead.
 type SingleNodeApi struct {
-	keyMap  map[string]interface{}
-	store   store.Store
-	ethKeys map[string]*ecdsa.PrivateKey
-	c       client.Client
+	keyMap map[string]interface{}
+	store  store.Store
+	ecPriv *ecdsa.PrivateKey
+	c      client.Client
 }
 
 func NewSingleNodeApi(c client.Client, store store.Store) *SingleNodeApi {
 	return &SingleNodeApi{
-		keyMap:  make(map[string]interface{}),
-		ethKeys: make(map[string]*ecdsa.PrivateKey),
-		c:       c,
-		store:   store,
+		keyMap: make(map[string]interface{}),
+		c:      c,
+		store:  store,
 	}
 }
 
 // Initializes private keys used for dheart
 func (api *SingleNodeApi) Init() {
 	// Initialized keygens
-	for chain := range libchain.GetSupportedEthChains() {
-		bz, err := api.store.GetEncrypted([]byte(api.getKeygenKey(chain)))
-		if err != nil {
-			continue
-		}
-
-		if libchain.IsETHBasedChain(chain) {
-			privKey, err := crypto.ToECDSA(bz)
-			if err != nil {
-				panic(err)
-			}
-
-			api.ethKeys[chain] = privKey
-		}
+	var err error
+	api.ecPriv, err = crypto.GenerateKey()
+	if err != nil {
+		panic(err)
 	}
 }
 
@@ -68,18 +58,16 @@ func (api *SingleNodeApi) Version() string {
 	return "1"
 }
 
-func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types.PubKeyWrapper) error {
-	log.Info("keygen: chain = ", chain)
+func (api *SingleNodeApi) KeyGen(keygenId string, keyType string, tPubKeys []types.PubKeyWrapper) error {
+	log.Info("keygen: keyType = ", keyType)
 	var err error
 
-	if libchain.IsETHBasedChain(chain) {
-		err = api.keyGenEth(chain)
-	} else {
-		return fmt.Errorf("Unknown chain: %s", chain)
+	if keyType != libchain.KEY_TYPE_ECDSA {
+		return errors.New("In")
 	}
 
 	log.Info("err = ", err)
-	pubKey := api.ethKeys[chain].Public()
+	pubKey := api.ecPriv.Public()
 	publicKeyECDSA, _ := pubKey.(*ecdsa.PublicKey)
 	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
 	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
@@ -91,7 +79,7 @@ func (api *SingleNodeApi) KeyGen(keygenId string, chain string, tPubKeys []types
 			log.Info("Sending keygen to Sisu")
 
 			result := types.KeygenResult{
-				Chain:       chain,
+				KeyType:     keyType,
 				Success:     true,
 				PubKeyBytes: publicKeyBytes,
 				Address:     address,
@@ -111,26 +99,8 @@ func (api *SingleNodeApi) getKeygenKey(chain string) []byte {
 	return []byte(fmt.Sprintf("keygen_%s", chain))
 }
 
-// Key generation for ETH based chains
-func (api *SingleNodeApi) keyGenEth(chain string) error {
-	log.Info("Keygen for chain", chain)
-	privateKey, err := crypto.GenerateKey()
-	if err != nil {
-		return err
-	}
-
-	api.ethKeys[chain] = privateKey
-
-	encoded := crypto.FromECDSA(privateKey)
-	return api.store.PutEncrypted(api.getKeygenKey(chain), encoded)
-}
-
 func (api *SingleNodeApi) keySignEth(chain string, bytesToSign []byte) ([]byte, error) {
-	if api.ethKeys[chain] == nil {
-		return nil, fmt.Errorf("There is no private key for this chain")
-	}
-
-	privateKey := api.ethKeys[chain]
+	privateKey := api.ecPriv
 	sig, err := crypto.Sign(bytesToSign, privateKey)
 
 	return sig, err

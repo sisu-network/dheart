@@ -150,7 +150,7 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 	switch request.WorkType {
 	case types.EcdsaKeygen, types.EddsaKeygen:
 		result := htypes.KeygenResult{
-			Chain:    chain,
+			KeyType:  libchain.GetKeygenType(request.Chain),
 			Success:  false,
 			Culprits: culprits,
 		}

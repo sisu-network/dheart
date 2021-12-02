@@ -22,6 +22,7 @@ import (
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/ecdsa"
 	"github.com/sisu-network/dheart/worker/types"
+	libchain "github.com/sisu-network/lib/chain"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
@@ -214,7 +215,7 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 
 	// Make a callback and start next work.
 	result := htypes.KeygenResult{
-		Chain:       request.Chain,
+		KeyType:     libchain.GetKeygenType(request.Chain),
 		PubKeyBytes: publicKeyBytes,
 		Success:     true,
 		Address:     address,
