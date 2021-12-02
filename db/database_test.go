@@ -66,8 +66,6 @@ func TestSqlDatabase_LoadKeygenData(t *testing.T) {
 		_ = db.Close()
 	})
 
-	chain := "chain-0"
-
 	data := keygen.LocalPartySaveData{
 		Ks: []*big.Int{big.NewInt(10)},
 	}
@@ -76,12 +74,12 @@ func TestSqlDatabase_LoadKeygenData(t *testing.T) {
 	assert.NoError(t, err)
 
 	rows := sqlmock.NewRows([]string{"keygen_output"}).AddRow(json)
-	mock.ExpectQuery("SELECT keygen_output FROM keygen WHERE chain=\\? AND batch_index=0").
-		WithArgs(chain).
+	mock.ExpectQuery("SELECT keygen_output FROM keygen WHERE key_type=\\? AND batch_index=0").
+		WithArgs(libchain.KEY_TYPE_ECDSA).
 		WillReturnRows(rows).
 		WillReturnError(nil)
 
-	got, err := sqlDatabase.LoadKeygenData(libchain.GetKeyTypeForChain(chain))
+	got, err := sqlDatabase.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
 	assert.NoError(t, err)
 	assert.EqualValues(t, data, *got)
 
@@ -185,7 +183,6 @@ func TestSqlDatabase_SavePreparams(t *testing.T) {
 		_ = db.Close()
 	})
 
-	chain := "chain-0"
 	preparams := keygen.LocalPreParams{
 		P: big.NewInt(10),
 		Q: big.NewInt(10),
@@ -195,7 +192,7 @@ func TestSqlDatabase_SavePreparams(t *testing.T) {
 	assert.NoError(t, err)
 
 	mock.ExpectExec("INSERT INTO preparams").
-		WithArgs(chain, preparamsJS).
+		WithArgs(libchain.KEY_TYPE_ECDSA, preparamsJS).
 		WillReturnResult(sqlmock.NewResult(1, 1)).
 		WillReturnError(nil)
 
@@ -216,7 +213,6 @@ func TestSqlDatabase_LoadPreparams(t *testing.T) {
 		_ = db.Close()
 	})
 
-	chain := "chain-0"
 	preparams := keygen.LocalPreParams{
 		P: big.NewInt(10),
 		Q: big.NewInt(10),
@@ -226,8 +222,8 @@ func TestSqlDatabase_LoadPreparams(t *testing.T) {
 	assert.NoError(t, err)
 
 	rows := sqlmock.NewRows([]string{"preparams"}).AddRow(preparamsJS)
-	mock.ExpectQuery("SELECT preparams FROM preparams WHERE chain=\\?").
-		WithArgs(chain).
+	mock.ExpectQuery("SELECT preparams FROM preparams WHERE key_type=\\?").
+		WithArgs(libchain.KEY_TYPE_ECDSA).
 		WillReturnRows(rows).
 		WillReturnError(nil)
 
