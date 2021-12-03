@@ -5,7 +5,7 @@ import (
 )
 
 type KeygenResult struct {
-	Chain       string
+	KeyType     string
 	Success     bool
 	PubKeyBytes []byte
 	Address     string

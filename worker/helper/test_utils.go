@@ -182,11 +182,11 @@ func (m *MockDatabase) Init() error {
 	return nil
 }
 
-func (m *MockDatabase) SavePreparams(chain string, preparams *keygen.LocalPreParams) error {
+func (m *MockDatabase) SavePreparams(preparams *keygen.LocalPreParams) error {
 	return nil
 }
 
-func (m *MockDatabase) LoadPreparams(chain string) (*keygen.LocalPreParams, error) {
+func (m *MockDatabase) LoadPreparams() (*keygen.LocalPreParams, error) {
 	return nil, nil
 }
 

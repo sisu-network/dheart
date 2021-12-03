@@ -62,6 +62,7 @@ func (h *Heart) Start() error {
 	}
 
 	if h.config.ShortcutPreparams {
+		log.Info("Loading preloaded preparams (we must be in dev mode)")
 		// Save precomputed preparams in the db. Only use this in local dev mode to speed up dev time.
 		preloadPreparams(h.db, h.config)
 	}
@@ -150,7 +151,7 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 	switch request.WorkType {
 	case types.EcdsaKeygen, types.EddsaKeygen:
 		result := htypes.KeygenResult{
-			Chain:    chain,
+			KeyType:  libchain.GetKeygenType(request.Chain),
 			Success:  false,
 			Culprits: culprits,
 		}
@@ -216,7 +217,7 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 	return nil
 }
 
-func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) error {
+func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey) error {
 	// TODO: Check if our pubkey is one of the pubkeys.
 
 	n := len(tPubKeys)
@@ -232,7 +233,7 @@ func (h *Heart) Keygen(keygenId string, chain string, tPubKeys []ctypes.PubKey) 
 	sorted := tss.SortPartyIDs(pids)
 	h.engine.AddNodes(nodes)
 
-	request := types.NewKeygenRequest(chain, workId, len(tPubKeys), sorted, nil, n-1)
+	request := types.NewKeygenRequest(keyType, workId, len(tPubKeys), sorted, nil, n-1)
 	return h.engine.AddRequest(request)
 }
 
@@ -257,7 +258,7 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	workId := req.OutChain + req.OutHash
 	request := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.BytesToSign))
 
-	presignInput, err := h.db.LoadKeygenData(req.OutChain)
+	presignInput, err := h.db.LoadKeygenData(libchain.GetKeyTypeForChain(req.OutChain))
 	if err != nil {
 		return err
 	}

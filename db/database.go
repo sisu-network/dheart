@@ -15,6 +15,8 @@ import (
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
+
+	libchain "github.com/sisu-network/lib/chain"
 )
 
 const (
@@ -29,10 +31,10 @@ var (
 type Database interface {
 	Init() error
 
-	SavePreparams(chain string, preparams *keygen.LocalPreParams) error
-	LoadPreparams(chain string) (*keygen.LocalPreParams, error)
+	SavePreparams(preparams *keygen.LocalPreParams) error
+	LoadPreparams() (*keygen.LocalPreParams, error)
 
-	SaveKeygenData(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
+	SaveKeygenData(keyType string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
 	LoadKeygenData(chain string) (*keygen.LocalPartySaveData, error)
 
 	SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
@@ -140,20 +142,22 @@ func (d *SqlDatabase) Init() error {
 	return nil
 }
 
-func (d *SqlDatabase) SavePreparams(chain string, preparams *keygen.LocalPreParams) error {
+func (d *SqlDatabase) SavePreparams(preparams *keygen.LocalPreParams) error {
 	bz, err := json.Marshal(preparams)
 	if err != nil {
 		return err
 	}
 
-	query := "INSERT INTO preparams(chain, preparams) VALUES (?, ?)"
-	_, err = d.db.Exec(query, chain, bz)
+	params := []interface{}{libchain.KEY_TYPE_ECDSA, bz}
+
+	query := "INSERT INTO preparams (key_type, preparams) VALUES (?, ?)"
+	_, err = d.db.Exec(query, params...)
 	return err
 }
 
-func (d *SqlDatabase) LoadPreparams(chain string) (*keygen.LocalPreParams, error) {
-	query := "SELECT preparams FROM preparams WHERE chain=?"
-	rows, err := d.db.Query(query, chain)
+func (d *SqlDatabase) LoadPreparams() (*keygen.LocalPreParams, error) {
+	query := "SELECT preparams FROM preparams WHERE key_type=?"
+	rows, err := d.db.Query(query, libchain.KEY_TYPE_ECDSA)
 	if err != nil {
 		return nil, err
 	}
@@ -177,14 +181,14 @@ func (d *SqlDatabase) LoadPreparams(chain string) (*keygen.LocalPreParams, error
 	return preparams, nil
 }
 
-func (d *SqlDatabase) SaveKeygenData(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
+func (d *SqlDatabase) SaveKeygenData(keyType string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
 	if len(keygenOutput) == 0 {
 		return nil
 	}
 
 	pidString := getPidString(pids)
 	// Constructs multi-insert query to do all insertion in 1 query.
-	query := "INSERT INTO keygen (chain, work_id, pids_string, batch_index, keygen_output) VALUES "
+	query := "INSERT INTO keygen (key_type, work_id, pids_string, batch_index, keygen_output) VALUES "
 
 	rowCount := 0
 	params := make([]interface{}, 0)
@@ -194,7 +198,7 @@ func (d *SqlDatabase) SaveKeygenData(chain string, workId string, pids []*tss.Pa
 			return err
 		}
 
-		params = append(params, chain)
+		params = append(params, keyType)
 		params = append(params, workId)
 		params = append(params, pidString)
 		params = append(params, i) // batch index
@@ -209,10 +213,10 @@ func (d *SqlDatabase) SaveKeygenData(chain string, workId string, pids []*tss.Pa
 	return err
 }
 
-func (d *SqlDatabase) LoadKeygenData(chain string) (*keygen.LocalPartySaveData, error) {
-	query := "SELECT keygen_output FROM keygen WHERE chain=? AND batch_index=0"
+func (d *SqlDatabase) LoadKeygenData(keyType string) (*keygen.LocalPartySaveData, error) {
+	query := "SELECT keygen_output FROM keygen WHERE key_type=? AND batch_index=0"
 	params := []interface{}{
-		chain,
+		keyType,
 	}
 
 	rows, err := d.db.Query(query, params...)
@@ -234,7 +238,7 @@ func (d *SqlDatabase) LoadKeygenData(chain string) (*keygen.LocalPartySaveData, 
 			return nil, err
 		}
 	} else {
-		log.Verbose("There is no such keygen output for ", chain)
+		log.Verbose("There is no such keygen output for ", keyType)
 	}
 
 	return result, nil

@@ -197,9 +197,9 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
 }
 
 func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
-	log.Info("Keygen finished for chain", request.Chain)
+	log.Info("Keygen finished for type ", request.KeygenType)
 	// Save to database
-	if err := engine.db.SaveKeygenData(request.Chain, request.WorkId, request.AllParties, output); err != nil {
+	if err := engine.db.SaveKeygenData(request.KeygenType, request.WorkId, request.AllParties, output); err != nil {
 		log.Error("error when saving keygen data", err)
 	}
 
@@ -212,9 +212,11 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 	address := crypto.PubkeyToAddress(publicKeyECDSA).Hex()
 	publicKeyBytes := crypto.FromECDSAPub(&publicKeyECDSA)
 
+	log.Debug("publicKeyBytes length = ", len(publicKeyBytes))
+
 	// Make a callback and start next work.
 	result := htypes.KeygenResult{
-		Chain:       request.Chain,
+		KeyType:     request.KeygenType,
 		PubKeyBytes: publicKeyBytes,
 		Success:     true,
 		Address:     address,
