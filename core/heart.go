@@ -34,7 +34,7 @@ type Heart struct {
 	config config.HeartConfig
 	db     db.Database
 	cm     p2p.ConnectionManager
-	engine *Engine
+	engine Engine
 	client client.Client
 
 	privateKey ctypes.PrivKey
@@ -79,7 +79,7 @@ func (h *Heart) Start() error {
 
 	// Engine
 	myNode := NewNode(h.privateKey.PubKey())
-	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey)
+	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey, NewDefaultEngineConfig())
 	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
 	h.engine.Init()
 

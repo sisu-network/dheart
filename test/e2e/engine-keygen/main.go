@@ -92,7 +92,7 @@ func main() {
 	// Create new engine
 	outCh := make(chan *htypes.KeygenResult)
 	cb := NewEngineCallback(outCh, nil, nil)
-	engine := core.NewEngine(nodes[index], cm, helper.NewMockDatabase(), cb, allKeys[index])
+	engine := core.NewEngine(nodes[index], cm, helper.NewMockDatabase(), cb, allKeys[index], core.NewDefaultEngineConfig())
 	cm.AddListener(p2p.TSSProtocolID, engine)
 
 	// Add nodes

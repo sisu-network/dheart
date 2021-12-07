@@ -34,6 +34,24 @@ const (
 
 var defaultJobTimeout = 10 * time.Minute
 
+type EngineConfig struct {
+	PresignJobTimeout time.Duration
+	KeygenJobTimeout  time.Duration
+	SigningJobTimeout time.Duration
+}
+
+type Engine interface {
+	Init()
+
+	AddNodes(nodes []*Node)
+
+	AddRequest(request *types.WorkRequest) error
+
+	OnNetworkMessage(message *p2p.P2PMessage)
+
+	ProcessNewMessage(tssMsg *commonTypes.TssMessage) error
+}
+
 type EngineCallback interface {
 	OnWorkKeygenFinished(result *htypes.KeygenResult)
 
@@ -44,12 +62,12 @@ type EngineCallback interface {
 	OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID)
 }
 
-// An Engine is a main component for TSS signing. It takes the following roles:
+// An DefaultEngine is a main component for TSS signing. It takes the following roles:
 // - Keep track of a list of running workers.
 // - Cache message sent to a worker even before the worker starts. Please note that workers in the
 //      networking performing the same work might not start at the same time.
 // - Route a message to appropriate worker.
-type Engine struct {
+type DefaultEngine struct {
 	myPid  *tss.PartyID
 	myNode *Node
 	db     db.Database
@@ -70,50 +88,44 @@ type Engine struct {
 	// TODO: Remove used presigns after getting a match to avoid using duplicated presigns.
 	presignsManager *AvailPresignManager
 
-	presignJobTimeout time.Duration
-	keygenJobTimeout  time.Duration
-	signingJobTimeout time.Duration
+	config EngineConfig
 }
 
-func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback, privateKey ctypes.PrivKey) *Engine {
-	return &Engine{
-		myNode:            myNode,
-		myPid:             myNode.PartyId,
-		db:                db,
-		cm:                cm,
-		workers:           make(map[string]worker.Worker),
-		requestQueue:      NewRequestQueue(),
-		workLock:          &sync.RWMutex{},
-		preworkCache:      worker.NewMessageCache(),
-		callback:          callback,
-		nodes:             make(map[string]*Node),
-		signer:            signer.NewDefaultSigner(privateKey),
-		nodeLock:          &sync.RWMutex{},
-		presignsManager:   NewAvailPresignManager(db),
-		keygenJobTimeout:  defaultJobTimeout,
-		signingJobTimeout: defaultJobTimeout,
-		presignJobTimeout: defaultJobTimeout,
+func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback, privateKey ctypes.PrivKey, config EngineConfig) Engine {
+	return &DefaultEngine{
+		myNode:          myNode,
+		myPid:           myNode.PartyId,
+		db:              db,
+		cm:              cm,
+		workers:         make(map[string]worker.Worker),
+		requestQueue:    NewRequestQueue(),
+		workLock:        &sync.RWMutex{},
+		preworkCache:    worker.NewMessageCache(),
+		callback:        callback,
+		nodes:           make(map[string]*Node),
+		signer:          signer.NewDefaultSigner(privateKey),
+		nodeLock:        &sync.RWMutex{},
+		presignsManager: NewAvailPresignManager(db),
+		config:          config,
 	}
 }
 
-func (engine *Engine) WithKeygenTimeout(timeout time.Duration) *Engine {
-	engine.keygenJobTimeout = timeout
-	return engine
+func NewDefaultEngineConfig() EngineConfig {
+	return EngineConfig{
+		KeygenJobTimeout:  defaultJobTimeout,
+		SigningJobTimeout: defaultJobTimeout,
+		PresignJobTimeout: defaultJobTimeout,
+	}
 }
 
-func (engine *Engine) WithPresignTimeout(timeout time.Duration) *Engine {
-	engine.presignJobTimeout = timeout
-	return engine
-}
-
-func (engine *Engine) Init() {
+func (engine *DefaultEngine) Init() {
 	err := engine.presignsManager.Load()
 	if err != nil {
 		panic(err)
 	}
 }
 
-func (engine *Engine) AddNodes(nodes []*Node) {
+func (engine *DefaultEngine) AddNodes(nodes []*Node) {
 	engine.nodeLock.Lock()
 	defer engine.nodeLock.Unlock()
 
@@ -122,7 +134,7 @@ func (engine *Engine) AddNodes(nodes []*Node) {
 	}
 }
 
-func (engine *Engine) AddRequest(request *types.WorkRequest) error {
+func (engine *DefaultEngine) AddRequest(request *types.WorkRequest) error {
 	if err := request.Validate(); err != nil {
 		log.Error(err)
 		return err
@@ -144,7 +156,7 @@ func (engine *Engine) AddRequest(request *types.WorkRequest) error {
 }
 
 // startWork creates a new worker to execute a new task.
-func (engine *Engine) startWork(request *types.WorkRequest) {
+func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 	var w worker.Worker
 	// Make a copy of myPid since the index will be changed during the TSS work.
 	workPartyId := tss.NewPartyID(engine.myPid.Id, engine.myPid.Moniker, engine.myPid.KeyInt())
@@ -152,13 +164,13 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 	// Create a new worker.
 	switch request.WorkType {
 	case types.EcdsaKeygen:
-		w = ecdsa.NewKeygenWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine, engine.keygenJobTimeout)
+		w = ecdsa.NewKeygenWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine, engine.config.KeygenJobTimeout)
 
 	case types.EcdsaPresign:
-		w = ecdsa.NewPresignWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine, engine.presignJobTimeout)
+		w = ecdsa.NewPresignWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine, engine.config.PresignJobTimeout)
 
 	case types.EcdsaSigning:
-		w = ecdsa.NewSigningWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine, engine.signingJobTimeout)
+		w = ecdsa.NewSigningWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine, engine.config.SigningJobTimeout)
 	}
 
 	engine.workLock.Lock()
@@ -174,7 +186,7 @@ func (engine *Engine) startWork(request *types.WorkRequest) {
 }
 
 // ProcessNewMessage processes new incoming tss message from network.
-func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
+func (engine *DefaultEngine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
 	engine.workLock.RLock()
 	worker := engine.getWorker(tssMsg.WorkId)
 	engine.workLock.RUnlock()
@@ -196,7 +208,7 @@ func (engine *Engine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
 	return nil
 }
 
-func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
+func (engine *DefaultEngine) OnWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
 	log.Info("Keygen finished for type ", request.KeygenType)
 	// Save to database
 	if err := engine.db.SaveKeygenData(request.KeygenType, request.WorkId, request.AllParties, output); err != nil {
@@ -227,7 +239,7 @@ func (engine *Engine) OnWorkKeygenFinished(request *types.WorkRequest, output []
 	engine.startNextWork()
 }
 
-func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
 	log.Info("Presign finished for chain", request.Chain)
 
 	if err := engine.db.SavePresignData(request.Chain, request.WorkId, pids, data); err != nil {
@@ -245,7 +257,7 @@ func (engine *Engine) OnWorkPresignFinished(request *types.WorkRequest, pids []*
 	engine.startNextWork()
 }
 
-func (engine *Engine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+func (engine *DefaultEngine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
 	log.Info("Signing finished for chain", request.Chain)
 
 	engine.callback.OnWorkSigningFinished(request, data)
@@ -255,7 +267,7 @@ func (engine *Engine) OnWorkSigningFinished(request *types.WorkRequest, data []*
 }
 
 // finishWorker removes a worker from the current worker pool.
-func (engine *Engine) finishWorker(workId string) {
+func (engine *DefaultEngine) finishWorker(workId string) {
 	engine.workLock.Lock()
 	delete(engine.workers, workId)
 	engine.workLock.Unlock()
@@ -263,7 +275,7 @@ func (engine *Engine) finishWorker(workId string) {
 
 // startNextWork gets a request from the queue (if not empty) and execute it. If there is no
 // available worker, wait for one of the current worker to finish before running.
-func (engine *Engine) startNextWork() {
+func (engine *DefaultEngine) startNextWork() {
 	engine.workLock.Lock()
 	if len(engine.workers) >= MaxWorker {
 		engine.workLock.Unlock()
@@ -279,14 +291,14 @@ func (engine *Engine) startNextWork() {
 	engine.startWork(nextWork)
 }
 
-func (engine *Engine) getNodeFromPeerId(peerId string) *Node {
+func (engine *DefaultEngine) getNodeFromPeerId(peerId string) *Node {
 	engine.nodeLock.RLock()
 	defer engine.nodeLock.RUnlock()
 
 	return engine.nodes[peerId]
 }
 
-func (engine *Engine) getWorker(workId string) worker.Worker {
+func (engine *DefaultEngine) getWorker(workId string) worker.Worker {
 	engine.workLock.RLock()
 	defer engine.workLock.RUnlock()
 
@@ -294,7 +306,7 @@ func (engine *Engine) getWorker(workId string) worker.Worker {
 }
 
 // Broadcast a message to everyone in a list.
-func (engine *Engine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
+func (engine *DefaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
 	if tssMessage.To == engine.myPid.Id {
 		return
 	}
@@ -309,7 +321,7 @@ func (engine *Engine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.T
 }
 
 // Send a message to a single destination.
-func (engine *Engine) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
+func (engine *DefaultEngine) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
 	if tssMessage.To == engine.myPid.Id {
 		return
 	}
@@ -324,7 +336,7 @@ func (engine *Engine) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMe
 }
 
 // sendData sends data to the network.
-func (engine *Engine) sendData(data []byte, pIDs []*tss.PartyID) {
+func (engine *DefaultEngine) sendData(data []byte, pIDs []*tss.PartyID) {
 	// Converts pids => peerIds
 	peerIds := make([]peer.ID, 0, len(pIDs))
 	engine.nodeLock.RLock()
@@ -352,7 +364,7 @@ func (engine *Engine) sendData(data []byte, pIDs []*tss.PartyID) {
 }
 
 // getSignedMessageBytes signs a tss message and returns serialized bytes of the signed message.
-func (engine *Engine) getSignedMessageBytes(tssMessage *common.TssMessage) ([]byte, error) {
+func (engine *DefaultEngine) getSignedMessageBytes(tssMessage *common.TssMessage) ([]byte, error) {
 	serialized, err := json.Marshal(tssMessage)
 	if err != nil {
 		return nil, fmt.Errorf("error when marshalling message %w", err)
@@ -377,7 +389,7 @@ func (engine *Engine) getSignedMessageBytes(tssMessage *common.TssMessage) ([]by
 }
 
 // OnNetworkMessage implements P2PDataListener interface.
-func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
+func (engine *DefaultEngine) OnNetworkMessage(message *p2p.P2PMessage) {
 	node := engine.getNodeFromPeerId(message.FromPeerId)
 	if node == nil {
 		return
@@ -399,11 +411,18 @@ func (engine *Engine) OnNetworkMessage(message *p2p.P2PMessage) {
 	}
 }
 
-func (engine *Engine) OnPreExecutionFinished(request *types.WorkRequest) {
+func (engine *DefaultEngine) GetActiveWorkerCount() int {
+	engine.workLock.RLock()
+	defer engine.workLock.RUnlock()
+
+	return len(engine.workers)
+}
+
+func (engine *DefaultEngine) OnPreExecutionFinished(request *types.WorkRequest) {
 	// TODO: implements this
 }
 
-func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
+func (engine *DefaultEngine) OnWorkFailed(request *types.WorkRequest) {
 	// Clear all the worker's resources
 	engine.workLock.Lock()
 	worker := engine.workers[request.WorkId]
@@ -421,15 +440,15 @@ func (engine *Engine) OnWorkFailed(request *types.WorkRequest) {
 	worker.Stop()
 }
 
-func (engine *Engine) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
+func (engine *DefaultEngine) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
 	return engine.presignsManager.GetAvailablePresigns(batchSize, n, pids)
 }
 
-func (engine *Engine) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
+func (engine *DefaultEngine) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
 	return engine.presignsManager.GetUnavailablePresigns(sentMsgNodes, pids)
 }
 
-func (engine *Engine) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {
+func (engine *DefaultEngine) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {
 	loaded, err := engine.db.LoadPresign(presignIds)
 	if err != nil {
 		log.Error("Cannot load presign, err =", err)
