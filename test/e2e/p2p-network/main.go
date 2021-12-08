@@ -35,7 +35,7 @@ func initialize() {
 // Runs this program on 2 different terminal with different index value.
 func main() {
 	var index, n int
-	flag.IntVar(&index, "index", 0, "listening port")
+	flag.IntVar(&index, "index", 0, "index of the node")
 	flag.Parse()
 
 	n = 2

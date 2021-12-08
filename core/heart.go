@@ -9,8 +9,6 @@ import (
 	"github.com/sisu-network/dheart/client"
 	htypes "github.com/sisu-network/dheart/types"
 
-	lru "github.com/hashicorp/golang-lru"
-
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 
@@ -40,17 +38,15 @@ type Heart struct {
 	privateKey ctypes.PrivKey
 	aesKey     []byte
 
-	requestCache *lru.Cache
-
-	requestMap map[string]interface{}
+	keysignRequests map[string]*htypes.KeysignRequest
 }
 
 func NewHeart(config config.HeartConfig, client client.Client) *Heart {
 	return &Heart{
-		config:     config,
-		aesKey:     config.AesKey,
-		client:     client,
-		requestMap: make(map[string]interface{}),
+		config:          config,
+		aesKey:          config.AesKey,
+		client:          client,
+		keysignRequests: make(map[string]*htypes.KeysignRequest),
 	}
 }
 
@@ -67,13 +63,6 @@ func (h *Heart) Start() error {
 		preloadPreparams(h.db, h.config)
 	}
 
-	// Cache
-	requestCache, err := lru.New(TX_CACHE_SIZE)
-	if err != nil {
-		return err
-	}
-	h.requestCache = requestCache
-
 	// Connection manager
 	h.cm = p2p.NewConnectionManager(h.config.Connection)
 
@@ -84,12 +73,12 @@ func (h *Heart) Start() error {
 	h.engine.Init()
 
 	// Start connection manager.
-	err = h.cm.Start(h.privateKey.Bytes(), h.privateKey.Type())
+	err := h.cm.Start(h.privateKey.Bytes(), h.privateKey.Type())
 	if err != nil {
 		log.Error("Cannot start connection manager. err =", err)
 		return err
 	} else {
-		log.Error("Connected manager started!")
+		log.Info("Connected manager started!")
 	}
 
 	return nil
@@ -113,15 +102,7 @@ func (h *Heart) OnWorkPresignFinished(result *htypes.PresignResult) {
 }
 
 func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
-	requestKey := h.getKey("keysign", request.Chain, request.WorkId)
-
-	value, ok := h.requestCache.Get(requestKey)
-	if !ok {
-		log.Critical("Cannot find client request. requestKey =", requestKey)
-		h.OnWorkFailed(request, make([]*tss.PartyID, 0))
-		return
-	}
-	clientRequest := value.(*htypes.KeysignRequest)
+	clientRequest := h.keysignRequests[request.WorkId]
 
 	// TODO: handle multiple tx here.
 	signature := data[0].Signature
@@ -139,14 +120,10 @@ func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCom
 		Signature:      signature, // TODO: Support multi tx per request on Sisu
 	}
 
-	h.requestCache.Remove(requestKey)
-
 	h.client.PostKeysignResult(result)
 }
 
 func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {
-	h.requestCache.Remove(h.getKey("keysign", request.Chain, request.WorkId))
-
 	chain := request.Chain
 	switch request.WorkType {
 	case types.EcdsaKeygen, types.EddsaKeygen:
@@ -241,7 +218,6 @@ func (h *Heart) getKey(requestType, chain, workdId string) string {
 	return fmt.Sprintf("%s__%s__%s", requestType, chain, workdId)
 }
 
-// func (h *Heart) Keysign(tx []byte, block int64, chain string, tPubKeys []ctypes.PubKey) error {
 func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) error {
 	n := len(tPubKeys)
 
@@ -256,17 +232,17 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 
 	// TODO: Find unique workId
 	workId := req.OutChain + req.OutHash
-	request := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.BytesToSign))
+	workerRequest := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.BytesToSign))
 
 	presignInput, err := h.db.LoadKeygenData(libchain.GetKeyTypeForChain(req.OutChain))
 	if err != nil {
 		return err
 	}
 
-	request.PresignInput = presignInput
-	err = h.engine.AddRequest(request)
+	workerRequest.PresignInput = presignInput
+	err = h.engine.AddRequest(workerRequest)
 
-	h.requestCache.Add(h.getKey("keysign", req.OutChain, workId), req)
+	h.keysignRequests[workerRequest.WorkId] = req
 
 	return err
 }

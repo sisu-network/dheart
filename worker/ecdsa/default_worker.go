@@ -237,7 +237,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 		}
 	}
 
-	log.Info("Executing work type", wTypes.WorkTypeStrings[workType])
+	log.Info("Executing work type ", wTypes.WorkTypeStrings[workType])
 	p2pCtx := tss.NewPeerContext(w.pIDs)
 
 	// Assign the correct index for our pid.

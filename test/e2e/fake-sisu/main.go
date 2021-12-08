@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	libchain "github.com/sisu-network/lib/chain"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/sisu-network/lib/log"
 
@@ -30,7 +32,7 @@ import (
 )
 
 const (
-	TEST_CHAIN = "eth"
+	TEST_CHAIN = "ganache1"
 )
 
 type MockSisuNode struct {
@@ -137,7 +139,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 
 	for i := 0; i < n; i++ {
 		go func(index int) {
-			nodes[index].client.KeyGen("Keygen0", TEST_CHAIN, tendermintPubKeys)
+			nodes[index].client.KeyGen("Keygen0", "ecdsa", tendermintPubKeys)
 		}(i)
 	}
 
@@ -194,7 +196,7 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 	wg.Add(n)
 
 	tx := generateEthTx()
-	signer := etypes.NewEIP2930Signer(big.NewInt(1))
+	signer := etypes.NewEIP2930Signer(libchain.GetChainIntFromId(TEST_CHAIN))
 	hash := signer.Hash(tx)
 	hashBytes := hash[:]
 
@@ -339,7 +341,7 @@ func main() {
 	log.Info("All keygen tasks finished")
 
 	// Test keysign.
-	signedTx := keysign(nodes, tendermintPubKeys, keysignChs, keygenResult.PubKeyBytes, big.NewInt(1))
+	signedTx := keysign(nodes, tendermintPubKeys, keysignChs, keygenResult.PubKeyBytes, libchain.GetChainIntFromId(TEST_CHAIN))
 	log.Info("Finished all keysign!")
 
 	deploySignedTx(keygenResult, signedTx)

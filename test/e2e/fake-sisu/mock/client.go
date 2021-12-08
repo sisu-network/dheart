@@ -52,7 +52,7 @@ func (c *DheartClient) CheckHealth() error {
 	return nil
 }
 
-func (c *DheartClient) KeyGen(keygenId string, chain string, pubKeys []ctypes.PubKey) error {
+func (c *DheartClient) KeyGen(keygenId string, keygenType string, pubKeys []ctypes.PubKey) error {
 	// Wrap pubkeys
 	wrappers := make([]dTypes.PubKeyWrapper, len(pubKeys))
 	for i, pubKey := range pubKeys {
@@ -72,7 +72,7 @@ func (c *DheartClient) KeyGen(keygenId string, chain string, pubKeys []ctypes.Pu
 	}
 
 	var result string
-	err := c.client.CallContext(context.Background(), &result, "tss_keyGen", keygenId, chain, wrappers)
+	err := c.client.CallContext(context.Background(), &result, "tss_keyGen", keygenId, keygenType, wrappers)
 	if err != nil {
 		log.Error("Cannot send keygen request, err = ", err)
 		return err

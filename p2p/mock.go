@@ -11,11 +11,10 @@ import (
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
-	"github.com/sisu-network/lib/log"
 )
 
 const (
-	TEST_PORT_BASE = 1000
+	TEST_PORT_BASE = 10000
 )
 
 var (
@@ -187,7 +186,7 @@ func GetMockConnectionConfig(n, index int, keyType string) (ConnectionsConfig, [
 	peerIds := GetMockPeers(n, keyType)
 
 	privateKey := GetPrivateKeyBytes(index, keyType)
-	peers := make([]string, n)
+	peers := make([]string, 0)
 
 	// create peers
 	for i := 0; i < n; i++ {
@@ -198,11 +197,11 @@ func GetMockConnectionConfig(n, index int, keyType string) (ConnectionsConfig, [
 		port := TEST_PORT_BASE * (i + 1)
 		peerId := peerIds[i]
 
-		peers[i] = fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, peerId)
-		log.Info("peers[i] =", i, peers[i])
+		peers = append(peers, fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, peerId))
 	}
 
 	return ConnectionsConfig{
+		Host:           "127.0.0.1",
 		Port:           TEST_PORT_BASE * (index + 1),
 		Rendezvous:     "rendezvous",
 		Protocol:       TSSProtocolID,
