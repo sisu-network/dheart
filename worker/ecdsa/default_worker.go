@@ -285,6 +285,8 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 		}
 	}
 
+	log.Info("nextJobType = ", nextJobType)
+
 	for _, job := range jobs {
 		if err := job.Start(); err != nil {
 			log.Error("error when starting job", err)
@@ -342,6 +344,7 @@ func (w *DefaultWorker) loadPreparams() error {
 
 		w.keygenInput = preparams
 	} else if err == nil {
+		log.Info("Preparams found")
 		w.keygenInput = preparams
 	} else {
 		log.Error("Failed to get preparams, err =", err)
@@ -477,7 +480,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	}
 
 	round, _ := message.GetMsgRound(msgs[0].Content())
-	// If this is are signing worker (with presign) and we are in still in the presigning phase but
+	// If this is signing worker (with presign) and we are in still in the presigning phase but
 	// this update mesasge is for signing round, we have to catch this message.
 	if w.jobType == types.EcdsaSigning && w.curJobType.Load() != types.EcdsaSigning && round == message.Sign1 {
 		w.preExecutionCache.AddMessage(tssMsg)
@@ -532,7 +535,7 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		log.Verbose(w.GetWorkId(), "Done!")
+		log.Verbose(w.GetWorkId(), " Done!")
 		w.callback.OnWorkKeygenFinished(w.request, w.keygenOutputs)
 	}
 }
@@ -554,7 +557,7 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		log.Verbose(w.GetWorkId(), "Presign Done!")
+		log.Verbose(w.GetWorkId(), " Presign Done!")
 
 		// If this is a signing request, we have to do signing after generating presign input
 		if w.jobType == types.EcdsaSigning {
@@ -589,7 +592,7 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		log.Verbose(w.GetWorkId(), "Signing Done!")
+		log.Verbose(w.GetWorkId(), " Signing Done!")
 		w.callback.OnWorkSigningFinished(w.request, w.signingOutputs)
 	}
 }

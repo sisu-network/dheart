@@ -14,6 +14,7 @@ import (
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/run"
+	"github.com/sisu-network/dheart/test/e2e/helper"
 	"github.com/sisu-network/dheart/test/mock"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
@@ -57,6 +58,8 @@ func main() {
 		n = 2
 	}
 
+	helper.ResetDb(index)
+
 	run.LoadConfigEnv("../../../.env")
 
 	done := make(chan bool)
@@ -91,15 +94,17 @@ func main() {
 		AesKey:     aesKey,
 		Connection: cfg.Connection,
 	}
+	pubkeys := getPublicKeys(n)
 
 	heart := core.NewHeart(heartConfig, mockClient)
+	heart.SetBootstrappedKeys(pubkeys)
 
 	err = heart.SetPrivKey(hex.EncodeToString(encryptedKey), "secp256k1")
 	if err != nil {
 		panic(err)
 	}
 
-	heart.Keygen("keygenId", "eth", getPublicKeys(n))
+	heart.Keygen("keygenId", "ecdsa", pubkeys)
 
 	select {
 	case <-time.After(time.Second * 30):

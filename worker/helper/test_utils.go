@@ -164,6 +164,10 @@ func (cb *MockEngineCallback) OnPreExecutionFinished(workId string) {
 	// Do nothing.
 }
 
+func (cb *MockEngineCallback) OnWorkerAvailable(count int) {
+	// Do nothing.
+}
+
 //---/
 
 type MockDatabase struct {

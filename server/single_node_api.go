@@ -189,6 +189,6 @@ func (api *SingleNodeApi) deployToChain(result *types.KeysignResult) {
 	if err := client.SendTransaction(context.Background(), signedTx); err != nil {
 		log.Error("cannot dispatch tx, err =", err)
 	} else {
-		log.Debug("Deployment succeeded")
+		log.Verbose("Deployment succeeded")
 	}
 }

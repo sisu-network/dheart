@@ -29,11 +29,12 @@ const (
 
 // The dragon heart of this component.
 type Heart struct {
-	config config.HeartConfig
-	db     db.Database
-	cm     p2p.ConnectionManager
-	engine Engine
-	client client.Client
+	config   config.HeartConfig
+	db       db.Database
+	cm       p2p.ConnectionManager
+	engine   Engine
+	client   client.Client
+	tPubKeys []ctypes.PubKey
 
 	privateKey ctypes.PrivKey
 	aesKey     []byte
@@ -69,6 +70,12 @@ func (h *Heart) Start() error {
 	// Engine
 	myNode := NewNode(h.privateKey.PubKey())
 	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey, NewDefaultEngineConfig())
+	if h.tPubKeys != nil {
+		h.engine.AddNodes(NewNodes(h.tPubKeys))
+	}
+
+	log.Info("Adding engine as listener for connection manager....")
+
 	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
 	h.engine.Init()
 
@@ -149,14 +156,53 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 	}
 }
 
+func (h *Heart) OnWorkerAvailable(count int) {
+	if h.tPubKeys == nil || len(h.tPubKeys) == 0 {
+		return
+	}
+
+	nodes := NewNodes(h.tPubKeys)
+	pids := make([]*tss.PartyID, len(h.tPubKeys))
+	for i, node := range nodes {
+		pids[i] = node.PartyId
+	}
+
+	sorted := tss.SortPartyIDs(pids)
+
+	// TODO: We might wait a few second to make sure that we still have bandwidth to do keysign.
+	keygenType := "ecdsa"
+	presignInput, err := h.db.LoadKeygenData(keygenType)
+	if err != nil {
+		log.Error("Cannot get presign input, err = ", err)
+		return
+	}
+
+	for i := 0; i < count; i++ {
+		workId := "presign_" + keygenType + "_" + utils.RandString(32)
+
+		presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, *presignInput, false)
+		err := h.engine.AddRequest(presignRequest)
+		if err != nil {
+			log.Error("Failed to add presign request to engine, err = ", err)
+		}
+	}
+}
+
 // --- End fo Engine callback /
 
 // --- Implements Server API  /
 
 // SetPrivKey receives encrypted private key from Sisu, decrypts it and start the engine,
 // network communication, etc.
-func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
-	encrypted, err := hex.DecodeString(encodedKey)
+
+func (h *Heart) SetBootstrappedKeys(tPubKeys []ctypes.PubKey) {
+	if h.tPubKeys == nil {
+		h.tPubKeys = tPubKeys
+	}
+}
+
+func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error {
+	encrypted, err := hex.DecodeString(encryptedKey)
 	if err != nil {
 		log.Error("Failed to decode string, err =", err)
 		return err
@@ -177,13 +223,13 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 		return nil
 	}
 
-	switch keyType {
+	switch tendermintKeyType {
 	case "ed25519":
 		h.privateKey = &ed25519.PrivKey{Key: decrypted}
 	case "secp256k1":
 		h.privateKey = &secp256k1.PrivKey{Key: decrypted}
 	default:
-		return fmt.Errorf("Unsupported key type: %s", keyType)
+		return fmt.Errorf("Unsupported key type: %s", tendermintKeyType)
 	}
 
 	err = h.Start()
@@ -198,6 +244,7 @@ func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey
 	// TODO: Check if our pubkey is one of the pubkeys.
 
 	n := len(tPubKeys)
+	h.tPubKeys = tPubKeys
 
 	nodes := NewNodes(tPubKeys)
 	// For keygen, workId is the same as keygenId
@@ -206,8 +253,8 @@ func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey
 	for i, node := range nodes {
 		pids[i] = node.PartyId
 	}
-
 	sorted := tss.SortPartyIDs(pids)
+
 	h.engine.AddNodes(nodes)
 
 	request := types.NewKeygenRequest(keyType, workId, len(tPubKeys), sorted, nil, n-1)
@@ -232,17 +279,17 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 
 	// TODO: Find unique workId
 	workId := req.OutChain + req.OutHash
-	workerRequest := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.BytesToSign))
+	workRequest := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.BytesToSign))
 
 	presignInput, err := h.db.LoadKeygenData(libchain.GetKeyTypeForChain(req.OutChain))
 	if err != nil {
 		return err
 	}
 
-	workerRequest.PresignInput = presignInput
-	err = h.engine.AddRequest(workerRequest)
+	workRequest.PresignInput = presignInput
+	err = h.engine.AddRequest(workRequest)
 
-	h.keysignRequests[workerRequest.WorkId] = req
+	h.keysignRequests[workRequest.WorkId] = req
 
 	return err
 }

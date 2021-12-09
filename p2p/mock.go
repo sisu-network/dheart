@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	TEST_PORT_BASE = 10000
+	TEST_PORT_BASE = 1000
 )
 
 var (
@@ -201,7 +201,7 @@ func GetMockConnectionConfig(n, index int, keyType string) (ConnectionsConfig, [
 	}
 
 	return ConnectionsConfig{
-		Host:           "127.0.0.1",
+		Host:           "0.0.0.0",
 		Port:           TEST_PORT_BASE * (index + 1),
 		Rendezvous:     "rendezvous",
 		Protocol:       TSSProtocolID,

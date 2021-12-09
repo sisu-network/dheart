@@ -39,9 +39,8 @@ func NewKeygenRequest(keyType, workId string, n int, PIDs tss.SortedPartyIDs, ke
 	return request
 }
 
-func NewPresignRequest(chain, workId string, n int, PIDs tss.SortedPartyIDs, presignInput keygen.LocalPartySaveData, forcedPresign bool) *WorkRequest {
+func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInput keygen.LocalPartySaveData, forcedPresign bool) *WorkRequest {
 	request := baseRequest(EcdsaPresign, workId, n, PIDs)
-	request.Chain = chain
 	request.PresignInput = &presignInput
 	request.ForcedPresign = forcedPresign
 

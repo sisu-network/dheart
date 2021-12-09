@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -27,6 +26,7 @@ import (
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/test/e2e/fake-sisu/mock"
+	"github.com/sisu-network/dheart/test/e2e/helper"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
 )
@@ -46,18 +46,6 @@ func loadConfigEnv(filenames ...string) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func resetDb(index int) {
-	// reset the dev db
-	database, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", "root", "password", "0.0.0.0", 3306, fmt.Sprintf("dheart%d", index)))
-	if err != nil {
-		panic(err)
-	}
-	defer database.Close()
-
-	database.Exec("TRUNCATE TABLE keygen")
-	database.Exec("TRUNCATE TABLE presign")
 }
 
 func createNodes(index int, n int, keygenCh chan *types.KeygenResult, keysignCh chan *types.KeysignResult) *MockSisuNode {
@@ -311,7 +299,7 @@ func main() {
 	}
 
 	for i := 0; i < n; i++ {
-		resetDb(i)
+		helper.ResetDb(i)
 	}
 
 	loadConfigEnv("../../../.env")

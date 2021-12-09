@@ -60,6 +60,8 @@ type EngineCallback interface {
 	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData)
 
 	OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID)
+
+	OnWorkerAvailable(count int)
 }
 
 // An DefaultEngine is a main component for TSS signing. It takes the following roles:
@@ -224,7 +226,7 @@ func (engine *DefaultEngine) OnWorkKeygenFinished(request *types.WorkRequest, ou
 	address := crypto.PubkeyToAddress(publicKeyECDSA).Hex()
 	publicKeyBytes := crypto.FromECDSAPub(&publicKeyECDSA)
 
-	log.Debug("publicKeyBytes length = ", len(publicKeyBytes))
+	log.Verbose("publicKeyBytes length = ", len(publicKeyBytes))
 
 	// Make a callback and start next work.
 	result := htypes.KeygenResult{
@@ -285,6 +287,10 @@ func (engine *DefaultEngine) startNextWork() {
 	engine.workLock.Unlock()
 
 	if nextWork == nil {
+		activeWorkerCount := engine.GetActiveWorkerCount()
+		if activeWorkerCount < MaxWorker {
+			engine.callback.OnWorkerAvailable(MaxWorker - activeWorkerCount)
+		}
 		return
 	}
 
@@ -392,6 +398,7 @@ func (engine *DefaultEngine) getSignedMessageBytes(tssMessage *common.TssMessage
 func (engine *DefaultEngine) OnNetworkMessage(message *p2p.P2PMessage) {
 	node := engine.getNodeFromPeerId(message.FromPeerId)
 	if node == nil {
+		log.Error("Cannot find node from peer id ", message.FromPeerId)
 		return
 	}
 
@@ -403,6 +410,7 @@ func (engine *DefaultEngine) OnNetworkMessage(message *p2p.P2PMessage) {
 
 	tssMessage := signedMessage.TssMessage
 	if tssMessage == nil {
+		log.Verbose("Tss message is nil")
 		return
 	}
 
