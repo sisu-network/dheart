@@ -63,13 +63,15 @@ func main() {
 	run.LoadConfigEnv("../../../.env")
 
 	done := make(chan bool)
+	presignResult := make(chan *types.PresignResult)
+
 	mockClient := &mock.MockClient{
 		PostKeygenResultFunc: func(result *types.KeygenResult) error {
 			done <- true
 			return nil
 		},
 		PostPresignResultFunc: func(result *types.PresignResult) error {
-			done <- true
+			presignResult <- result
 			return nil
 		},
 	}
@@ -119,7 +121,11 @@ func main() {
 	select {
 	case <-time.After(time.Second * 30):
 		panic("Time out")
-	case <-done:
-		log.Verbose("Presign Test passed")
+	case result := <-presignResult:
+		if result.Success {
+			log.Info("Presign Test Passed")
+		} else {
+			log.Info("Test result failed, culprits = ", result.Culprits)
+		}
 	}
 }

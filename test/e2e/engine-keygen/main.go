@@ -46,8 +46,6 @@ func (cb *EngineCallback) OnWorkSigningFinished(request *types.WorkRequest, data
 func (cb *EngineCallback) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {
 }
 
-func (cb *EngineCallback) OnWorkerAvailable(count int) {}
-
 func getSortedPartyIds(n int) tss.SortedPartyIDs {
 	keys := p2p.GetAllSecp256k1PrivateKeys(n)
 	partyIds := make([]*tss.PartyID, n)

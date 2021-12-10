@@ -71,11 +71,11 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 		var culprits []*tss.PartyID
 		if w.request.IsSigning() {
 			// Only get unavailable presign when the round is signing
-			culprits = w.callback.GetUnavailablePresigns(w.availableParties.parties, w.allParties)
+			culprits = w.callback.GetUnavailablePresigns(w.availableParties.getAllPartiesMap(), w.allParties)
 		} else {
 			// Blame nodes that does not send messages
 			for _, party := range w.allParties {
-				if _, ok := w.availableParties.parties[party.Id]; !ok {
+				if ok := w.availableParties.hasPartyId(party.Id); !ok {
 					culprits = append(culprits, party)
 				}
 			}
@@ -127,7 +127,9 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 				continue
 			}
 
-			w.availableParties.add(party, 1)
+			if tssMsg.AvailabilityResponseMessage.MaxJob > 0 {
+				w.availableParties.add(party, int(tssMsg.AvailabilityResponseMessage.MaxJob))
+			}
 		}
 
 		if ok, presignIds, selectedPids := w.checkEnoughParticipants(); ok {
@@ -155,8 +157,11 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 			return true, nil, parties
 		}
 	} else {
-		// presign works.
-		return true, nil, w.availableParties.getPartyList(w.request.N)
+		// Choose top parties with highest computing power.
+		topParties, maxJob := w.availableParties.getTopParties(w.request.N)
+		w.batchSize = maxJob
+
+		return true, nil, topParties
 	}
 }
 
@@ -228,6 +233,7 @@ func (w *DefaultWorker) onPreExecutionRequest(tssMsg *commonTypes.TssMessage) er
 		// TODO: Check that the sender is indeed the leader.
 		// We receive a message from a leader to check our availability. Reply "Yes".
 		responseMsg := common.NewAvailabilityResponseMessage(w.myPid.Id, tssMsg.From, w.workId, common.AvailabilityResponseMessage_YES)
+		responseMsg.AvailabilityResponseMessage.MaxJob = int32(w.maxJob)
 
 		go w.dispatcher.UnicastMessage(sender, responseMsg)
 	} else {
