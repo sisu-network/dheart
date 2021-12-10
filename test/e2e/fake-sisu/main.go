@@ -329,8 +329,6 @@ func main() {
 	log.Info("All keygen tasks finished")
 
 	// Test keysign.
-	signedTx := keysign(nodes, tendermintPubKeys, keysignChs, keygenResult.PubKeyBytes, libchain.GetChainIntFromId(TEST_CHAIN))
+	keysign(nodes, tendermintPubKeys, keysignChs, keygenResult.PubKeyBytes, libchain.GetChainIntFromId(TEST_CHAIN))
 	log.Info("Finished all keysign!")
-
-	deploySignedTx(keygenResult, signedTx)
 }

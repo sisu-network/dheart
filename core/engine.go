@@ -50,6 +50,8 @@ type Engine interface {
 	OnNetworkMessage(message *p2p.P2PMessage)
 
 	ProcessNewMessage(tssMsg *commonTypes.TssMessage) error
+
+	GetActiveWorkerCount() int
 }
 
 type EngineCallback interface {

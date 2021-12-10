@@ -286,13 +286,19 @@ func (h *Heart) BlockEnd(blockHeight int64) {
 		return
 	}
 
-	workId := "presign_" + keygenType + "_" + strconv.FormatInt(blockHeight, 10)
-	log.Info("Presign workId = ", workId)
+	activeWorkerCount := h.engine.GetActiveWorkerCount()
+	log.Verbose("activeWorkerCount = ", activeWorkerCount)
 
-	presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, *presignInput, false)
-	err = h.engine.AddRequest(presignRequest)
-	if err != nil {
-		log.Error("Failed to add presign request to engine, err = ", err)
+	if activeWorkerCount < MaxWorker {
+		// TODO Presign work with our available worker
+		workId := "presign_" + keygenType + "_" + strconv.FormatInt(blockHeight, 10)
+		log.Info("Presign workId = ", workId)
+
+		presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, *presignInput, false)
+		err = h.engine.AddRequest(presignRequest)
+		if err != nil {
+			log.Error("Failed to add presign request to engine, err = ", err)
+		}
 	}
 }
 
