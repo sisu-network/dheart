@@ -60,7 +60,7 @@ func main() {
 
 	helper.ResetDb(index)
 
-	run.LoadConfigEnv("../../../.env")
+	run.LoadConfigEnv("../../../../.env")
 
 	done := make(chan bool)
 	presignResult := make(chan *types.PresignResult)
@@ -78,7 +78,7 @@ func main() {
 
 	dbConfig := config.GetLocalhostDbConfig()
 	dbConfig.Schema = fmt.Sprintf("dheart%d", index)
-	dbConfig.MigrationPath = "file://../../../db/migrations/"
+	dbConfig.MigrationPath = "file://../../../../db/migrations/"
 
 	cfg := config.HeartConfig{
 		UseOnMemory: false,

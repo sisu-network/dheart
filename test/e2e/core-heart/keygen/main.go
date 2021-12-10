@@ -60,7 +60,7 @@ func main() {
 
 	helper.ResetDb(index)
 
-	run.LoadConfigEnv("../../../.env")
+	run.LoadConfigEnv("../../../../.env")
 
 	done := make(chan bool)
 	mockClient := &mock.MockClient{
@@ -72,7 +72,7 @@ func main() {
 
 	dbConfig := config.GetLocalhostDbConfig()
 	dbConfig.Schema = fmt.Sprintf("dheart%d", index)
-	dbConfig.MigrationPath = "file://../../../db/migrations/"
+	dbConfig.MigrationPath = "file://../../../../db/migrations/"
 
 	cfg := config.HeartConfig{
 		UseOnMemory: false,
@@ -112,4 +112,6 @@ func main() {
 	case <-done:
 		log.Verbose("core-heart Test passed")
 	}
+
+	// os.Exit(123)
 }
