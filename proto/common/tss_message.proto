@@ -51,6 +51,7 @@ message AvailabilityResponseMessage {
  }
 
  ANSWER answer = 1;
+ int32 maxJob = 2;
 }
 
 // A message from a leader to send to everyone with a list of participants for a particular work

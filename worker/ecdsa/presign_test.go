@@ -71,6 +71,7 @@ func TestPresignEndToEnd(t *testing.T) {
 				},
 			},
 			10*time.Minute,
+			1,
 		)
 
 		workers[i] = worker
@@ -124,6 +125,7 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 				},
 			},
 			10*time.Minute,
+			1,
 		)
 
 		workers[i] = worker
@@ -173,6 +175,7 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 				},
 			},
 			time.Second,
+			1,
 		)
 
 		workers[i] = worker

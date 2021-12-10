@@ -102,12 +102,12 @@ func (request *WorkRequest) GetPriority() int {
 		}
 
 		// Presign
-		return 70
+		return 40
 	}
 
 	// Signing
 	if request.WorkType == EcdsaSigning || request.WorkType == EddsaSigning {
-		return 60
+		return 80
 	}
 
 	log.Critical("Unknown work type", request.WorkType)

@@ -65,6 +65,7 @@ type DefaultWorker struct {
 	callback   WorkerCallback
 	workId     string
 	db         db.Database
+	maxJob     int
 
 	// PreExecution
 	preExecMsgCh     chan *common.PreExecOutputMessage
@@ -121,7 +122,7 @@ func NewKeygenWorker(
 	callback WorkerCallback,
 	jobTimeout time.Duration,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, 1)
 
 	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
@@ -140,8 +141,9 @@ func NewPresignWorker(
 	db db.Database,
 	callback WorkerCallback,
 	jobTimeout time.Duration,
+	maxJob int,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, maxJob)
 
 	w.jobType = wTypes.EcdsaPresign
 	w.presignInput = request.PresignInput
@@ -159,9 +161,10 @@ func NewSigningWorker(
 	db db.Database,
 	callback WorkerCallback,
 	jobTimeout time.Duration,
+	maxJob int,
 ) worker.Worker {
 	// TODO: The request.Pids
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, maxJob)
 
 	w.jobType = wTypes.EcdsaSigning
 	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
@@ -180,6 +183,7 @@ func baseWorker(
 	db db.Database,
 	callback WorkerCallback,
 	timeOut time.Duration,
+	maxJob int,
 ) *DefaultWorker {
 	return &DefaultWorker{
 		request:           request,
@@ -201,6 +205,7 @@ func baseWorker(
 		preExecutionCache: worker.NewMessageCache(),
 		blameMgr:          blame.NewManager(),
 		jobTimeout:        timeOut,
+		maxJob:            maxJob,
 	}
 }
 

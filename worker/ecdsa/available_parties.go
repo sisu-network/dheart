@@ -8,21 +8,24 @@ import (
 
 type AvailableParties struct {
 	parties map[string]*tss.PartyID
+	maxJobs map[string]int
 	lock    *sync.RWMutex
 }
 
 func NewAvailableParties() *AvailableParties {
 	return &AvailableParties{
 		parties: make(map[string]*tss.PartyID),
+		maxJobs: make(map[string]int),
 		lock:    &sync.RWMutex{},
 	}
 }
 
-func (ap *AvailableParties) add(p *tss.PartyID) {
+func (ap *AvailableParties) add(p *tss.PartyID, maxJob int) {
 	ap.lock.Lock()
 	defer ap.lock.Unlock()
 
 	ap.parties[p.Id] = p
+	ap.maxJobs[p.Id] = maxJob
 }
 
 func (ap *AvailableParties) getLength() int {

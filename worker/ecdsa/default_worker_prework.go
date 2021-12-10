@@ -26,7 +26,7 @@ func (w *DefaultWorker) preExecution() {
 	request := w.request
 
 	leader := worker.ChooseLeader(request.WorkId, request.AllParties)
-	w.availableParties.add(w.myPid)
+	w.availableParties.add(w.myPid, 1)
 
 	// Step2: If this node is the leader, sends check availability to everyone.
 	if w.myPid.Id == leader.Id {
@@ -45,7 +45,7 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 			// update the availability.
 			for _, p := range w.allParties {
 				if p.Id == tssMsg.From {
-					w.availableParties.add(p)
+					w.availableParties.add(p, 1)
 					break
 				}
 			}
@@ -127,7 +127,7 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 				continue
 			}
 
-			w.availableParties.add(party)
+			w.availableParties.add(party, 1)
 		}
 
 		if ok, presignIds, selectedPids := w.checkEnoughParticipants(); ok {
@@ -225,8 +225,10 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 func (w *DefaultWorker) onPreExecutionRequest(tssMsg *commonTypes.TssMessage) error {
 	sender := w.getPartyIdFromString(tssMsg.From)
 	if sender != nil {
+		// TODO: Check that the sender is indeed the leader.
 		// We receive a message from a leader to check our availability. Reply "Yes".
 		responseMsg := common.NewAvailabilityResponseMessage(w.myPid.Id, tssMsg.From, w.workId, common.AvailabilityResponseMessage_YES)
+
 		go w.dispatcher.UnicastMessage(sender, responseMsg)
 	} else {
 		return fmt.Errorf("cannot find party with id %s", tssMsg.From)

@@ -126,6 +126,7 @@ func TestSigningEndToEnd(t *testing.T) {
 				},
 			},
 			10*time.Minute,
+			1,
 		)
 
 		workers[i] = worker
@@ -201,6 +202,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 				},
 			},
 			10*time.Minute,
+			1,
 		)
 
 		workers[i] = worker
@@ -254,6 +256,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 				},
 			},
 			10*time.Minute,
+			1,
 		)
 
 		workers[i] = worker
@@ -316,6 +319,7 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 				},
 			},
 			time.Second,
+			1,
 		)
 
 		workers[i] = worker
