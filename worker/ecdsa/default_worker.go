@@ -455,6 +455,14 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		return errors.New("batch size does not match")
 	}
 
+	jobType := w.curJobType.Load().(wTypes.WorkType)
+	// If this is signing worker (with presign) and we are in still in the presigning phase but
+	// this update mesasge is for signing round, we have to catch this message.
+	if jobType == wTypes.EcdsaPresign && w.jobType == wTypes.EcdsaSigning &&
+		len(tssMsg.UpdateMessages) > 0 && tssMsg.UpdateMessages[0].Round == "SignRound1Message" {
+		w.preExecutionCache.AddMessage(tssMsg)
+	}
+
 	// Do all message validation first before processing.
 	// TODO: Add more validation here.
 	msgs := make([]tss.ParsedMessage, w.batchSize)
@@ -482,14 +490,6 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		}
 
 		msgs[i] = msg
-	}
-
-	round, _ := message.GetMsgRound(msgs[0].Content())
-	// If this is signing worker (with presign) and we are in still in the presigning phase but
-	// this update mesasge is for signing round, we have to catch this message.
-	if w.jobType == types.EcdsaSigning && w.curJobType.Load() != types.EcdsaSigning && round == message.Sign1 {
-		w.preExecutionCache.AddMessage(tssMsg)
-		return nil
 	}
 
 	for i, j := range jobs {
