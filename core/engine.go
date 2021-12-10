@@ -60,8 +60,6 @@ type EngineCallback interface {
 	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData)
 
 	OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID)
-
-	OnWorkerAvailable(count int)
 }
 
 // An DefaultEngine is a main component for TSS signing. It takes the following roles:
@@ -180,7 +178,7 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 	engine.workLock.Unlock()
 
 	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId)
-	log.Info("Starting a work with id", request.WorkId, "with cache size", len(cachedMsgs))
+	log.Info("Starting a work with id ", request.WorkId, "with cache size", len(cachedMsgs))
 
 	if err := w.Start(cachedMsgs); err != nil {
 		log.Error("Cannot start work error", err)
@@ -287,10 +285,6 @@ func (engine *DefaultEngine) startNextWork() {
 	engine.workLock.Unlock()
 
 	if nextWork == nil {
-		activeWorkerCount := engine.GetActiveWorkerCount()
-		if activeWorkerCount < MaxWorker {
-			engine.callback.OnWorkerAvailable(MaxWorker - activeWorkerCount)
-		}
 		return
 	}
 

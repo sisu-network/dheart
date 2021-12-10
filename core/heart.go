@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
@@ -156,38 +157,6 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 	}
 }
 
-func (h *Heart) OnWorkerAvailable(count int) {
-	if h.tPubKeys == nil || len(h.tPubKeys) == 0 {
-		return
-	}
-
-	nodes := NewNodes(h.tPubKeys)
-	pids := make([]*tss.PartyID, len(h.tPubKeys))
-	for i, node := range nodes {
-		pids[i] = node.PartyId
-	}
-
-	sorted := tss.SortPartyIDs(pids)
-
-	// TODO: We might wait a few second to make sure that we still have bandwidth to do keysign.
-	keygenType := "ecdsa"
-	presignInput, err := h.db.LoadKeygenData(keygenType)
-	if err != nil {
-		log.Error("Cannot get presign input, err = ", err)
-		return
-	}
-
-	for i := 0; i < count; i++ {
-		workId := "presign_" + keygenType + "_" + utils.RandString(32)
-
-		presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, *presignInput, false)
-		err := h.engine.AddRequest(presignRequest)
-		if err != nil {
-			log.Error("Failed to add presign request to engine, err = ", err)
-		}
-	}
-}
-
 // --- End fo Engine callback /
 
 // --- Implements Server API  /
@@ -292,6 +261,39 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	h.keysignRequests[workRequest.WorkId] = req
 
 	return err
+}
+
+// Called at the end of Sisu's block. This could be a time when we can check our CPU resource and
+// does additional presign work.
+func (h *Heart) BlockEnd(blockHeight int64) {
+	if h.tPubKeys == nil || len(h.tPubKeys) == 0 {
+		return
+	}
+
+	nodes := NewNodes(h.tPubKeys)
+	pids := make([]*tss.PartyID, len(h.tPubKeys))
+	for i, node := range nodes {
+		pids[i] = node.PartyId
+	}
+
+	sorted := tss.SortPartyIDs(pids)
+
+	keygenType := "ecdsa"
+	presignInput, err := h.db.LoadKeygenData(keygenType)
+
+	if err != nil {
+		log.Error("Cannot get presign input, err = ", err)
+		return
+	}
+
+	workId := "presign_" + keygenType + "_" + strconv.FormatInt(blockHeight, 10)
+	log.Info("Presign workId = ", workId)
+
+	presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, *presignInput, false)
+	err = h.engine.AddRequest(presignRequest)
+	if err != nil {
+		log.Error("Failed to add presign request to engine, err = ", err)
+	}
 }
 
 // --- End of Server API  /
