@@ -37,7 +37,7 @@ func (api *TssApi) KeyGen(keygenId string, chain string, keyWrappers []types.Pub
 		return fmt.Errorf("invalid keys array cannot be empty")
 	}
 
-	log.Info("There is a keygen request", keygenId, chain)
+	log.Info("There is a keygen request ", keygenId, chain)
 
 	pubKeys := make([]ctypes.PubKey, len(keyWrappers))
 
@@ -107,4 +107,8 @@ func (api *TssApi) KeySign(req *types.KeysignRequest, keyWrappers []types.PubKey
 	}
 
 	return err
+}
+
+func (api *TssApi) BlockEnd(blockHeight int64) error {
+	return api.heart.BlockEnd(blockHeight)
 }

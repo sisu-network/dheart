@@ -239,6 +239,7 @@ func (d *SqlDatabase) LoadKeygenData(keyType string) (*keygen.LocalPartySaveData
 		}
 	} else {
 		log.Verbose("There is no such keygen output for ", keyType)
+		return nil, nil
 	}
 
 	return result, nil

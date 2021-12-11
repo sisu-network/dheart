@@ -84,6 +84,11 @@ func (c *DefaultClient) PostKeygenResult(result *types.KeygenResult) error {
 }
 
 func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
+	// TODO: Implement presignResult call in Sisu.
+	if true {
+		return nil
+	}
+
 	log.Debug("Sending presign result to sisu server")
 
 	var r interface{}

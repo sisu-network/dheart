@@ -83,7 +83,7 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 
 		w.blameMgr.AddPreExecutionCulprit(append(culprits, w.myPid))
 
-		log.Error("Leader: error while waiting for member response", err)
+		log.Error("Leader: error while waiting for member response, err = ", err)
 		w.leaderFinalized(false, nil, nil)
 		w.callback.OnWorkFailed(w.request)
 		return

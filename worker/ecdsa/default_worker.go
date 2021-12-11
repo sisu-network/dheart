@@ -265,6 +265,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 			nextJobType = wTypes.EcdsaKeygen
 
 		case wTypes.EcdsaPresign:
+			w.presignInput = w.request.PresignInput
 			jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
 			nextJobType = wTypes.EcdsaPresign
 

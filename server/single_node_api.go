@@ -192,3 +192,8 @@ func (api *SingleNodeApi) deployToChain(result *types.KeysignResult) {
 		log.Verbose("Deployment succeeded")
 	}
 }
+
+func (api *SingleNodeApi) BlockEnd(blockHeight int64) error {
+	// Do nothing.
+	return nil
+}

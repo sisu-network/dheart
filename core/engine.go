@@ -180,10 +180,10 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 	engine.workLock.Unlock()
 
 	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId)
-	log.Info("Starting a work with id ", request.WorkId, "with cache size", len(cachedMsgs))
+	log.Info("Starting a work with id ", request.WorkId, " with cache size ", len(cachedMsgs))
 
 	if err := w.Start(cachedMsgs); err != nil {
-		log.Error("Cannot start work error", err)
+		log.Error("Cannot start work error = ", err)
 	}
 }
 

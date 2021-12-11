@@ -14,6 +14,7 @@ type Api interface {
 	SetPrivKey(encodedKey string, keyType string) error
 	KeyGen(keygenId string, chain string, tPubKeys []types.PubKeyWrapper) error
 	KeySign(req *types.KeysignRequest, tPubKeys []types.PubKeyWrapper) error
+	BlockEnd(blockHeight int64) error
 }
 
 func GetApi(cfg config.HeartConfig, store store.Store, client client.Client) Api {

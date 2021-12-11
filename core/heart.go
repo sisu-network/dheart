@@ -265,9 +265,9 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 
 // Called at the end of Sisu's block. This could be a time when we can check our CPU resource and
 // does additional presign work.
-func (h *Heart) BlockEnd(blockHeight int64) {
+func (h *Heart) BlockEnd(blockHeight int64) error {
 	if h.tPubKeys == nil || len(h.tPubKeys) == 0 {
-		return
+		return nil
 	}
 
 	nodes := NewNodes(h.tPubKeys)
@@ -283,7 +283,12 @@ func (h *Heart) BlockEnd(blockHeight int64) {
 
 	if err != nil {
 		log.Error("Cannot get presign input, err = ", err)
-		return
+		return err
+	}
+
+	if presignInput == nil {
+		log.Info("Cannot find presign input. Presign cannot be executed until keygen has finished running.")
+		return nil
 	}
 
 	activeWorkerCount := h.engine.GetActiveWorkerCount()
@@ -294,12 +299,14 @@ func (h *Heart) BlockEnd(blockHeight int64) {
 		workId := "presign_" + keygenType + "_" + strconv.FormatInt(blockHeight, 10)
 		log.Info("Presign workId = ", workId)
 
-		presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, *presignInput, false)
+		presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, presignInput, false)
 		err = h.engine.AddRequest(presignRequest)
 		if err != nil {
 			log.Error("Failed to add presign request to engine, err = ", err)
 		}
 	}
+
+	return nil
 }
 
 // --- End of Server API  /
