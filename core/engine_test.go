@@ -111,7 +111,7 @@ func TestEngineJobTimeout(t *testing.T) {
 
 	for i := 0; i < n; i++ {
 		config := NewDefaultEngineConfig()
-		config.KeygenJobTimeout = time.Second
+		config.PresignJobTimeout = time.Second
 
 		engines[i] = NewEngine(
 			nodes[i],
