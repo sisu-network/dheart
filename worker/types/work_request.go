@@ -39,10 +39,9 @@ func NewKeygenRequest(keyType, workId string, n int, PIDs tss.SortedPartyIDs, ke
 	return request
 }
 
-func NewPresignRequest(chain, workId string, n int, PIDs tss.SortedPartyIDs, presignInput keygen.LocalPartySaveData, forcedPresign bool) *WorkRequest {
+func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInput *keygen.LocalPartySaveData, forcedPresign bool) *WorkRequest {
 	request := baseRequest(EcdsaPresign, workId, n, PIDs)
-	request.Chain = chain
-	request.PresignInput = &presignInput
+	request.PresignInput = presignInput
 	request.ForcedPresign = forcedPresign
 
 	return request
@@ -103,12 +102,12 @@ func (request *WorkRequest) GetPriority() int {
 		}
 
 		// Presign
-		return 70
+		return 40
 	}
 
 	// Signing
 	if request.WorkType == EcdsaSigning || request.WorkType == EddsaSigning {
-		return 60
+		return 80
 	}
 
 	log.Critical("Unknown work type", request.WorkType)

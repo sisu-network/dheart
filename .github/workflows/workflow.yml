@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
         with:
           go-version: 1.16
       - name: Configure git for private module
-        run: git config --global url."https://${{ secrets.TOKEN_CI }}:@github.com".insteadOf "https://github.com"
+        run: git config --global url."https://${{ secrets.ACCESS_TOKEN }}:@github.com".insteadOf "https://github.com"
       - name: Linter
         run: make lint
       - name: Unit test

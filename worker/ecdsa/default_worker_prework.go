@@ -26,7 +26,7 @@ func (w *DefaultWorker) preExecution() {
 	request := w.request
 
 	leader := worker.ChooseLeader(request.WorkId, request.AllParties)
-	w.availableParties.add(w.myPid)
+	w.availableParties.add(w.myPid, 1)
 
 	// Step2: If this node is the leader, sends check availability to everyone.
 	if w.myPid.Id == leader.Id {
@@ -45,7 +45,7 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 			// update the availability.
 			for _, p := range w.allParties {
 				if p.Id == tssMsg.From {
-					w.availableParties.add(p)
+					w.availableParties.add(p, 1)
 					break
 				}
 			}
@@ -71,11 +71,11 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 		var culprits []*tss.PartyID
 		if w.request.IsSigning() {
 			// Only get unavailable presign when the round is signing
-			culprits = w.callback.GetUnavailablePresigns(w.availableParties.parties, w.allParties)
+			culprits = w.callback.GetUnavailablePresigns(w.availableParties.getAllPartiesMap(), w.allParties)
 		} else {
 			// Blame nodes that does not send messages
 			for _, party := range w.allParties {
-				if _, ok := w.availableParties.parties[party.Id]; !ok {
+				if ok := w.availableParties.hasPartyId(party.Id); !ok {
 					culprits = append(culprits, party)
 				}
 			}
@@ -83,10 +83,14 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 
 		w.blameMgr.AddPreExecutionCulprit(append(culprits, w.myPid))
 
-		log.Error("Leader: error while waiting for member response", err)
+		log.Error("Leader: error while waiting for member response, err = ", err)
 		w.leaderFinalized(false, nil, nil)
 		w.callback.OnWorkFailed(w.request)
 		return
+	}
+
+	if w.request.IsSigning() {
+		w.callback.ConsumePresignIds(presignIds)
 	}
 
 	w.leaderFinalized(true, presignIds, selectedPids)
@@ -127,7 +131,9 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 				continue
 			}
 
-			w.availableParties.add(party)
+			if tssMsg.AvailabilityResponseMessage.MaxJob > 0 {
+				w.availableParties.add(party, int(tssMsg.AvailabilityResponseMessage.MaxJob))
+			}
 		}
 
 		if ok, presignIds, selectedPids := w.checkEnoughParticipants(); ok {
@@ -147,6 +153,7 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 		// Check if we can find a presign list that match this of nodes.
 		presignIds, selectedPids := w.callback.GetAvailablePresigns(w.batchSize, w.request.N, w.availableParties.getPartyList(w.request.N))
 		if len(presignIds) == w.batchSize {
+			log.Info("checkEnoughParticipants: presignIds = ", presignIds, " batchSize = ", w.batchSize)
 			// Announce this as success and return
 			return true, presignIds, selectedPids
 		} else {
@@ -155,14 +162,17 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 			return true, nil, parties
 		}
 	} else {
-		// presign works.
-		return true, nil, w.availableParties.getPartyList(w.request.N)
+		// Choose top parties with highest computing power.
+		topParties, maxJob := w.availableParties.getTopParties(w.request.N)
+		w.batchSize = maxJob
+
+		return true, nil, topParties
 	}
 }
 
 // Finalize work as a leader and start execution.
 func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selectedPids []*tss.PartyID) {
-	if !success {
+	if !success { // Failure case
 		msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, false, presignIds, w.pIDs)
 		go w.dispatcher.BroadcastMessage(w.pIDs, msg)
 		return
@@ -181,6 +191,9 @@ func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selec
 	if w.request.IsSigning() {
 		if presignIds != nil && len(presignIds) > 0 {
 			w.signingInput = w.callback.GetPresignOutputs(presignIds)
+			if w.signingInput != nil && len(w.signingInput) > 0 {
+				log.Info("Found a set of presign input")
+			}
 		} else {
 			w.signingInput = nil
 			workType = types.EcdsaPresign
@@ -205,7 +218,7 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 	}
 
 	// Send a message to the leader.
-	tssMsg := common.NewAvailabilityResponseMessage(w.myPid.Id, leader.Id, w.workId, common.AvailabilityResponseMessage_YES)
+	tssMsg := common.NewAvailabilityResponseMessage(w.myPid.Id, leader.Id, w.workId, common.AvailabilityResponseMessage_YES, w.maxJob)
 	go w.dispatcher.UnicastMessage(leader, tssMsg)
 
 	// Waits for response from the leader.
@@ -225,8 +238,11 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 func (w *DefaultWorker) onPreExecutionRequest(tssMsg *commonTypes.TssMessage) error {
 	sender := w.getPartyIdFromString(tssMsg.From)
 	if sender != nil {
+		// TODO: Check that the sender is indeed the leader.
 		// We receive a message from a leader to check our availability. Reply "Yes".
-		responseMsg := common.NewAvailabilityResponseMessage(w.myPid.Id, tssMsg.From, w.workId, common.AvailabilityResponseMessage_YES)
+		responseMsg := common.NewAvailabilityResponseMessage(w.myPid.Id, tssMsg.From, w.workId, common.AvailabilityResponseMessage_YES, w.maxJob)
+		responseMsg.AvailabilityResponseMessage.MaxJob = int32(w.maxJob)
+
 		go w.dispatcher.UnicastMessage(sender, responseMsg)
 	} else {
 		return fmt.Errorf("cannot find party with id %s", tssMsg.From)
@@ -271,6 +287,11 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 			// We are one of the participants, execute the work
 			if err := w.executeWork(workType); err != nil {
 				log.Error("Error when executing work", err)
+			} else {
+				if w.request.IsSigning() {
+					// Consumes the presigns if this is a signing task.
+					w.callback.ConsumePresignIds(msg.PresignIds)
+				}
 			}
 		} else {
 			// We are not in the participant list. Terminate this work. Nothing else to do.
@@ -283,7 +304,11 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 }
 
 func (w *DefaultWorker) Stop() {
-	for _, job := range w.jobs {
+	w.jobsLock.RLock()
+	jobs := w.jobs
+	w.jobsLock.RUnlock()
+
+	for _, job := range jobs {
 		if job != nil {
 			job.Stop()
 		}

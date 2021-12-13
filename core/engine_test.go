@@ -24,7 +24,7 @@ func TestEngineDelayStart(t *testing.T) {
 
 	errCh := make(chan error)
 	outCh := make(chan *p2pDataWrapper)
-	engines := make([]*Engine, n)
+	engines := make([]Engine, n)
 	workId := "presign0"
 	done := make(chan bool)
 	finishedWorkerCount := 0
@@ -62,15 +62,16 @@ func TestEngineDelayStart(t *testing.T) {
 				OnWorkPresignFinishedFunc: cb,
 			},
 			privKeys[i],
+			NewDefaultEngineConfig(),
 		)
 		engines[i].AddNodes(nodes)
 	}
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest("eth", workId, n, helper.CopySortedPartyIds(pIDs), *savedData[i], true)
+		request := types.NewPresignRequest(workId, n, helper.CopySortedPartyIds(pIDs), savedData[i], true)
 
-		go func(engine *Engine, request *types.WorkRequest, delay time.Duration) {
+		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simulate that different workers can start at different times.
 			time.Sleep(delay)
 			engine.AddRequest(request)
@@ -89,7 +90,7 @@ func TestEngineJobTimeout(t *testing.T) {
 
 	errCh := make(chan error)
 	outCh := make(chan *p2pDataWrapper)
-	engines := make([]*Engine, n)
+	engines := make([]Engine, n)
 	workId := "presign0"
 	done := make(chan bool)
 	finishedWorkerCount := 0
@@ -109,6 +110,9 @@ func TestEngineJobTimeout(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
+		config := NewDefaultEngineConfig()
+		config.PresignJobTimeout = time.Second
+
 		engines[i] = NewEngine(
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
@@ -126,15 +130,16 @@ func TestEngineJobTimeout(t *testing.T) {
 				},
 			},
 			privKeys[i],
-		).WithKeygenTimeout(time.Second)
+			config,
+		)
 		engines[i].AddNodes(nodes)
 	}
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest("eth", workId, n, helper.CopySortedPartyIds(pIDs), *savedData[i], true)
+		request := types.NewPresignRequest(workId, n, helper.CopySortedPartyIds(pIDs), savedData[i], true)
 
-		go func(engine *Engine, request *types.WorkRequest, delay time.Duration) {
+		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simulate that different workers can start at different times.
 			time.Sleep(delay)
 			engine.AddRequest(request)
@@ -145,7 +150,7 @@ func TestEngineJobTimeout(t *testing.T) {
 	runEngines(engines, workId, outCh, errCh, done, 2*time.Second)
 }
 
-func runEngines(engines []*Engine, workId string, outCh chan *p2pDataWrapper, errCh chan error, done chan bool, delay time.Duration) {
+func runEngines(engines []Engine, workId string, outCh chan *p2pDataWrapper, errCh chan error, done chan bool, delay time.Duration) {
 	// Run all engines
 	for {
 		select {
@@ -158,7 +163,8 @@ func runEngines(engines []*Engine, workId string, outCh chan *p2pDataWrapper, er
 
 		case p2pMsgWrapper := <-outCh:
 			for _, engine := range engines {
-				if engine.myNode.PeerId.String() == p2pMsgWrapper.To {
+				defaultEngine := engine.(*DefaultEngine)
+				if defaultEngine.myNode.PeerId.String() == p2pMsgWrapper.To {
 					signedMessage := &common.SignedMessage{}
 					if err := json.Unmarshal(p2pMsgWrapper.msg.Data, signedMessage); err != nil {
 						panic(err)

@@ -28,7 +28,7 @@ import (
 
 var (
 	LeaderWaitTime              = 10 * time.Second
-	PreExecutionRequestWaitTime = 3 * time.Second
+	PreExecutionRequestWaitTime = 5 * time.Second
 )
 
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
@@ -37,6 +37,8 @@ type WorkerCallback interface {
 	// GetAvailablePresigns returns a list of presign output that will be used for signing. The presign's
 	// party ids should match the pids params passed into the function.
 	GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID)
+
+	ConsumePresignIds(presignIds []string)
 
 	GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
 
@@ -65,6 +67,7 @@ type DefaultWorker struct {
 	callback   WorkerCallback
 	workId     string
 	db         db.Database
+	maxJob     int
 
 	// PreExecution
 	preExecMsgCh     chan *common.PreExecOutputMessage
@@ -121,7 +124,7 @@ func NewKeygenWorker(
 	callback WorkerCallback,
 	jobTimeout time.Duration,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, 1)
 
 	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
@@ -140,8 +143,9 @@ func NewPresignWorker(
 	db db.Database,
 	callback WorkerCallback,
 	jobTimeout time.Duration,
+	maxJob int,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, maxJob)
 
 	w.jobType = wTypes.EcdsaPresign
 	w.presignInput = request.PresignInput
@@ -159,9 +163,10 @@ func NewSigningWorker(
 	db db.Database,
 	callback WorkerCallback,
 	jobTimeout time.Duration,
+	maxJob int,
 ) worker.Worker {
 	// TODO: The request.Pids
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout)
+	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, maxJob)
 
 	w.jobType = wTypes.EcdsaSigning
 	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
@@ -180,6 +185,7 @@ func baseWorker(
 	db db.Database,
 	callback WorkerCallback,
 	timeOut time.Duration,
+	maxJob int,
 ) *DefaultWorker {
 	return &DefaultWorker{
 		request:           request,
@@ -201,6 +207,7 @@ func baseWorker(
 		preExecutionCache: worker.NewMessageCache(),
 		blameMgr:          blame.NewManager(),
 		jobTimeout:        timeOut,
+		maxJob:            maxJob,
 	}
 }
 
@@ -237,7 +244,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 		}
 	}
 
-	log.Info("Executing work type", wTypes.WorkTypeStrings[workType])
+	log.Info("Executing work type ", wTypes.WorkTypeStrings[workType])
 	p2pCtx := tss.NewPeerContext(w.pIDs)
 
 	// Assign the correct index for our pid.
@@ -260,6 +267,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 			nextJobType = wTypes.EcdsaKeygen
 
 		case wTypes.EcdsaPresign:
+			w.presignInput = w.request.PresignInput
 			jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
 			nextJobType = wTypes.EcdsaPresign
 
@@ -284,6 +292,8 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 			return fmt.Errorf("unknown job type %d", w.jobType)
 		}
 	}
+
+	log.Info("nextJobType = ", nextJobType)
 
 	for _, job := range jobs {
 		if err := job.Start(); err != nil {
@@ -342,6 +352,7 @@ func (w *DefaultWorker) loadPreparams() error {
 
 		w.keygenInput = preparams
 	} else if err == nil {
+		log.Info("Preparams found")
 		w.keygenInput = preparams
 	} else {
 		log.Error("Failed to get preparams, err =", err)
@@ -447,6 +458,14 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		return errors.New("batch size does not match")
 	}
 
+	jobType := w.curJobType.Load().(wTypes.WorkType)
+	// If this is signing worker (with presign) and we are in still in the presigning phase but
+	// this update mesasge is for signing round, we have to catch this message.
+	if jobType == wTypes.EcdsaPresign && w.jobType == wTypes.EcdsaSigning &&
+		len(tssMsg.UpdateMessages) > 0 && tssMsg.UpdateMessages[0].Round == "SignRound1Message" {
+		w.preExecutionCache.AddMessage(tssMsg)
+	}
+
 	// Do all message validation first before processing.
 	// TODO: Add more validation here.
 	msgs := make([]tss.ParsedMessage, w.batchSize)
@@ -474,14 +493,6 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		}
 
 		msgs[i] = msg
-	}
-
-	round, _ := message.GetMsgRound(msgs[0].Content())
-	// If this is are signing worker (with presign) and we are in still in the presigning phase but
-	// this update mesasge is for signing round, we have to catch this message.
-	if w.jobType == types.EcdsaSigning && w.curJobType.Load() != types.EcdsaSigning && round == message.Sign1 {
-		w.preExecutionCache.AddMessage(tssMsg)
-		return nil
 	}
 
 	for i, j := range jobs {
@@ -532,7 +543,7 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		log.Verbose(w.GetWorkId(), "Done!")
+		log.Verbose(w.GetWorkId(), " Done!")
 		w.callback.OnWorkKeygenFinished(w.request, w.keygenOutputs)
 	}
 }
@@ -554,7 +565,7 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		log.Verbose(w.GetWorkId(), "Presign Done!")
+		log.Verbose(w.GetWorkId(), " Presign Done!")
 
 		// If this is a signing request, we have to do signing after generating presign input
 		if w.jobType == types.EcdsaSigning {
@@ -589,7 +600,7 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 	w.finalOutputLock.RUnlock()
 
 	if count == w.batchSize {
-		log.Verbose(w.GetWorkId(), "Signing Done!")
+		log.Verbose(w.GetWorkId(), " Signing Done!")
 		w.callback.OnWorkSigningFinished(w.request, w.signingOutputs)
 	}
 }

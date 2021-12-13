@@ -126,6 +126,7 @@ func TestSigningEndToEnd(t *testing.T) {
 				},
 			},
 			10*time.Minute,
+			1,
 		)
 
 		workers[i] = worker
@@ -201,6 +202,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 				},
 			},
 			10*time.Minute,
+			1,
 		)
 
 		workers[i] = worker
@@ -244,7 +246,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 			batchSize,
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 3*time.Second+1, 0),
+			helper.NewTestDispatcher(outCh, PreExecutionRequestWaitTime+1*time.Second, 0),
 			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
 			&helper.MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
@@ -254,6 +256,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 				},
 			},
 			10*time.Minute,
+			1,
 		)
 
 		workers[i] = worker
@@ -316,6 +319,7 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 				},
 			},
 			time.Second,
+			1,
 		)
 
 		workers[i] = worker

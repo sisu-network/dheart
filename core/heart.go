@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
 	htypes "github.com/sisu-network/dheart/types"
-
-	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/ed25519"
 	"github.com/sisu-network/cosmos-sdk/crypto/keys/secp256k1"
@@ -31,26 +30,25 @@ const (
 
 // The dragon heart of this component.
 type Heart struct {
-	config config.HeartConfig
-	db     db.Database
-	cm     p2p.ConnectionManager
-	engine *Engine
-	client client.Client
+	config   config.HeartConfig
+	db       db.Database
+	cm       p2p.ConnectionManager
+	engine   Engine
+	client   client.Client
+	tPubKeys []ctypes.PubKey
 
 	privateKey ctypes.PrivKey
 	aesKey     []byte
 
-	requestCache *lru.Cache
-
-	requestMap map[string]interface{}
+	keysignRequests map[string]*htypes.KeysignRequest
 }
 
 func NewHeart(config config.HeartConfig, client client.Client) *Heart {
 	return &Heart{
-		config:     config,
-		aesKey:     config.AesKey,
-		client:     client,
-		requestMap: make(map[string]interface{}),
+		config:          config,
+		aesKey:          config.AesKey,
+		client:          client,
+		keysignRequests: make(map[string]*htypes.KeysignRequest),
 	}
 }
 
@@ -67,29 +65,28 @@ func (h *Heart) Start() error {
 		preloadPreparams(h.db, h.config)
 	}
 
-	// Cache
-	requestCache, err := lru.New(TX_CACHE_SIZE)
-	if err != nil {
-		return err
-	}
-	h.requestCache = requestCache
-
 	// Connection manager
 	h.cm = p2p.NewConnectionManager(h.config.Connection)
 
 	// Engine
 	myNode := NewNode(h.privateKey.PubKey())
-	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey)
+	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey, NewDefaultEngineConfig())
+	if h.tPubKeys != nil {
+		h.engine.AddNodes(NewNodes(h.tPubKeys))
+	}
+
+	log.Info("Adding engine as listener for connection manager....")
+
 	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
 	h.engine.Init()
 
 	// Start connection manager.
-	err = h.cm.Start(h.privateKey.Bytes(), h.privateKey.Type())
+	err := h.cm.Start(h.privateKey.Bytes(), h.privateKey.Type())
 	if err != nil {
 		log.Error("Cannot start connection manager. err =", err)
 		return err
 	} else {
-		log.Error("Connected manager started!")
+		log.Info("Connected manager started!")
 	}
 
 	return nil
@@ -113,15 +110,7 @@ func (h *Heart) OnWorkPresignFinished(result *htypes.PresignResult) {
 }
 
 func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
-	requestKey := h.getKey("keysign", request.Chain, request.WorkId)
-
-	value, ok := h.requestCache.Get(requestKey)
-	if !ok {
-		log.Critical("Cannot find client request. requestKey =", requestKey)
-		h.OnWorkFailed(request, make([]*tss.PartyID, 0))
-		return
-	}
-	clientRequest := value.(*htypes.KeysignRequest)
+	clientRequest := h.keysignRequests[request.WorkId]
 
 	// TODO: handle multiple tx here.
 	signature := data[0].Signature
@@ -139,14 +128,10 @@ func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCom
 		Signature:      signature, // TODO: Support multi tx per request on Sisu
 	}
 
-	h.requestCache.Remove(requestKey)
-
 	h.client.PostKeysignResult(result)
 }
 
 func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {
-	h.requestCache.Remove(h.getKey("keysign", request.Chain, request.WorkId))
-
 	chain := request.Chain
 	switch request.WorkType {
 	case types.EcdsaKeygen, types.EddsaKeygen:
@@ -178,8 +163,15 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 
 // SetPrivKey receives encrypted private key from Sisu, decrypts it and start the engine,
 // network communication, etc.
-func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
-	encrypted, err := hex.DecodeString(encodedKey)
+
+func (h *Heart) SetBootstrappedKeys(tPubKeys []ctypes.PubKey) {
+	if h.tPubKeys == nil {
+		h.tPubKeys = tPubKeys
+	}
+}
+
+func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error {
+	encrypted, err := hex.DecodeString(encryptedKey)
 	if err != nil {
 		log.Error("Failed to decode string, err =", err)
 		return err
@@ -200,13 +192,13 @@ func (h *Heart) SetPrivKey(encodedKey string, keyType string) error {
 		return nil
 	}
 
-	switch keyType {
+	switch tendermintKeyType {
 	case "ed25519":
 		h.privateKey = &ed25519.PrivKey{Key: decrypted}
 	case "secp256k1":
 		h.privateKey = &secp256k1.PrivKey{Key: decrypted}
 	default:
-		return fmt.Errorf("Unsupported key type: %s", keyType)
+		return fmt.Errorf("Unsupported key type: %s", tendermintKeyType)
 	}
 
 	err = h.Start()
@@ -221,6 +213,7 @@ func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey
 	// TODO: Check if our pubkey is one of the pubkeys.
 
 	n := len(tPubKeys)
+	h.tPubKeys = tPubKeys
 
 	nodes := NewNodes(tPubKeys)
 	// For keygen, workId is the same as keygenId
@@ -229,8 +222,8 @@ func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey
 	for i, node := range nodes {
 		pids[i] = node.PartyId
 	}
-
 	sorted := tss.SortPartyIDs(pids)
+
 	h.engine.AddNodes(nodes)
 
 	request := types.NewKeygenRequest(keyType, workId, len(tPubKeys), sorted, nil, n-1)
@@ -241,7 +234,6 @@ func (h *Heart) getKey(requestType, chain, workdId string) string {
 	return fmt.Sprintf("%s__%s__%s", requestType, chain, workdId)
 }
 
-// func (h *Heart) Keysign(tx []byte, block int64, chain string, tPubKeys []ctypes.PubKey) error {
 func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) error {
 	n := len(tPubKeys)
 
@@ -256,19 +248,65 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 
 	// TODO: Find unique workId
 	workId := req.OutChain + req.OutHash
-	request := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.BytesToSign))
+	workRequest := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.BytesToSign))
 
 	presignInput, err := h.db.LoadKeygenData(libchain.GetKeyTypeForChain(req.OutChain))
 	if err != nil {
 		return err
 	}
 
-	request.PresignInput = presignInput
-	err = h.engine.AddRequest(request)
+	workRequest.PresignInput = presignInput
+	err = h.engine.AddRequest(workRequest)
 
-	h.requestCache.Add(h.getKey("keysign", req.OutChain, workId), req)
+	h.keysignRequests[workRequest.WorkId] = req
 
 	return err
+}
+
+// Called at the end of Sisu's block. This could be a time when we can check our CPU resource and
+// does additional presign work.
+func (h *Heart) BlockEnd(blockHeight int64) error {
+	if h.tPubKeys == nil || len(h.tPubKeys) == 0 {
+		return nil
+	}
+
+	nodes := NewNodes(h.tPubKeys)
+	pids := make([]*tss.PartyID, len(h.tPubKeys))
+	for i, node := range nodes {
+		pids[i] = node.PartyId
+	}
+
+	sorted := tss.SortPartyIDs(pids)
+
+	keygenType := "ecdsa"
+	presignInput, err := h.db.LoadKeygenData(keygenType)
+
+	if err != nil {
+		log.Error("Cannot get presign input, err = ", err)
+		return err
+	}
+
+	if presignInput == nil {
+		log.Info("Cannot find presign input. Presign cannot be executed until keygen has finished running.")
+		return nil
+	}
+
+	activeWorkerCount := h.engine.GetActiveWorkerCount()
+	log.Verbose("activeWorkerCount = ", activeWorkerCount)
+
+	if activeWorkerCount < MaxWorker {
+		// TODO Presign work with our available worker
+		workId := "presign_" + keygenType + "_" + strconv.FormatInt(blockHeight, 10)
+		log.Info("Presign workId = ", workId)
+
+		presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, presignInput, false)
+		err = h.engine.AddRequest(presignRequest)
+		if err != nil {
+			log.Error("Failed to add presign request to engine, err = ", err)
+		}
+	}
+
+	return nil
 }
 
 // --- End of Server API  /

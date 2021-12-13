@@ -14,6 +14,7 @@ import (
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/run"
+	"github.com/sisu-network/dheart/test/e2e/helper"
 	"github.com/sisu-network/dheart/test/mock"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
@@ -57,19 +58,33 @@ func main() {
 		n = 2
 	}
 
-	run.LoadConfigEnv("../../../.env")
+	helper.ResetDb(index)
+
+	run.LoadConfigEnv("../../../../.env")
 
 	done := make(chan bool)
+	presignResult := make(chan *types.PresignResult)
+	signingResult := make(chan *types.KeysignResult)
+
 	mockClient := &mock.MockClient{
 		PostKeygenResultFunc: func(result *types.KeygenResult) error {
 			done <- true
+			return nil
+		},
+		PostPresignResultFunc: func(result *types.PresignResult) error {
+			presignResult <- result
+			return nil
+		},
+
+		PostKeysignResultFunc: func(result *types.KeysignResult) error {
+			signingResult <- result
 			return nil
 		},
 	}
 
 	dbConfig := config.GetLocalhostDbConfig()
 	dbConfig.Schema = fmt.Sprintf("dheart%d", index)
-	dbConfig.MigrationPath = "file://../../../db/migrations/"
+	dbConfig.MigrationPath = "file://../../../../db/migrations/"
 
 	cfg := config.HeartConfig{
 		UseOnMemory: false,
@@ -78,8 +93,6 @@ func main() {
 
 	conConfig, privKey := p2p.GetMockSecp256k1Config(n, index)
 	cfg.Connection = conConfig
-
-	encryptedKey := getEncrypted(privKey)
 
 	aesKey, err := hex.DecodeString(os.Getenv("AES_KEY_HEX"))
 	if err != nil {
@@ -91,20 +104,56 @@ func main() {
 		AesKey:     aesKey,
 		Connection: cfg.Connection,
 	}
+	pubkeys := getPublicKeys(n)
 
 	heart := core.NewHeart(heartConfig, mockClient)
+	heart.SetBootstrappedKeys(pubkeys)
 
+	encryptedKey := getEncrypted(privKey)
 	err = heart.SetPrivKey(hex.EncodeToString(encryptedKey), "secp256k1")
 	if err != nil {
 		panic(err)
 	}
 
-	heart.Keygen("keygenId", "eth", getPublicKeys(n))
-
+	heart.Keygen("keygenId", "ecdsa", pubkeys)
 	select {
 	case <-time.After(time.Second * 30):
 		panic("Time out")
 	case <-done:
-		log.Verbose("core-heart Test passed")
+	}
+
+	// Presign
+	heart.BlockEnd(0)
+	select {
+	case <-time.After(time.Second * 30):
+		panic("Time out")
+	case result := <-presignResult:
+		if result.Success {
+			log.Info("Presign Test Passed")
+		} else {
+			log.Info("Test result failed, culprits = ", result.Culprits)
+			panic("Presigning failed")
+		}
+	}
+
+	// Signing. Make sure that we don't create any new presign.
+	keysignRequest := &types.KeysignRequest{
+		Id:          "keysign",
+		OutChain:    "ganache1",
+		BytesToSign: []byte("test"),
+	}
+
+	heart.Keysign(keysignRequest, pubkeys)
+
+	select {
+	case <-time.After(time.Second * 30):
+		panic("Time out")
+	case result := <-signingResult:
+		if result.Success {
+			log.Info("Singing Test Passed")
+		} else {
+			log.Info("Test signing result failed, culprits = ", result.Culprits)
+			panic("Signing failed")
+		}
 	}
 }

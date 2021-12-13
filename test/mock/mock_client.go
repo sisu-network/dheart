@@ -4,6 +4,7 @@ import (
 	"github.com/sisu-network/dheart/types"
 )
 
+// TODO: Use mock gen instead
 type MockClient struct {
 	TryDialFunc           func()
 	PostKeygenResultFunc  func(result *types.KeygenResult) error

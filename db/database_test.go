@@ -99,7 +99,6 @@ func TestSqlDatabase_SavePresignData(t *testing.T) {
 		_ = db.Close()
 	})
 
-	chain := "chain-0"
 	wordId := "work0"
 	pids := []*tss.PartyID{{
 		MessageWrapper_PartyID: &tss.MessageWrapper_PartyID{
@@ -117,11 +116,11 @@ func TestSqlDatabase_SavePresignData(t *testing.T) {
 	assert.NoError(t, err)
 
 	mock.ExpectExec("INSERT INTO presign").
-		WithArgs("work0-0", chain, wordId, "party-0", 0, PresignStatusNotUsed, json).
+		WithArgs("work0-0", wordId, "party-0", 0, PresignStatusNotUsed, json).
 		WillReturnResult(sqlmock.NewResult(1, 1)).
 		WillReturnError(nil)
 
-	assert.NoError(t, sqlDatabase.SavePresignData(chain, wordId, pids, presignData))
+	assert.NoError(t, sqlDatabase.SavePresignData(wordId, pids, presignData))
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

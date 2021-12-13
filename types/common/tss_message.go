@@ -39,10 +39,11 @@ func NewAvailabilityRequestMessage(from, to, workId string) *TssMessage {
 	return msg
 }
 
-func NewAvailabilityResponseMessage(from, to, workId string, answer AvailabilityResponseMessage_ANSWER) *TssMessage {
+func NewAvailabilityResponseMessage(from, to, workId string, answer AvailabilityResponseMessage_ANSWER, maxJob int) *TssMessage {
 	msg := baseMessage(TssMessage_AVAILABILITY_RESPONSE, from, to, workId)
 	msg.AvailabilityResponseMessage = &AvailabilityResponseMessage{
 		Answer: AvailabilityResponseMessage_YES,
+		MaxJob: int32(maxJob),
 	}
 
 	return msg

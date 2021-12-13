@@ -66,6 +66,7 @@ type MockWorkerCallback struct {
 	GetAvailablePresignsFunc   func(count int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID)
 	GetPresignOutputsFunc      func(presignIds []string) []*presign.LocalPresignData
 	GetUnavailablePresignsFunc func(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
+	ConsumePresignIdsFunc      func(presignIds []string)
 
 	workerIndex     int
 	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)
@@ -117,6 +118,13 @@ func (cb *MockWorkerCallback) GetAvailablePresigns(count int, n int, pids []*tss
 	}
 
 	return nil, nil
+}
+
+func (cb *MockWorkerCallback) ConsumePresignIds(presignIds []string) {
+	if cb.ConsumePresignIdsFunc != nil {
+		cb.ConsumePresignIdsFunc(presignIds)
+	}
+
 }
 
 func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {
@@ -194,7 +202,7 @@ func (m *MockDatabase) SaveKeygenData(chain string, workId string, pids []*tss.P
 	return nil
 }
 
-func (m *MockDatabase) SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
+func (m *MockDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
 	return nil
 }
 

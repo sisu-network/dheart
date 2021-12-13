@@ -11,6 +11,7 @@ import (
 	"github.com/golang-migrate/migrate/database/mysql"
 	_ "github.com/golang-migrate/migrate/source/file"
 	"github.com/sisu-network/dheart/core/config"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -35,9 +36,9 @@ type Database interface {
 	LoadPreparams() (*keygen.LocalPreParams, error)
 
 	SaveKeygenData(keyType string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
-	LoadKeygenData(chain string) (*keygen.LocalPartySaveData, error)
+	LoadKeygenData(keyType string) (*keygen.LocalPartySaveData, error)
 
-	SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
+	SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
 	GetAvailablePresignShortForm() ([]string, []string, error) // Returns presignIds, pids, error
 
 	LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error)
@@ -186,7 +187,7 @@ func (d *SqlDatabase) SaveKeygenData(keyType string, workId string, pids []*tss.
 		return nil
 	}
 
-	pidString := getPidString(pids)
+	pidString := utils.GetPidString(pids)
 	// Constructs multi-insert query to do all insertion in 1 query.
 	query := "INSERT INTO keygen (key_type, work_id, pids_string, batch_index, keygen_output) VALUES "
 
@@ -239,21 +240,22 @@ func (d *SqlDatabase) LoadKeygenData(keyType string) (*keygen.LocalPartySaveData
 		}
 	} else {
 		log.Verbose("There is no such keygen output for ", keyType)
+		return nil, nil
 	}
 
 	return result, nil
 }
 
-func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
+func (d *SqlDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
 	if len(presignOutputs) == 0 {
 		return nil
 	}
 
-	pidString := getPidString(pids)
+	pidString := utils.GetPidString(pids)
 
 	// Constructs multi-insert query to do all insertion in 1 query.
-	query := "INSERT INTO presign (presign_id, chain, work_id, pids_string, batch_index, status, presign_output) VALUES "
-	query = query + getQueryQuestionMark(len(presignOutputs), 7)
+	query := "INSERT INTO presign (presign_id, work_id, pids_string, batch_index, status, presign_output) VALUES "
+	query = query + getQueryQuestionMark(len(presignOutputs), 6)
 
 	params := make([]interface{}, 0)
 	for i, output := range presignOutputs {
@@ -265,7 +267,6 @@ func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.P
 		presignId := fmt.Sprintf("%s-%d", workId, i)
 
 		params = append(params, presignId)
-		params = append(params, chain)
 		params = append(params, workId)
 		params = append(params, pidString)
 
@@ -359,15 +360,17 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 func (d *SqlDatabase) UpdatePresignStatus(presignIds []string) error {
 	presignString := getQueryQuestionMark(1, len(presignIds))
 	query := fmt.Sprintf(
-		"UPDATE status FROM presign SET status = %s WHERE presign_id IN (%s)",
-		PresignStatusUsed,
+		"UPDATE presign SET status = ? WHERE presign_id IN %s",
 		presignString,
 	)
 
-	interfaceArr := make([]interface{}, len(presignIds))
+	interfaceArr := make([]interface{}, len(presignIds)+1)
+	interfaceArr[0] = PresignStatusUsed
 	for i, presignId := range presignIds {
-		interfaceArr[i] = presignId
+		interfaceArr[i+1] = presignId
 	}
+
+	log.Verbose("UpdatePresignStatus: query = ", query)
 
 	_, err := d.db.Exec(query, interfaceArr...)
 	return err

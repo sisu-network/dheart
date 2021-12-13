@@ -23,6 +23,7 @@ func NewSimpleListener(dataChan chan *p2p.P2PMessage) *SimpleListener {
 func (listener *SimpleListener) OnNetworkMessage(message *p2p.P2PMessage) {
 	log.Verbose("There is a new message from", message.FromPeerId)
 	log.Verbose(string(message.Data))
+	listener.dataChan <- message
 }
 
 func initialize() {
@@ -35,7 +36,7 @@ func initialize() {
 // Runs this program on 2 different terminal with different index value.
 func main() {
 	var index, n int
-	flag.IntVar(&index, "index", 0, "listening port")
+	flag.IntVar(&index, "index", 0, "index of the node")
 	flag.Parse()
 
 	n = 2
@@ -52,7 +53,7 @@ func main() {
 		panic(err)
 	}
 
-	time.Sleep(time.Second * 4)
+	time.Sleep(time.Second * 8)
 
 	go func() {
 		peerIds := p2p.GetMockPeers(n, "secp256k1")
@@ -72,7 +73,10 @@ func main() {
 	}()
 
 	select {
+	case <-time.After(time.Second * 10):
+		panic("Timeout!")
 	case msg := <-dataChan:
-		log.Verbose("Message =", string(msg.Data))
+		log.Verbose("Message = ", string(msg.Data))
+		log.Info("Test passed!")
 	}
 }

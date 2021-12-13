@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -11,6 +10,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	libchain "github.com/sisu-network/lib/chain"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/sisu-network/lib/log"
@@ -25,12 +26,13 @@ import (
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/test/e2e/fake-sisu/mock"
+	"github.com/sisu-network/dheart/test/e2e/helper"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
 )
 
 const (
-	TEST_CHAIN = "eth"
+	TEST_CHAIN = "ganache1"
 )
 
 type MockSisuNode struct {
@@ -44,18 +46,6 @@ func loadConfigEnv(filenames ...string) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func resetDb(index int) {
-	// reset the dev db
-	database, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", "root", "password", "0.0.0.0", 3306, fmt.Sprintf("dheart%d", index)))
-	if err != nil {
-		panic(err)
-	}
-	defer database.Close()
-
-	database.Exec("TRUNCATE TABLE keygen")
-	database.Exec("TRUNCATE TABLE presign")
 }
 
 func createNodes(index int, n int, keygenCh chan *types.KeygenResult, keysignCh chan *types.KeysignResult) *MockSisuNode {
@@ -137,7 +127,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 
 	for i := 0; i < n; i++ {
 		go func(index int) {
-			nodes[index].client.KeyGen("Keygen0", TEST_CHAIN, tendermintPubKeys)
+			nodes[index].client.KeyGen("Keygen0", "ecdsa", tendermintPubKeys)
 		}(i)
 	}
 
@@ -194,7 +184,7 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 	wg.Add(n)
 
 	tx := generateEthTx()
-	signer := etypes.NewEIP2930Signer(big.NewInt(1))
+	signer := etypes.NewEIP2930Signer(libchain.GetChainIntFromId(TEST_CHAIN))
 	hash := signer.Hash(tx)
 	hashBytes := hash[:]
 
@@ -309,7 +299,7 @@ func main() {
 	}
 
 	for i := 0; i < n; i++ {
-		resetDb(i)
+		helper.ResetDb(i)
 	}
 
 	loadConfigEnv("../../../.env")
@@ -339,8 +329,6 @@ func main() {
 	log.Info("All keygen tasks finished")
 
 	// Test keysign.
-	signedTx := keysign(nodes, tendermintPubKeys, keysignChs, keygenResult.PubKeyBytes, big.NewInt(1))
+	keysign(nodes, tendermintPubKeys, keysignChs, keygenResult.PubKeyBytes, libchain.GetChainIntFromId(TEST_CHAIN))
 	log.Info("Finished all keysign!")
-
-	deploySignedTx(keygenResult, signedTx)
 }

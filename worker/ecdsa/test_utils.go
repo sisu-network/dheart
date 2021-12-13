@@ -24,6 +24,17 @@ func startAllWorkers(workers []worker.Worker) {
 	wg.Wait()
 }
 
+// debug function to get worker index from its id
+func getWorkerIndex(workers []worker.Worker, id string) int {
+	for i, w := range workers {
+		if w.GetPartyId() == id {
+			return i
+		}
+	}
+
+	return -1
+}
+
 func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, done chan bool) {
 	for {
 		select {

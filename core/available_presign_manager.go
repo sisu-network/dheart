@@ -1,12 +1,15 @@
 package core
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/lib/log"
+	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -35,12 +38,14 @@ func NewAvailPresignManager(db db.Database) *AvailPresignManager {
 // GetUnavailablePresigns returns a list of choosen nodes that has not sent messages
 func (m *AvailPresignManager) GetUnavailablePresigns(sentNodes map[string]*tss.PartyID, allParties []*tss.PartyID) []*tss.PartyID {
 	// Nodes that are chosen.
+	m.lock.RLock()
 	pids := make([]string, 0, len(m.inUse))
 	for _, v := range m.inUse {
 		if len(v) > 0 {
 			pids = append(pids, v[0].Pids...)
 		}
 	}
+	m.lock.RUnlock()
 
 	// Nodes that are chosen but don't send messages.
 	missingIDs := make(map[string]struct{}, 0)
@@ -86,6 +91,34 @@ func (m *AvailPresignManager) Load() error {
 	m.lock.Unlock()
 
 	return nil
+}
+
+func (m *AvailPresignManager) AddPresign(workId string, partyIds []*tss.PartyID, presignOutputs []*presign.LocalPresignData) {
+	if err := m.db.SavePresignData(workId, partyIds, presignOutputs); err != nil {
+		log.Error("error when saving presign data", err)
+
+		return
+	}
+
+	pids := utils.GetPidsArray(partyIds)
+	pidString := utils.GetPidString(partyIds)
+
+	// Add this to on-memory. TODO: Control the number of on-memory presign items size.
+	arr := make([]*common.AvailablePresign, len(presignOutputs))
+
+	for i := range presignOutputs {
+		presignId := fmt.Sprintf("%s-%d", workId, i)
+
+		arr[i] = &common.AvailablePresign{
+			PresignId:  presignId,
+			PidsString: pidString,
+			Pids:       pids,
+		}
+	}
+
+	m.lock.Lock()
+	m.available[pidString] = arr
+	m.lock.Unlock()
 }
 
 func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
@@ -144,6 +177,14 @@ func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []
 	}
 
 	return presignIds, selectedPids
+}
+
+func (m *AvailPresignManager) ConsumePresignIds(presignIds []string) {
+	// TODO: call the updateUsage
+	err := m.db.UpdatePresignStatus(presignIds)
+	if err != nil {
+		log.Error("Cannot update presign status, err = ", err)
+	}
 }
 
 func (m *AvailPresignManager) updateUsage(pidsString string, aps []*common.AvailablePresign, used bool) {
