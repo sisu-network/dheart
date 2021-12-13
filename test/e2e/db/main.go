@@ -76,7 +76,7 @@ func testInsertingPresignData(database db.Database) {
 		},
 	}
 
-	err := database.SavePresignData("eth", workId, pids, output)
+	err := database.SavePresignData(workId, pids, output)
 	if err != nil {
 		panic(err)
 	}

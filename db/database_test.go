@@ -121,7 +121,7 @@ func TestSqlDatabase_SavePresignData(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1)).
 		WillReturnError(nil)
 
-	assert.NoError(t, sqlDatabase.SavePresignData(chain, wordId, pids, presignData))
+	assert.NoError(t, sqlDatabase.SavePresignData(wordId, pids, presignData))
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

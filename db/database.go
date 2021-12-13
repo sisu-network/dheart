@@ -38,7 +38,7 @@ type Database interface {
 	SaveKeygenData(keyType string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
 	LoadKeygenData(keyType string) (*keygen.LocalPartySaveData, error)
 
-	SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
+	SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
 	GetAvailablePresignShortForm() ([]string, []string, error) // Returns presignIds, pids, error
 
 	LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error)
@@ -246,7 +246,7 @@ func (d *SqlDatabase) LoadKeygenData(keyType string) (*keygen.LocalPartySaveData
 	return result, nil
 }
 
-func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
+func (d *SqlDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
 	if len(presignOutputs) == 0 {
 		return nil
 	}
@@ -254,8 +254,8 @@ func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.P
 	pidString := utils.GetPidString(pids)
 
 	// Constructs multi-insert query to do all insertion in 1 query.
-	query := "INSERT INTO presign (presign_id, chain, work_id, pids_string, batch_index, status, presign_output) VALUES "
-	query = query + getQueryQuestionMark(len(presignOutputs), 7)
+	query := "INSERT INTO presign (presign_id, work_id, pids_string, batch_index, status, presign_output) VALUES "
+	query = query + getQueryQuestionMark(len(presignOutputs), 6)
 
 	params := make([]interface{}, 0)
 	for i, output := range presignOutputs {
@@ -267,7 +267,6 @@ func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.P
 		presignId := fmt.Sprintf("%s-%d", workId, i)
 
 		params = append(params, presignId)
-		params = append(params, chain)
 		params = append(params, workId)
 		params = append(params, pidString)
 

@@ -94,7 +94,7 @@ func (m *AvailPresignManager) Load() error {
 }
 
 func (m *AvailPresignManager) AddPresign(workId string, partyIds []*tss.PartyID, presignOutputs []*presign.LocalPresignData) {
-	if err := m.db.SavePresignData("", workId, partyIds, presignOutputs); err != nil {
+	if err := m.db.SavePresignData(workId, partyIds, presignOutputs); err != nil {
 		log.Error("error when saving presign data", err)
 
 		return

@@ -202,7 +202,7 @@ func (m *MockDatabase) SaveKeygenData(chain string, workId string, pids []*tss.P
 	return nil
 }
 
-func (m *MockDatabase) SavePresignData(chain string, workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
+func (m *MockDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
 	return nil
 }
 
