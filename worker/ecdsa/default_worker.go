@@ -28,7 +28,7 @@ import (
 
 var (
 	LeaderWaitTime              = 10 * time.Second
-	PreExecutionRequestWaitTime = 3 * time.Second
+	PreExecutionRequestWaitTime = 5 * time.Second
 )
 
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
@@ -37,6 +37,8 @@ type WorkerCallback interface {
 	// GetAvailablePresigns returns a list of presign output that will be used for signing. The presign's
 	// party ids should match the pids params passed into the function.
 	GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID)
+
+	ConsumePresignIds(presignIds []string)
 
 	GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
 

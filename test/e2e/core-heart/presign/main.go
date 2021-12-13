@@ -64,6 +64,7 @@ func main() {
 
 	done := make(chan bool)
 	presignResult := make(chan *types.PresignResult)
+	signingResult := make(chan *types.KeysignResult)
 
 	mockClient := &mock.MockClient{
 		PostKeygenResultFunc: func(result *types.KeygenResult) error {
@@ -72,6 +73,11 @@ func main() {
 		},
 		PostPresignResultFunc: func(result *types.PresignResult) error {
 			presignResult <- result
+			return nil
+		},
+
+		PostKeysignResultFunc: func(result *types.KeysignResult) error {
+			signingResult <- result
 			return nil
 		},
 	}
@@ -126,6 +132,28 @@ func main() {
 			log.Info("Presign Test Passed")
 		} else {
 			log.Info("Test result failed, culprits = ", result.Culprits)
+			panic("Presigning failed")
+		}
+	}
+
+	// Signing. Make sure that we don't create any new presign.
+	keysignRequest := &types.KeysignRequest{
+		Id:          "keysign",
+		OutChain:    "ganache1",
+		BytesToSign: []byte("test"),
+	}
+
+	heart.Keysign(keysignRequest, pubkeys)
+
+	select {
+	case <-time.After(time.Second * 30):
+		panic("Time out")
+	case result := <-signingResult:
+		if result.Success {
+			log.Info("Singing Test Passed")
+		} else {
+			log.Info("Test signing result failed, culprits = ", result.Culprits)
+			panic("Signing failed")
 		}
 	}
 }

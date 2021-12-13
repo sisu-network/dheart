@@ -11,6 +11,7 @@ import (
 	"github.com/golang-migrate/migrate/database/mysql"
 	_ "github.com/golang-migrate/migrate/source/file"
 	"github.com/sisu-network/dheart/core/config"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -186,7 +187,7 @@ func (d *SqlDatabase) SaveKeygenData(keyType string, workId string, pids []*tss.
 		return nil
 	}
 
-	pidString := getPidString(pids)
+	pidString := utils.GetPidString(pids)
 	// Constructs multi-insert query to do all insertion in 1 query.
 	query := "INSERT INTO keygen (key_type, work_id, pids_string, batch_index, keygen_output) VALUES "
 
@@ -250,7 +251,7 @@ func (d *SqlDatabase) SavePresignData(chain string, workId string, pids []*tss.P
 		return nil
 	}
 
-	pidString := getPidString(pids)
+	pidString := utils.GetPidString(pids)
 
 	// Constructs multi-insert query to do all insertion in 1 query.
 	query := "INSERT INTO presign (presign_id, chain, work_id, pids_string, batch_index, status, presign_output) VALUES "
@@ -360,15 +361,17 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 func (d *SqlDatabase) UpdatePresignStatus(presignIds []string) error {
 	presignString := getQueryQuestionMark(1, len(presignIds))
 	query := fmt.Sprintf(
-		"UPDATE status FROM presign SET status = %s WHERE presign_id IN (%s)",
-		PresignStatusUsed,
+		"UPDATE presign SET status = ? WHERE presign_id IN %s",
 		presignString,
 	)
 
-	interfaceArr := make([]interface{}, len(presignIds))
+	interfaceArr := make([]interface{}, len(presignIds)+1)
+	interfaceArr[0] = PresignStatusUsed
 	for i, presignId := range presignIds {
-		interfaceArr[i] = presignId
+		interfaceArr[i+1] = presignId
 	}
+
+	log.Verbose("UpdatePresignStatus: query = ", query)
 
 	_, err := d.db.Exec(query, interfaceArr...)
 	return err

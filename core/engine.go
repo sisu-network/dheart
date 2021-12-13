@@ -242,11 +242,13 @@ func (engine *DefaultEngine) OnWorkKeygenFinished(request *types.WorkRequest, ou
 }
 
 func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
-	log.Info("Presign finished for chain", request.Chain)
+	log.Info("Presign finished, request.WorkId = ", request.WorkId)
 
-	if err := engine.db.SavePresignData(request.Chain, request.WorkId, pids, data); err != nil {
-		log.Error("error when saving presign data", err)
-	}
+	// if err := engine.db.SavePresignData(request.Chain, request.WorkId, pids, data); err != nil {
+	// 	log.Error("error when saving presign data", err)
+	// }
+
+	engine.presignsManager.AddPresign(request.WorkId, pids, data)
 
 	result := htypes.PresignResult{
 		Chain:   request.Chain,
@@ -446,6 +448,10 @@ func (engine *DefaultEngine) OnWorkFailed(request *types.WorkRequest) {
 
 func (engine *DefaultEngine) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
 	return engine.presignsManager.GetAvailablePresigns(batchSize, n, pids)
+}
+
+func (engine *DefaultEngine) ConsumePresignIds(presignIds []string) {
+	engine.presignsManager.ConsumePresignIds(presignIds)
 }
 
 func (engine *DefaultEngine) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
