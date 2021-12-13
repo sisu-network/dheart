@@ -304,7 +304,11 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 }
 
 func (w *DefaultWorker) Stop() {
-	for _, job := range w.jobs {
+	w.jobsLock.RLock()
+	jobs := w.jobs
+	w.jobsLock.RUnlock()
+
+	for _, job := range jobs {
 		if job != nil {
 			job.Stop()
 		}
