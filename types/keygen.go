@@ -6,6 +6,7 @@ import (
 
 type KeygenResult struct {
 	KeyType     string
+	KeygenIndex int
 	Success     bool
 	PubKeyBytes []byte
 	Address     string

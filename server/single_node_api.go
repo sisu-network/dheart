@@ -1,21 +1,17 @@
 package server
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
-	eTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sisu-network/dheart/client"
 	"github.com/sisu-network/dheart/store"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/lib/log"
 
-	"github.com/ethereum/go-ethereum/ethclient"
 	libchain "github.com/sisu-network/lib/chain"
 )
 
@@ -125,29 +121,20 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 			log.Info("Sending Keysign to Sisu")
 
 			result := &types.KeysignResult{
-				Id:             req.Id,
-				Success:        true,
-				OutChain:       req.OutChain,
-				OutBlockHeight: req.OutBlockHeight,
-				OutHash:        req.OutHash,
-				BytesToSign:    req.BytesToSign,
-				Signature:      signature,
+				Request:   req,
+				Success:   true,
+				Signature: signature,
 			}
 
-			// api.deployToChain(result)
 			api.c.PostKeysignResult(result)
 		}()
 	} else {
 		log.Error("Cannot do key gen. Err =", err)
 		api.c.PostKeysignResult(&types.KeysignResult{
-			Id:             req.Id,
-			Success:        false,
-			ErrMesage:      err.Error(),
-			OutChain:       req.OutChain,
-			OutBlockHeight: req.OutBlockHeight,
-			OutHash:        req.OutHash,
-			BytesToSign:    req.BytesToSign,
-			Signature:      signature,
+			Request:   req,
+			Success:   false,
+			ErrMesage: err.Error(),
+			Signature: signature,
 		})
 	}
 
@@ -156,41 +143,6 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 
 func (api *SingleNodeApi) SetPrivKey(encodedKey string, keyType string) error {
 	return nil
-}
-
-// Used for debugging only.
-func (api *SingleNodeApi) deployToChain(result *types.KeysignResult) {
-	log.Info("Deploying to chain", result.OutChain)
-
-	chainId := big.NewInt(1)
-	rpcEndpoint := "http://localhost:7545"
-
-	if result.OutChain == "sisu-eth" {
-		chainId = big.NewInt(36767)
-		rpcEndpoint = "http://localhost:8545"
-	}
-
-	tx := &eTypes.Transaction{}
-	tx.UnmarshalBinary(result.BytesToSign)
-
-	signedTx, err := tx.WithSignature(eTypes.NewEIP155Signer(chainId), result.Signature)
-	if err != nil {
-		log.Error("cannot set signatuer for tx, err =", err)
-		return
-	}
-
-	client, err := ethclient.Dial(rpcEndpoint)
-	if err != nil {
-		log.Error("Cannot dial chain", result.OutChain, "at endpoint", rpcEndpoint)
-		// TODO: Add retry mechanism here.
-		return
-	}
-
-	if err := client.SendTransaction(context.Background(), signedTx); err != nil {
-		log.Error("cannot dispatch tx, err =", err)
-	} else {
-		log.Verbose("Deployment succeeded")
-	}
 }
 
 func (api *SingleNodeApi) BlockEnd(blockHeight int64) error {

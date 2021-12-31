@@ -3,24 +3,19 @@ package types
 import "github.com/sisu-network/tss-lib/tss"
 
 type KeysignRequest struct {
-	Id             string
-	OutChain       string
-	OutHash        string
-	OutBlockHeight int64
-	BytesToSign    []byte
+	Id          string
+	InChain     string
+	OutChain    string
+	OutHash     string
+	BytesToSign []byte
 }
 
 type KeysignResult struct {
+	Request   *KeysignRequest
 	Success   bool
 	ErrMesage string
 
-	Id             string
-	OutChain       string
-	OutHash        string
-	OutBlockHeight int64
-
-	BytesToSign []byte
-	Signature   []byte
+	Signature []byte
 
 	Culprits []*tss.PartyID
 }

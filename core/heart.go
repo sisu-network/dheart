@@ -119,19 +119,17 @@ func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCom
 	}
 
 	result := &htypes.KeysignResult{
-		Id:             clientRequest.Id,
-		Success:        true,
-		OutChain:       clientRequest.OutChain,
-		OutBlockHeight: clientRequest.OutBlockHeight,
-		OutHash:        clientRequest.OutHash,
-		BytesToSign:    clientRequest.BytesToSign,
-		Signature:      signature, // TODO: Support multi tx per request on Sisu
+		Success:   true,
+		Request:   clientRequest,
+		Signature: signature, // TODO: Support multi tx per request on Sisu
 	}
 
 	h.client.PostKeysignResult(result)
 }
 
 func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {
+	clientRequest := h.keysignRequests[request.WorkId]
+
 	chain := request.Chain
 	switch request.WorkType {
 	case types.EcdsaKeygen, types.EddsaKeygen:
@@ -150,6 +148,7 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 		h.client.PostPresignResult(&result)
 	case types.EcdsaSigning, types.EddsaSigning:
 		result := htypes.KeysignResult{
+			Request:  clientRequest,
 			Success:  false,
 			Culprits: culprits,
 		}
