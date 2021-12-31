@@ -19,6 +19,7 @@ type WorkRequest struct {
 
 	// Used only for keygen, presign & signing
 	KeygenType  string
+	KeygenIndex int
 	KeygenInput *keygen.LocalPreParams
 	Threshold   int
 

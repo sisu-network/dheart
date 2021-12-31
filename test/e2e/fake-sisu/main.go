@@ -190,11 +190,10 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 
 	for i := 0; i < n; i++ {
 		request := &types.KeysignRequest{
-			Id:             "Keysign0",
-			OutChain:       TEST_CHAIN,
-			OutHash:        "Hash0",
-			OutBlockHeight: 123,
-			BytesToSign:    hashBytes,
+			Id:          "Keysign0",
+			OutChain:    TEST_CHAIN,
+			OutHash:     "Hash0",
+			BytesToSign: hashBytes,
 		}
 		nodes[i].client.KeySign(request, tendermintPubKeys)
 	}
