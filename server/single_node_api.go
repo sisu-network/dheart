@@ -105,13 +105,18 @@ func (api *SingleNodeApi) keySignEth(chain string, bytesToSign []byte) ([]byte, 
 // Signing any transaction
 func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.PubKeyWrapper) error {
 	var err error
-	var signature []byte
 
-	log.Debug("Signing transaction for chain", req.OutChain)
-	if libchain.IsETHBasedChain(req.OutChain) {
-		signature, err = api.keySignEth(req.OutChain, req.BytesToSign)
-	} else {
-		return fmt.Errorf("Unknown chain: %s", req.OutChain)
+	signatures := make([][]byte, len(req.KeysignMessages))
+
+	for i, msg := range req.KeysignMessages {
+		if libchain.IsETHBasedChain(msg.OutChain) {
+			signature, err := api.keySignEth(msg.OutChain, msg.BytesToSign)
+			if err == nil {
+				signatures[i] = signature
+			}
+		} else {
+			return fmt.Errorf("Unknown chain: %s for message at index %d", msg.OutChain, i)
+		}
 	}
 
 	if err == nil {
@@ -121,9 +126,9 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 			log.Info("Sending Keysign to Sisu")
 
 			result := &types.KeysignResult{
-				Request:   req,
-				Success:   true,
-				Signature: signature,
+				Request:    req,
+				Success:    true,
+				Signatures: signatures,
 			}
 
 			api.c.PostKeysignResult(result)
@@ -134,7 +139,6 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 			Request:   req,
 			Success:   false,
 			ErrMesage: err.Error(),
-			Signature: signature,
 		})
 	}
 

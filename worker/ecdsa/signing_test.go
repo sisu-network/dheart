@@ -93,7 +93,7 @@ func TestSigningEndToEnd(t *testing.T) {
 			BatchSize:  batchSize,
 			AllParties: helper.CopySortedPartyIds(pIDs),
 			Threshold:  len(pIDs) - 1,
-			Message:    signingMsg,
+			Messages:   []string{signingMsg},
 			N:          n,
 		}
 
@@ -169,7 +169,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 			PresignInput: presignInputs[i],
 			AllParties:   helper.CopySortedPartyIds(pIDs),
 			Threshold:    len(pIDs) - 1,
-			Message:      signingMsg,
+			Messages:     []string{signingMsg},
 			N:            n,
 		}
 
@@ -238,7 +238,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 			BatchSize:  batchSize,
 			AllParties: helper.CopySortedPartyIds(pIDs),
 			Threshold:  len(pIDs) - 1,
-			Message:    signingMsg,
+			Messages:   []string{signingMsg},
 			N:          n,
 		}
 
@@ -291,7 +291,7 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 			BatchSize:  batchSize,
 			AllParties: helper.CopySortedPartyIds(pIDs),
 			Threshold:  len(pIDs) - 1,
-			Message:    signingMsg,
+			Messages:   []string{signingMsg},
 			N:          n,
 		}
 

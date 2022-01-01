@@ -91,7 +91,7 @@ type DefaultWorker struct {
 	keygenInput        *keygen.LocalPreParams
 	presignInput       *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
 	signingInput       []*presign.LocalPresignData
-	signingMessage     string
+	signingMessages    []string
 
 	// A map between of rounds and list of messages that have been produced. The size of the list
 	// is the same as batchSize.
@@ -170,7 +170,7 @@ func NewSigningWorker(
 
 	w.jobType = wTypes.EcdsaSigning
 	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
-	w.signingMessage = request.Message
+	w.signingMessages = request.Messages
 	w.curRound = message.Sign1
 
 	return w
@@ -283,7 +283,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 			} else {
 				w.curRound = message.Sign1
 				nextJobType = wTypes.EcdsaSigning
-				jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessage, w.signingInput[i], w, w.jobTimeout)
+				jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessages[i], w.signingInput[i], w, w.jobTimeout)
 			}
 
 		default:
@@ -336,7 +336,7 @@ func (w *DefaultWorker) loadPreparams() error {
 	preparams, err := w.db.LoadPreparams()
 	if err == db.ErrNotFound {
 		timeout := 60 * 5 * time.Second // 5 minutes
-		log.Info("Generating preparams for chain", w.request.Chain, " timeout =", timeout)
+		log.Info("Generating preparams for work type ", w.request.WorkType, " timeout =", timeout)
 		start := time.Now()
 		preparams, err = keygen.GeneratePreParams(timeout)
 		log.Info("Generating time = ", time.Now().Sub(start))

@@ -9,6 +9,8 @@ import (
 
 	"github.com/sisu-network/lib/log"
 
+	libchain "github.com/sisu-network/lib/chain"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/joho/godotenv"
@@ -53,12 +55,17 @@ func main() {
 	}
 
 	request := &types.KeysignRequest{
-		OutChain:    "eth",
-		OutHash:     "",
-		BytesToSign: bz,
+		KeyType: libchain.KEY_TYPE_ECDSA,
+		KeysignMessages: []*types.KeysignMessage{
+			{
+				OutChain:    "eth",
+				OutHash:     "",
+				BytesToSign: bz,
+			},
+		},
 	}
 
-	done := make(chan []byte)
+	done := make(chan [][]byte)
 
 	privKeyBytes, err := hex.DecodeString("9f575b88940d452da46a6ceec06a108fcd5863885524aec7fb0bc4906eb63ab1")
 	if err != nil {
@@ -76,13 +83,16 @@ func main() {
 
 	mockSisuClient := &mock.MockClient{
 		PostKeysignResultFunc: func(result *types.KeysignResult) error {
-			ok := crypto.VerifySignature(pubKeyBytes, hash[:], result.Signature[:len(result.Signature)-1])
-			if !ok {
-				panic("signature verification failed")
+			for _, sig := range result.Signatures {
+				ok := crypto.VerifySignature(pubKeyBytes, hash[:], sig[:len(sig)-1])
+				if !ok {
+					panic("signature verification failed")
+				}
+
+				log.Info("Signature is correct")
 			}
 
-			log.Info("Signature is correct")
-			done <- result.Signature
+			done <- result.Signatures
 
 			return nil
 		},
@@ -100,12 +110,12 @@ func main() {
 	api.Init()
 	api.KeySign(request, nil)
 
-	signature := <-done
-	if signature == nil {
+	signatures := <-done
+	if signatures == nil {
 		panic(fmt.Errorf("invalid signature"))
 	}
 
-	signedTx, err := tx.WithSignature(signer, signature)
+	signedTx, err := tx.WithSignature(signer, signatures[0])
 	if err != nil {
 		panic(err)
 	}

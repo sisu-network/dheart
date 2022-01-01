@@ -254,7 +254,7 @@ func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, p
 	engine.presignsManager.AddPresign(request.WorkId, pids, data)
 
 	result := htypes.PresignResult{
-		Chain:   request.Chain,
+		// Chain:   request.Chain,
 		Success: true,
 	}
 
@@ -265,7 +265,7 @@ func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, p
 }
 
 func (engine *DefaultEngine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
-	log.Info("Signing finished for chain", request.Chain)
+	log.Info("Signing finished for workId ", request.WorkId)
 
 	engine.callback.OnWorkSigningFinished(request, data)
 

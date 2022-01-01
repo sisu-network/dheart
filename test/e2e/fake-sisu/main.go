@@ -178,7 +178,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 	return results[0]
 }
 
-func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignChs []chan *types.KeysignResult, publicKeyBytes []byte, chainId *big.Int) *etypes.Transaction {
+func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignChs []chan *types.KeysignResult, publicKeyBytes []byte, chainId *big.Int) []*etypes.Transaction {
 	n := len(nodes)
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
@@ -190,10 +190,15 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 
 	for i := 0; i < n; i++ {
 		request := &types.KeysignRequest{
-			Id:          "Keysign0",
-			OutChain:    TEST_CHAIN,
-			OutHash:     "Hash0",
-			BytesToSign: hashBytes,
+			KeyType: libchain.KEY_TYPE_ECDSA,
+			KeysignMessages: []*types.KeysignMessage{
+				{
+					Id:          "Keysign0",
+					OutChain:    TEST_CHAIN,
+					OutHash:     "Hash0",
+					BytesToSign: hashBytes,
+				},
+			},
 		}
 		nodes[i].client.KeySign(request, tendermintPubKeys)
 	}
@@ -213,29 +218,40 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 	// Verify signing result.
 	// Check that if all signatures are the same.
 	for i := 0; i < n; i++ {
-		match := bytes.Equal(results[i].Signature, results[0].Signature)
-		if !match {
-			panic("Signatures do not match")
+		if len(results[i].Signatures) != len(results[0].Signatures) {
+			panic("Length of signature arrays do not match")
+		}
+
+		for j := 0; j < len(results[0].Signatures); j++ {
+			match := bytes.Equal(results[0].Signatures[j], results[i].Signatures[j])
+			if !match {
+				panic(fmt.Sprintf("Signatures do not match at node %d and job %d", i, j))
+			}
 		}
 	}
 
-	sigPublicKey, err := crypto.Ecrecover(hashBytes, results[0].Signature)
-	if err != nil {
-		panic(err)
-	}
-	matches := bytes.Equal(sigPublicKey, publicKeyBytes)
-	if !matches {
-		panic("Reconstructed pubkey does not match pubkey")
-	} else {
-		log.Info("Signature matched")
+	signedTxs := make([]*etypes.Transaction, len(results[0].Signatures))
+	for j := 0; j < len(results[0].Signatures); j++ {
+		sigPublicKey, err := crypto.Ecrecover(hashBytes, results[0].Signatures[j])
+		if err != nil {
+			panic(err)
+		}
+		matches := bytes.Equal(sigPublicKey, publicKeyBytes)
+		if !matches {
+			panic("Reconstructed pubkey does not match pubkey")
+		} else {
+			log.Info("Signature matched")
+		}
+
+		signedTx, err := tx.WithSignature(signer, results[0].Signatures[j])
+		if err != nil {
+			panic(err)
+		}
+
+		signedTxs[j] = signedTx
 	}
 
-	signedTx, err := tx.WithSignature(signer, results[0].Signature)
-	if err != nil {
-		panic(err)
-	}
-
-	return signedTx
+	return signedTxs
 }
 
 // deploy a signed tx to a local ganache cli

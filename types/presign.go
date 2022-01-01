@@ -3,7 +3,7 @@ package types
 import "github.com/sisu-network/tss-lib/tss"
 
 type PresignResult struct {
-	Chain       string
+	// Chain       string
 	Success     bool
 	PubKeyBytes []byte
 	Address     string

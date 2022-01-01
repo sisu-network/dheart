@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
@@ -9,7 +10,7 @@ import (
 )
 
 type WorkRequest struct {
-	Chain         string
+	// Chain         string
 	WorkType      WorkType
 	AllParties    []*tss.PartyID
 	WorkId        string
@@ -27,7 +28,7 @@ type WorkRequest struct {
 	PresignInput *keygen.LocalPartySaveData
 
 	// Used for signing
-	Message string
+	Messages []string // TODO: Make this a byte array
 }
 
 func NewKeygenRequest(keyType, workId string, n int, PIDs tss.SortedPartyIDs, keygenInput *keygen.LocalPreParams, threshold int) *WorkRequest {
@@ -48,10 +49,10 @@ func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInp
 	return request
 }
 
-func NewSigningRequets(chain, workId string, n int, PIDs tss.SortedPartyIDs, message string) *WorkRequest {
+func NewSigningRequets(workId string, n int, PIDs tss.SortedPartyIDs, messages []string) *WorkRequest {
 	request := baseRequest(EcdsaSigning, workId, n, PIDs)
-	request.Chain = chain
-	request.Message = message
+	// request.Chain = chain
+	request.Messages = messages
 
 	return request
 }
@@ -77,8 +78,13 @@ func (request *WorkRequest) Validate() error {
 		if request.PresignInput == nil {
 			return errors.New("Presign input could not be nil for signing task")
 		}
-		if request.Message == "" {
-			return errors.New("Signing message could not be empty")
+		if len(request.Messages) == 0 {
+			return errors.New("Signing messages array could not be empty")
+		}
+		for i, msg := range request.Messages {
+			if len(msg) == 0 {
+				return fmt.Errorf("Message %d is empty", i)
+			}
 		}
 
 	case EddsaKeygen:
