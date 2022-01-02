@@ -28,8 +28,9 @@ import (
 )
 
 const (
-	MaxWorker = 2
-	BatchSize = 4
+	MaxWorker    = 2
+	BatchSize    = 4
+	MaxBatchSize = 4
 )
 
 var defaultJobTimeout = 10 * time.Minute
@@ -40,6 +41,7 @@ type EngineConfig struct {
 	SigningJobTimeout time.Duration
 }
 
+// go:generate mockgen -source core/engine.go -destination=test/mock/core/engine.go -package=mock
 type Engine interface {
 	Init()
 
@@ -171,11 +173,11 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 
 	case types.EcdsaPresign:
 		w = ecdsa.NewPresignWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine,
-			engine.config.PresignJobTimeout, 1)
+			engine.config.PresignJobTimeout, MaxBatchSize)
 
 	case types.EcdsaSigning:
 		w = ecdsa.NewSigningWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine,
-			engine.config.SigningJobTimeout, 1)
+			engine.config.SigningJobTimeout, MaxBatchSize)
 	}
 
 	engine.workLock.Lock()

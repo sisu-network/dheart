@@ -181,6 +181,11 @@ func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []
 
 func (m *AvailPresignManager) ConsumePresignIds(presignIds []string) {
 	// TODO: call the updateUsage
+	if len(presignIds) == 0 {
+		log.Error("Presign is empty")
+		return
+	}
+
 	err := m.db.UpdatePresignStatus(presignIds)
 	if err != nil {
 		log.Error("Cannot update presign status, err = ", err)

@@ -256,7 +256,7 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 		workId = utils.KeccakHash32(workId)
 		signMessages[i] = string(req.KeysignMessages[i].BytesToSign)
 	}
-	workRequest := types.NewSigningRequets(workId, len(tPubKeys), sorted, signMessages)
+	workRequest := types.NewSigningRequest(workId, len(tPubKeys), sorted, signMessages)
 
 	presignInput, err := h.db.LoadKeygenData(req.KeyType)
 	if err != nil {
@@ -307,7 +307,7 @@ func (h *Heart) BlockEnd(blockHeight int64) error {
 		workId := "presign_" + keygenType + "_" + strconv.FormatInt(blockHeight, 10)
 		log.Info("Presign workId = ", workId)
 
-		presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, presignInput, false)
+		presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, presignInput, false, MaxBatchSize)
 		err = h.engine.AddRequest(presignRequest)
 		if err != nil {
 			log.Error("Failed to add presign request to engine, err = ", err)

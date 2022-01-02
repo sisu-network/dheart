@@ -89,7 +89,7 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 		return
 	}
 
-	if w.request.IsSigning() {
+	if w.request.IsSigning() && len(presignIds) > 0 {
 		w.callback.ConsumePresignIds(presignIds)
 	}
 
@@ -195,6 +195,7 @@ func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selec
 				log.Info("Found a set of presign input")
 			}
 		} else {
+			log.Info("Cannot find pre-generated presign. Doing presign work right now.")
 			w.signingInput = nil
 			workType = types.EcdsaPresign
 		}
@@ -288,7 +289,7 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 			if err := w.executeWork(workType); err != nil {
 				log.Error("Error when executing work", err)
 			} else {
-				if w.request.IsSigning() {
+				if w.request.IsSigning() && len(msg.PresignIds) > 0 {
 					// Consumes the presigns if this is a signing task.
 					w.callback.ConsumePresignIds(msg.PresignIds)
 				}
