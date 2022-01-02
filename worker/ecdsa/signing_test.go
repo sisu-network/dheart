@@ -81,7 +81,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	signer := etypes.NewEIP2930Signer(big.NewInt(1))
 	hash := signer.Hash(ethTx)
 	hashBytes := hash[:]
-	signingMsg := string(hashBytes)
+	signingMsgs := []string{string(hashBytes)}
 
 	outputs := make([][]*libCommon.SignatureData, len(pIDs)) // n * batchSize
 	outputLock := &sync.Mutex{}
@@ -93,7 +93,7 @@ func TestSigningEndToEnd(t *testing.T) {
 			BatchSize:  batchSize,
 			AllParties: helper.CopySortedPartyIds(pIDs),
 			Threshold:  len(pIDs) - 1,
-			Messages:   []string{signingMsg},
+			Messages:   signingMsgs,
 			N:          n,
 		}
 
@@ -139,7 +139,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	runAllWorkers(workers, outCh, done)
 
 	// Verify signature
-	verifySignature(t, signingMsg, outputs, wrapper.Outputs[0][0].ECDSAPub.X(), wrapper.Outputs[0][0].ECDSAPub.Y())
+	verifySignature(t, signingMsgs, outputs, wrapper.Outputs[0][0].ECDSAPub.X(), wrapper.Outputs[0][0].ECDSAPub.Y())
 
 	// Verify that this ETH transaction is correctly signed
 	verifyEthSignature(t, hashBytes, outputs[0][0], wrapper.Outputs[0][0])
@@ -156,7 +156,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 	workers := make([]worker.Worker, n)
 	done := make(chan bool)
 	finishedWorkerCount := 0
-	signingMsg := "This is a test"
+	signingMsgs := []string{"This is a test", "another message"}
 
 	outputs := make([][]*libCommon.SignatureData, len(pIDs)) // n * batchSize
 	outputLock := &sync.Mutex{}
@@ -169,7 +169,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 			PresignInput: presignInputs[i],
 			AllParties:   helper.CopySortedPartyIds(pIDs),
 			Threshold:    len(pIDs) - 1,
-			Messages:     []string{signingMsg},
+			Messages:     signingMsgs,
 			N:            n,
 		}
 
@@ -215,7 +215,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 	runAllWorkers(workers, outCh, done)
 
 	// Verify signature
-	verifySignature(t, signingMsg, outputs, nil, nil)
+	verifySignature(t, signingMsgs, outputs, nil, nil)
 }
 
 func TestSigning_PreExecutionTimeout(t *testing.T) {
@@ -334,8 +334,7 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 	assert.EqualValues(t, 4, numFailedWorkers)
 }
 
-// func verifySignature(t *testing.T, msg string, outputs [][]*libCommon.SignatureData, wrapper *helper.PresignDataWrapper) {
-func verifySignature(t *testing.T, msg string, outputs [][]*libCommon.SignatureData, pubX, pubY *big.Int) {
+func verifySignature(t *testing.T, msgs []string, outputs [][]*libCommon.SignatureData, pubX, pubY *big.Int) {
 	// Loop every single element in the batch
 	for j := range outputs[0] {
 		// Verify all workers have the same signature.
@@ -354,7 +353,7 @@ func verifySignature(t *testing.T, msg string, outputs [][]*libCommon.SignatureD
 				X:     pubX,
 				Y:     pubY,
 			}
-			ok := ecdsa.Verify(&pk, []byte(msg), R, S)
+			ok := ecdsa.Verify(&pk, []byte(msgs[j]), R, S)
 			assert.True(t, ok, "ecdsa verify must pass")
 		}
 	}
