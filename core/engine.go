@@ -249,14 +249,9 @@ func (engine *DefaultEngine) OnWorkKeygenFinished(request *types.WorkRequest, ou
 func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
 	log.Info("Presign finished, request.WorkId = ", request.WorkId)
 
-	// if err := engine.db.SavePresignData(request.Chain, request.WorkId, pids, data); err != nil {
-	// 	log.Error("error when saving presign data", err)
-	// }
-
 	engine.presignsManager.AddPresign(request.WorkId, pids, data)
 
 	result := htypes.PresignResult{
-		// Chain:   request.Chain,
 		Success: true,
 	}
 

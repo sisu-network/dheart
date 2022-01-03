@@ -85,6 +85,7 @@ func TestPresignEndToEnd(t *testing.T) {
 
 	verifyPubKey(t, n, batchSize, presignOutputs)
 
+	// Do not delete
 	// Save presign data. Uncomment this line to save presign data fixtures after test (these
 	// fixtures could be used in signing test)
 	// helper.SavePresignData(n, presignOutputs, 0)
