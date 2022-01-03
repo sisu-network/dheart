@@ -3,6 +3,11 @@ package types
 import "github.com/sisu-network/tss-lib/tss"
 
 type KeysignRequest struct {
+	KeyType         string
+	KeysignMessages []*KeysignMessage
+}
+
+type KeysignMessage struct {
 	Id          string
 	InChain     string
 	OutChain    string
@@ -11,11 +16,12 @@ type KeysignRequest struct {
 }
 
 type KeysignResult struct {
-	Request   *KeysignRequest
+	Request *KeysignRequest
+
 	Success   bool
 	ErrMesage string
 
-	Signature []byte
+	Signatures [][]byte
 
 	Culprits []*tss.PartyID
 }

@@ -112,16 +112,21 @@ func (h *Heart) OnWorkPresignFinished(result *htypes.PresignResult) {
 func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
 	clientRequest := h.keysignRequests[request.WorkId]
 
-	// TODO: handle multiple tx here.
-	signature := data[0].Signature
-	if libchain.IsETHBasedChain(request.Chain) {
-		signature = append(signature, data[0].SignatureRecovery[0])
+	signatures := make([][]byte, len(data))
+
+	for i, sig := range data {
+		signatures[i] = sig.Signature
+		if libchain.IsETHBasedChain(clientRequest.KeysignMessages[i].OutChain) {
+			signatures[i] = append(signatures[i], data[i].SignatureRecovery[0])
+		}
 	}
 
+	// TODO: handle multiple tx here.
+
 	result := &htypes.KeysignResult{
-		Success:   true,
-		Request:   clientRequest,
-		Signature: signature, // TODO: Support multi tx per request on Sisu
+		Success:    true,
+		Request:    clientRequest,
+		Signatures: signatures,
 	}
 
 	h.client.PostKeysignResult(result)
@@ -130,18 +135,16 @@ func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCom
 func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {
 	clientRequest := h.keysignRequests[request.WorkId]
 
-	chain := request.Chain
 	switch request.WorkType {
 	case types.EcdsaKeygen, types.EddsaKeygen:
 		result := htypes.KeygenResult{
-			KeyType:  libchain.GetKeygenType(request.Chain),
+			KeyType:  request.KeygenType,
 			Success:  false,
 			Culprits: culprits,
 		}
 		h.client.PostKeygenResult(&result)
 	case types.EcdsaPresign, types.EddsaPresign:
 		result := htypes.PresignResult{
-			Chain:    chain,
 			Success:  false,
 			Culprits: culprits,
 		}
@@ -246,10 +249,16 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	h.engine.AddNodes(nodes)
 
 	// TODO: Find unique workId
-	workId := req.OutChain + req.OutHash
-	workRequest := types.NewSigningRequets(req.OutChain, workId, len(tPubKeys), sorted, string(req.BytesToSign))
+	workId := ""
+	signMessages := make([]string, len(req.KeysignMessages)) // TODO: make this a byte array
+	for i, msg := range req.KeysignMessages {
+		workId = workId + msg.OutChain + msg.OutHash
+		workId = utils.KeccakHash32(workId)
+		signMessages[i] = string(req.KeysignMessages[i].BytesToSign)
+	}
+	workRequest := types.NewSigningRequest(workId, len(tPubKeys), sorted, signMessages)
 
-	presignInput, err := h.db.LoadKeygenData(libchain.GetKeyTypeForChain(req.OutChain))
+	presignInput, err := h.db.LoadKeygenData(req.KeyType)
 	if err != nil {
 		return err
 	}
@@ -298,7 +307,7 @@ func (h *Heart) BlockEnd(blockHeight int64) error {
 		workId := "presign_" + keygenType + "_" + strconv.FormatInt(blockHeight, 10)
 		log.Info("Presign workId = ", workId)
 
-		presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, presignInput, false)
+		presignRequest := types.NewPresignRequest(workId, len(h.tPubKeys), sorted, presignInput, false, MaxBatchSize)
 		err = h.engine.AddRequest(presignRequest)
 		if err != nil {
 			log.Error("Failed to add presign request to engine, err = ", err)

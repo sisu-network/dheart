@@ -23,6 +23,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tendermint/tendermint v0.34.13 // indirect
+	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	google.golang.org/protobuf v1.27.1
 )
 

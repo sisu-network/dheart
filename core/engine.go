@@ -28,8 +28,9 @@ import (
 )
 
 const (
-	MaxWorker = 2
-	BatchSize = 4
+	MaxWorker    = 2
+	BatchSize    = 4
+	MaxBatchSize = 4
 )
 
 var defaultJobTimeout = 10 * time.Minute
@@ -40,6 +41,7 @@ type EngineConfig struct {
 	SigningJobTimeout time.Duration
 }
 
+// go:generate mockgen -source core/engine.go -destination=test/mock/core/engine.go -package=mock
 type Engine interface {
 	Init()
 
@@ -171,11 +173,11 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 
 	case types.EcdsaPresign:
 		w = ecdsa.NewPresignWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine,
-			engine.config.PresignJobTimeout, 1)
+			engine.config.PresignJobTimeout, MaxBatchSize)
 
 	case types.EcdsaSigning:
 		w = ecdsa.NewSigningWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine,
-			engine.config.SigningJobTimeout, 1)
+			engine.config.SigningJobTimeout, MaxBatchSize)
 	}
 
 	engine.workLock.Lock()
@@ -247,14 +249,9 @@ func (engine *DefaultEngine) OnWorkKeygenFinished(request *types.WorkRequest, ou
 func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
 	log.Info("Presign finished, request.WorkId = ", request.WorkId)
 
-	// if err := engine.db.SavePresignData(request.Chain, request.WorkId, pids, data); err != nil {
-	// 	log.Error("error when saving presign data", err)
-	// }
-
 	engine.presignsManager.AddPresign(request.WorkId, pids, data)
 
 	result := htypes.PresignResult{
-		Chain:   request.Chain,
 		Success: true,
 	}
 
@@ -265,7 +262,7 @@ func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, p
 }
 
 func (engine *DefaultEngine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
-	log.Info("Signing finished for chain", request.Chain)
+	log.Info("Signing finished for workId ", request.WorkId)
 
 	engine.callback.OnWorkSigningFinished(request, data)
 

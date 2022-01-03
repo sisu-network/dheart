@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
@@ -9,7 +10,6 @@ import (
 )
 
 type WorkRequest struct {
-	Chain         string
 	WorkType      WorkType
 	AllParties    []*tss.PartyID
 	WorkId        string
@@ -27,12 +27,12 @@ type WorkRequest struct {
 	PresignInput *keygen.LocalPartySaveData
 
 	// Used for signing
-	Message string
+	Messages []string // TODO: Make this a byte array
 }
 
 func NewKeygenRequest(keyType, workId string, n int, PIDs tss.SortedPartyIDs, keygenInput *keygen.LocalPreParams, threshold int) *WorkRequest {
 	// Note: we only support ecdsa for now
-	request := baseRequest(EcdsaKeygen, workId, n, PIDs)
+	request := baseRequest(EcdsaKeygen, workId, n, PIDs, 1)
 	request.KeygenInput = keygenInput
 	request.Threshold = threshold
 	request.KeygenType = keyType
@@ -40,28 +40,27 @@ func NewKeygenRequest(keyType, workId string, n int, PIDs tss.SortedPartyIDs, ke
 	return request
 }
 
-func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInput *keygen.LocalPartySaveData, forcedPresign bool) *WorkRequest {
-	request := baseRequest(EcdsaPresign, workId, n, PIDs)
-	request.PresignInput = presignInput
+func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInputs *keygen.LocalPartySaveData, forcedPresign bool, batchSize int) *WorkRequest {
+	request := baseRequest(EcdsaPresign, workId, n, PIDs, batchSize)
+	request.PresignInput = presignInputs
 	request.ForcedPresign = forcedPresign
 
 	return request
 }
 
-func NewSigningRequets(chain, workId string, n int, PIDs tss.SortedPartyIDs, message string) *WorkRequest {
-	request := baseRequest(EcdsaSigning, workId, n, PIDs)
-	request.Chain = chain
-	request.Message = message
+func NewSigningRequest(workId string, n int, PIDs tss.SortedPartyIDs, messages []string) *WorkRequest {
+	request := baseRequest(EcdsaSigning, workId, n, PIDs, len(messages))
+	request.Messages = messages
 
 	return request
 }
 
-func baseRequest(workType WorkType, workdId string, n int, pIDs tss.SortedPartyIDs) *WorkRequest {
+func baseRequest(workType WorkType, workdId string, n int, pIDs tss.SortedPartyIDs, batchSize int) *WorkRequest {
 	return &WorkRequest{
 		AllParties: pIDs,
 		WorkType:   workType,
 		WorkId:     workdId,
-		BatchSize:  1, // TODO: Support real batching
+		BatchSize:  batchSize,
 		N:          n,
 	}
 }
@@ -74,11 +73,13 @@ func (request *WorkRequest) Validate() error {
 			return errors.New("Presign input could not be nil for presign task")
 		}
 	case EcdsaSigning:
-		if request.PresignInput == nil {
-			return errors.New("Presign input could not be nil for signing task")
+		if len(request.Messages) == 0 {
+			return errors.New("Signing messages array could not be empty")
 		}
-		if request.Message == "" {
-			return errors.New("Signing message could not be empty")
+		for i, msg := range request.Messages {
+			if len(msg) == 0 {
+				return fmt.Errorf("Message %d is empty", i)
+			}
 		}
 
 	case EddsaKeygen:

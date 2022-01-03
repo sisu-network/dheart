@@ -10,6 +10,8 @@ import (
 	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/lib/log"
 
+	libchain "github.com/sisu-network/lib/chain"
+
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/p2p"
@@ -138,9 +140,14 @@ func main() {
 
 	// Signing. Make sure that we don't create any new presign.
 	keysignRequest := &types.KeysignRequest{
-		Id:          "keysign",
-		OutChain:    "ganache1",
-		BytesToSign: []byte("test"),
+		KeyType: libchain.KEY_TYPE_ECDSA,
+		KeysignMessages: []*types.KeysignMessage{
+			{
+				Id:          "keysign",
+				OutChain:    "ganache1",
+				BytesToSign: []byte("test"),
+			},
+		},
 	}
 
 	heart.Keysign(keysignRequest, pubkeys)
