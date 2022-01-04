@@ -213,7 +213,6 @@ func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error 
 
 func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey) error {
 	// TODO: Check if our pubkey is one of the pubkeys.
-
 	n := len(tPubKeys)
 	h.tPubKeys = tPubKeys
 

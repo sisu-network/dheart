@@ -100,7 +100,6 @@ func TestSigningEndToEnd(t *testing.T) {
 		workerIndex := i
 
 		worker := NewSigningWorker(
-			batchSize,
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh, 0, 0),
@@ -176,7 +175,6 @@ func TestSigning_PresignAndSign(t *testing.T) {
 		workerIndex := i
 
 		worker := NewSigningWorker(
-			batchSize,
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh, 0, 0),
@@ -243,7 +241,6 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 		}
 
 		worker := NewSigningWorker(
-			batchSize,
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh, PreExecutionRequestWaitTime+1*time.Second, 0),
@@ -298,7 +295,6 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 		workerIndex := i
 
 		worker := NewSigningWorker(
-			batchSize,
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh, 0, 2*time.Second+1),

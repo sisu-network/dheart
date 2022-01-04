@@ -41,6 +41,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 			WorkId:      "Keygen0",
 			WorkType:    types.EcdsaKeygen,
 			AllParties:  helper.CopySortedPartyIds(pIDs),
+			BatchSize:   batchSize,
 			KeygenInput: preparams,
 			Threshold:   threshold,
 			N:           totalParticipants,
@@ -49,7 +50,6 @@ func TestKeygenEndToEnd(t *testing.T) {
 		workerIndex := i
 
 		workers[i] = NewKeygenWorker(
-			batchSize,
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh, 0, 0),
@@ -116,13 +116,13 @@ func TestKeygenTimeout(t *testing.T) {
 			WorkId:      "Keygen0",
 			WorkType:    types.EcdsaKeygen,
 			AllParties:  helper.CopySortedPartyIds(pIDs),
+			BatchSize:   batchSize,
 			KeygenInput: preparams,
 			Threshold:   threshold,
 			N:           totalParticipants,
 		}
 
 		workers[i] = NewKeygenWorker(
-			batchSize,
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh, 0, 2*time.Second),

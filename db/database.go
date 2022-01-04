@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate"
@@ -82,11 +83,25 @@ func (d *SqlDatabase) Connect() error {
 
 	log.Info("Schema = ", schema)
 
-	// Connect to the db
-	database, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/", username, password, host, d.config.Port))
+	var err error
+	var database *sql.DB
+	// TODO: This is a temporary fix to run local docker. The correct fix is to redo the entire
+	// life cycle of Sisu and dheart.
+	for i := 0; i < 5; i++ {
+		// Connect to the db with retry
+		log.Verbose("Attempt number ", i+1)
+		database, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/", username, password, host, d.config.Port))
+		time.Sleep(time.Second * 5)
+		if err != nil {
+			break
+		}
+	}
+
 	if err != nil {
+		log.Error("All DB connection retry failed")
 		return err
 	}
+
 	_, err = database.Exec("CREATE DATABASE IF NOT EXISTS " + schema)
 	if err != nil {
 		return err

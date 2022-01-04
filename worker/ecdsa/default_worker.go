@@ -116,7 +116,6 @@ type DefaultWorker struct {
 }
 
 func NewKeygenWorker(
-	batchSize int,
 	request *types.WorkRequest,
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
@@ -124,19 +123,18 @@ func NewKeygenWorker(
 	callback WorkerCallback,
 	jobTimeout time.Duration,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, 1)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, 1)
 
 	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
 	w.threshold = request.Threshold
-	w.keygenOutputs = make([]*keygen.LocalPartySaveData, batchSize)
+	w.keygenOutputs = make([]*keygen.LocalPartySaveData, request.BatchSize)
 	w.curRound = message.Keygen1
 
 	return w
 }
 
 func NewPresignWorker(
-	batchSize int,
 	request *types.WorkRequest,
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
@@ -145,18 +143,17 @@ func NewPresignWorker(
 	jobTimeout time.Duration,
 	maxJob int,
 ) worker.Worker {
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, maxJob)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, maxJob)
 
 	w.jobType = wTypes.EcdsaPresign
 	w.presignInput = request.PresignInput
-	w.presignOutputs = make([]*presign.LocalPresignData, batchSize)
+	w.presignOutputs = make([]*presign.LocalPresignData, request.BatchSize)
 	w.curRound = message.Presign1
 
 	return w
 }
 
 func NewSigningWorker(
-	batchSize int,
 	request *types.WorkRequest,
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
@@ -166,10 +163,10 @@ func NewSigningWorker(
 	maxJob int,
 ) worker.Worker {
 	// TODO: The request.Pids
-	w := baseWorker(request, batchSize, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, maxJob)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, maxJob)
 
 	w.jobType = wTypes.EcdsaSigning
-	w.signingOutputs = make([]*libCommon.SignatureData, batchSize)
+	w.signingOutputs = make([]*libCommon.SignatureData, request.BatchSize)
 	w.signingMessages = request.Messages
 	w.curRound = message.Sign1
 
@@ -178,7 +175,6 @@ func NewSigningWorker(
 
 func baseWorker(
 	request *types.WorkRequest,
-	batchSize int,
 	allParties []*tss.PartyID,
 	myPid *tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
@@ -190,13 +186,13 @@ func baseWorker(
 	return &DefaultWorker{
 		request:           request,
 		workId:            request.WorkId,
-		batchSize:         batchSize,
+		batchSize:         request.BatchSize,
 		db:                db,
 		myPid:             myPid,
 		allParties:        allParties,
 		dispatcher:        dispatcher,
 		callback:          callback,
-		jobs:              make([]*Job, batchSize),
+		jobs:              make([]*Job, request.BatchSize),
 		jobsLock:          &sync.RWMutex{},
 		jobOutput:         make(map[string][]tss.Message),
 		jobOutputLock:     &sync.RWMutex{},
@@ -455,7 +451,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	}
 
 	if w.batchSize != len(tssMsg.UpdateMessages) {
-		return errors.New("batch size does not match")
+		return errors.New(fmt.Sprintf("batch size does not match %d %d", w.batchSize, len(tssMsg.UpdateMessages)))
 	}
 
 	jobType := w.curJobType.Load().(wTypes.WorkType)
