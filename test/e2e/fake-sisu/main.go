@@ -115,7 +115,7 @@ func setPrivateKeys(nodes []*MockSisuNode) {
 
 	wg.Wait()
 	log.Info("Done Setting private key!")
-	time.Sleep(time.Second)
+	time.Sleep(3 * time.Second)
 }
 
 func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs []chan *types.KeygenResult) *types.KeygenResult {
@@ -314,7 +314,7 @@ func main() {
 	}
 
 	for i := 0; i < n; i++ {
-		helper.ResetDb(i)
+		helper.ResetDbAtPort(i, 4000)
 	}
 
 	loadConfigEnv("../../../.env")

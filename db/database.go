@@ -91,10 +91,10 @@ func (d *SqlDatabase) Connect() error {
 		// Connect to the db with retry
 		log.Verbose("Attempt number ", i+1)
 		database, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/", username, password, host, d.config.Port))
-		time.Sleep(time.Second * 5)
-		if err != nil {
+		if err == nil {
 			break
 		}
+		time.Sleep(time.Second * 3)
 	}
 
 	if err != nil {

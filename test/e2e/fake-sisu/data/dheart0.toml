@@ -11,7 +11,7 @@ port = 5678
 ###                        Database Configuration                           ###
 ###############################################################################
 [db]
-  host = "host.docker.internal"
+  host = "mysql"
   port = 3306
   username = "root"
   password = "password"
@@ -22,4 +22,3 @@ port = 5678
   port = 28300
   rendezvous = "rendezvous"
   peers = ["/dns/dheart1/tcp/28300/p2p/12D3KooWELVfM7ydZDeKKbXfMDKVEzfgLHEKZTCGjCXPC5V3m7Yo"]
-
