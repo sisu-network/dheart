@@ -1,20 +1,41 @@
 version: "3.9"
 services:
+  mysql:
+    image: mysql:8.0.19
+    command: "--default-authentication-plugin=mysql_native_password"
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 3s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - ./db:/var/lib/mysql
+    expose:
+      - 3306
+    ports:
+      - 4000:3306
+
   dheart0:
     image: dheart
     expose:
       - 28300
     ports:
       - 5678:5678
-    restart: on-failure
     volumes:
       - ./data/dheart0.toml:/root/dheart.toml
+    depends_on:
+      - mysql
+
   dheart1:
     image: dheart
     expose:
       - 28300
     ports:
       - 5679:5678
-    restart: on-failure
     volumes:
       - ./data/dheart1.toml:/root/dheart.toml
+    depends_on:
+      - mysql

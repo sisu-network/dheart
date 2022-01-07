@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -80,15 +81,15 @@ func createNodes(index int, n int, keygenCh chan *types.KeygenResult, keysignCh 
 func generateEthTx() *etypes.Transaction {
 	nonce := 0
 
-	value := big.NewInt(1000000000000000000) // in wei (1 eth)
-	gasLimit := uint64(21000)                // in units
-	gasPrice := big.NewInt(50)
+	value := big.NewInt(100000000000000000) // in wei (0.1 eth)
+	gasLimit := uint64(8_000_000)           // in units
+	gasPrice := big.NewInt(100000000)
 
 	toAddress := common.HexToAddress("0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d")
 	var data []byte
-	tx := etypes.NewTransaction(uint64(nonce), toAddress, value, gasLimit, gasPrice, data)
+	rawTx := etypes.NewTransaction(uint64(nonce), toAddress, value, gasLimit, gasPrice, data)
 
-	return tx
+	return rawTx
 }
 
 func setPrivateKeys(nodes []*MockSisuNode) {
@@ -115,7 +116,7 @@ func setPrivateKeys(nodes []*MockSisuNode) {
 
 	wg.Wait()
 	log.Info("Done Setting private key!")
-	time.Sleep(time.Second)
+	time.Sleep(3 * time.Second)
 }
 
 func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs []chan *types.KeygenResult) *types.KeygenResult {
@@ -255,7 +256,7 @@ func keysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysignCh
 }
 
 // deploy a signed tx to a local ganache cli
-func deploySignedTx(keygenResult *types.KeygenResult, tx *etypes.Transaction) {
+func deploySignedTx(keygenResult *types.KeygenResult, txs []*etypes.Transaction) {
 	blockTime := time.Second * 3
 	ethCl, err := ethclient.Dial("http://0.0.0.0:7545")
 	if err != nil {
@@ -263,6 +264,8 @@ func deploySignedTx(keygenResult *types.KeygenResult, tx *etypes.Transaction) {
 	}
 
 	var beforeTxBalance *big.Int
+
+	log.Info("Public key address = ", keygenResult.Address)
 
 	for {
 		balance, err := ethCl.BalanceAt(context.Background(), common.HexToAddress(keygenResult.Address), nil)
@@ -277,9 +280,11 @@ func deploySignedTx(keygenResult *types.KeygenResult, tx *etypes.Transaction) {
 		log.Info("Balance is 0. Keep waiting...")
 	}
 
-	err = ethCl.SendTransaction(context.Background(), tx)
-	if err != nil {
-		panic(err)
+	for _, tx := range txs {
+		err = ethCl.SendTransaction(context.Background(), tx)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	log.Info("A transaction is dispatched")
@@ -298,7 +303,7 @@ func deploySignedTx(keygenResult *types.KeygenResult, tx *etypes.Transaction) {
 		panic("sender account does not change. The tx likely failed")
 	}
 
-	_, _, err = ethCl.TransactionByHash(context.Background(), tx.Hash())
+	_, _, err = ethCl.TransactionByHash(context.Background(), txs[0].Hash())
 	if err != nil {
 		panic(err)
 	}
@@ -314,7 +319,7 @@ func main() {
 	}
 
 	for i := 0; i < n; i++ {
-		helper.ResetDb(i)
+		helper.ResetDbAtPort(i, 4000)
 	}
 
 	loadConfigEnv("../../../.env")
@@ -344,6 +349,8 @@ func main() {
 	log.Info("All keygen tasks finished")
 
 	// Test keysign.
-	keysign(nodes, tendermintPubKeys, keysignChs, keygenResult.PubKeyBytes, libchain.GetChainIntFromId(TEST_CHAIN))
+	txs := keysign(nodes, tendermintPubKeys, keysignChs, keygenResult.PubKeyBytes, libchain.GetChainIntFromId(TEST_CHAIN))
 	log.Info("Finished all keysign!")
+
+	deploySignedTx(keygenResult, txs)
 }

@@ -168,15 +168,15 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 	// Create a new worker.
 	switch request.WorkType {
 	case types.EcdsaKeygen:
-		w = ecdsa.NewKeygenWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine,
+		w = ecdsa.NewKeygenWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config.KeygenJobTimeout)
 
 	case types.EcdsaPresign:
-		w = ecdsa.NewPresignWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine,
+		w = ecdsa.NewPresignWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config.PresignJobTimeout, MaxBatchSize)
 
 	case types.EcdsaSigning:
-		w = ecdsa.NewSigningWorker(request.BatchSize, request, workPartyId, engine, engine.db, engine,
+		w = ecdsa.NewSigningWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config.SigningJobTimeout, MaxBatchSize)
 	}
 

@@ -25,7 +25,7 @@ func NewTssApi(heart *core.Heart) *TssApi {
 }
 
 func (api *TssApi) Init() {
-
+	api.heart.Start()
 }
 
 func (api *TssApi) Version() string {

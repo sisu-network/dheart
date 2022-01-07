@@ -56,7 +56,7 @@ func (h *Heart) Start() error {
 	log.Info("Starting heart")
 	// Create db
 	if err := h.createDb(); err != nil {
-		return err
+		panic(err)
 	}
 
 	if h.config.ShortcutPreparams {
@@ -64,6 +64,12 @@ func (h *Heart) Start() error {
 		// Save precomputed preparams in the db. Only use this in local dev mode to speed up dev time.
 		preloadPreparams(h.db, h.config)
 	}
+
+	return nil
+}
+
+func (h *Heart) Run() error {
+	log.Info("Running heart")
 
 	// Connection manager
 	h.cm = p2p.NewConnectionManager(h.config.Connection)
@@ -203,7 +209,7 @@ func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error 
 		return fmt.Errorf("Unsupported key type: %s", tendermintKeyType)
 	}
 
-	err = h.Start()
+	err = h.Run()
 	if err != nil {
 		log.Error("Failed to start heart, err =", err)
 	}
@@ -213,7 +219,6 @@ func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error 
 
 func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey) error {
 	// TODO: Check if our pubkey is one of the pubkeys.
-
 	n := len(tPubKeys)
 	h.tPubKeys = tPubKeys
 
@@ -229,6 +234,7 @@ func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey
 	h.engine.AddNodes(nodes)
 
 	request := types.NewKeygenRequest(keyType, workId, len(tPubKeys), sorted, nil, n-1)
+
 	return h.engine.AddRequest(request)
 }
 

@@ -45,6 +45,7 @@ func TestPresignEndToEnd(t *testing.T) {
 			WorkId:       "Presign0",
 			WorkType:     types.EcdsaPresign,
 			AllParties:   helper.CopySortedPartyIds(pIDs),
+			BatchSize:    batchSize,
 			PresignInput: presignInputs[i],
 			Threshold:    len(pIDs) - 1,
 			N:            n,
@@ -53,7 +54,6 @@ func TestPresignEndToEnd(t *testing.T) {
 		workerIndex := i
 
 		worker := NewPresignWorker(
-			batchSize,
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh, 0, 0),
@@ -107,13 +107,13 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 			WorkId:       "Presign0",
 			WorkType:     types.EcdsaPresign,
 			AllParties:   helper.CopySortedPartyIds(pIDs),
+			BatchSize:    batchSize,
 			PresignInput: presignInputs[i],
 			Threshold:    len(pIDs) - 1,
 			N:            n,
 		}
 
 		worker := NewPresignWorker(
-			batchSize,
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh, PreExecutionRequestWaitTime+1*time.Second, 0),
@@ -157,13 +157,13 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 			WorkId:       "Presign0",
 			WorkType:     types.EcdsaPresign,
 			AllParties:   helper.CopySortedPartyIds(pIDs),
+			BatchSize:    batchSize,
 			PresignInput: presignInputs[i],
 			Threshold:    len(pIDs) - 1,
 			N:            n,
 		}
 
 		worker := NewPresignWorker(
-			batchSize,
 			request,
 			pIDs[i],
 			helper.NewTestDispatcher(outCh, 0, 2*time.Second),

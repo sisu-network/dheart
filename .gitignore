@@ -3,3 +3,4 @@ dheart
 build
 tmp
 .idea
+test/e2e/fake-sisu/db

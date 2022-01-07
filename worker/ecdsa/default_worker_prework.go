@@ -163,8 +163,9 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 		}
 	} else {
 		// Choose top parties with highest computing power.
-		topParties, maxJob := w.availableParties.getTopParties(w.request.N)
-		w.batchSize = maxJob
+		topParties, _ := w.availableParties.getTopParties(w.request.N)
+
+		w.batchSize = w.request.BatchSize
 
 		return true, nil, topParties
 	}
