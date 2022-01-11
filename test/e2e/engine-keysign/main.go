@@ -21,7 +21,7 @@ import (
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 
-	ctypes "github.com/sisu-network/cosmos-sdk/crypto/types"
+	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
 )
 

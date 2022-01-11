@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/BurntSushi/toml v0.4.1
 	github.com/DATA-DOG/go-sqlmock v1.5.0
+	github.com/cosmos/cosmos-sdk v0.42.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/ethereum/go-ethereum v1.10.12
@@ -17,7 +18,6 @@ require (
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-kad-dht v0.11.1
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/sisu-network/cosmos-sdk v0.42.1-fork004
 	github.com/sisu-network/lib v0.0.1-alpha10
 	github.com/sisu-network/tss-lib v0.1.1
 	github.com/stretchr/testify v1.7.0
