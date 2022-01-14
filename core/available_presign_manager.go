@@ -35,8 +35,8 @@ func NewAvailPresignManager(db db.Database) *AvailPresignManager {
 	}
 }
 
-// GetUnavailablePresigns returns a list of choosen nodes that has not sent messages
-func (m *AvailPresignManager) GetUnavailablePresigns(sentNodes map[string]*tss.PartyID, allParties []*tss.PartyID) []*tss.PartyID {
+// GetUnavailableNodes returns a list of choosen nodes that has not sent messages
+func (m *AvailPresignManager) GetUnavailableNodes(sentNodes map[string]*tss.PartyID, allParties []*tss.PartyID) []*tss.PartyID {
 	// Nodes that are chosen.
 	m.lock.RLock()
 	pids := make([]string, 0, len(m.inUse))

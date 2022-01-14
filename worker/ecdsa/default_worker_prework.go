@@ -70,8 +70,9 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 		// Only blame nodes that are chosen and don't send messages in time and the leader.
 		var culprits []*tss.PartyID
 		if w.request.IsSigning() {
+			// TODO: Fix this logic.
 			// Only get unavailable presign when the round is signing
-			culprits = w.callback.GetUnavailablePresigns(w.availableParties.getAllPartiesMap(), w.allParties)
+			culprits = w.callback.GetUnavailableNodes(w.availableParties.getAllPartiesMap(), w.allParties)
 		} else {
 			// Blame nodes that does not send messages
 			for _, party := range w.allParties {
@@ -147,7 +148,7 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 // checkEnoughParticipants is a function called by the leader in the election to see if we have
 // enough nodes to participate and find a common presign set.
 func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyID) {
-	if w.availableParties.getLength() < w.request.N {
+	if w.availableParties.getLength() < w.request.Threshold {
 		return false, nil, make([]*tss.PartyID, 0)
 	}
 

@@ -233,9 +233,7 @@ func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey
 
 	h.engine.AddNodes(nodes)
 
-	threshold := (n + 1) * 2 / 3
-
-	request := types.NewKeygenRequest(keyType, workId, sorted, nil, threshold)
+	request := types.NewKeygenRequest(keyType, workId, sorted, nil, utils.GetThreshold(n))
 
 	return h.engine.AddRequest(request)
 }

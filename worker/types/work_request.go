@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
@@ -46,7 +47,7 @@ func NewPresignRequest(workId string, PIDs tss.SortedPartyIDs, presignInputs *ke
 
 	request := baseRequest(EcdsaPresign, workId, n, PIDs, batchSize)
 	request.PresignInput = presignInputs
-	request.Threshold = (n + 1) * 2 / 3
+	request.Threshold = utils.GetThreshold(n)
 	request.ForcedPresign = forcedPresign
 
 	return request
@@ -56,6 +57,7 @@ func NewSigningRequest(workId string, PIDs tss.SortedPartyIDs, messages []string
 	n := len(PIDs)
 	request := baseRequest(EcdsaSigning, workId, n, PIDs, len(messages))
 	request.Messages = messages
+	request.Threshold = utils.GetThreshold(n)
 
 	return request
 }

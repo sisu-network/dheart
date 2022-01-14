@@ -136,7 +136,7 @@ func TestAvailPresignManager_GetUnavailablePresigns(t *testing.T) {
 		"3": partyIds[1],
 	}
 
-	unavailablePartyIDs := availManager.GetUnavailablePresigns(sentNodes, partyIds)
+	unavailablePartyIDs := availManager.GetUnavailableNodes(sentNodes, partyIds)
 	assert.Len(t, unavailablePartyIDs, 1)
 	assert.Equal(t, "5", unavailablePartyIDs[0].Id)
 }

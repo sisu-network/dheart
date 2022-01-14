@@ -40,7 +40,7 @@ type WorkerCallback interface {
 
 	ConsumePresignIds(presignIds []string)
 
-	GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
+	GetUnavailableNodes(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
 
 	GetPresignOutputs(presignIds []string) []*presign.LocalPresignData
 

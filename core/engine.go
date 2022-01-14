@@ -454,8 +454,8 @@ func (engine *DefaultEngine) ConsumePresignIds(presignIds []string) {
 	engine.presignsManager.ConsumePresignIds(presignIds)
 }
 
-func (engine *DefaultEngine) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
-	return engine.presignsManager.GetUnavailablePresigns(sentMsgNodes, pids)
+func (engine *DefaultEngine) GetUnavailableNodes(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
+	return engine.presignsManager.GetUnavailableNodes(sentMsgNodes, pids)
 }
 
 func (engine *DefaultEngine) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {
