@@ -4,7 +4,9 @@
 # TODO: Fix flakiness of the p2p lib. Sometimes, a node cannot connect to its peers. Because of this
 # flakiness, we don't want to include this test scripts into our CI flow yet.
 
-FOLDERS=('core-heart/keygen' 'core-heart/presign' 'engine-keygen' 'p2p-network')
+# FOLDERS=('core-heart/keygen' 'core-heart/presign' 'engine-keygen' 'p2p-network')
+FOLDERS=('core-heart/presign')
+
 
 CUR_PATH=$(pwd)
 

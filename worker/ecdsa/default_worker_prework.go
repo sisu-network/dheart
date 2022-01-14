@@ -69,31 +69,19 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 	// Waits for all members to respond.
 	presignIds, selectedPids, err := w.waitForMemberResponse()
 	if err != nil {
-		// Only blame nodes that are chosen and don't send messages in time and the leader.
 		var culprits []*tss.PartyID
-		if w.request.IsSigning() {
-			// TODO: Fix this logic.
-			// Only get unavailable presign when the round is signing
-			culprits = w.callback.GetUnavailableNodes(w.availableParties.getAllPartiesMap(), w.allParties)
-		} else {
-			// Blame nodes that does not send messages
-			for _, party := range w.allParties {
-				if ok := w.availableParties.hasPartyId(party.Id); !ok {
-					culprits = append(culprits, party)
-				}
+		// Blame nodes that do not send messages
+		for _, party := range w.allParties {
+			if ok := w.availableParties.hasPartyId(party.Id); !ok {
+				culprits = append(culprits, party)
 			}
 		}
-
 		w.blameMgr.AddPreExecutionCulprit(append(culprits, w.myPid))
 
 		log.Error("Leader: error while waiting for member response, err = ", err)
 		w.leaderFinalized(false, nil, nil)
 		w.callback.OnWorkFailed(w.request)
 		return
-	}
-
-	if w.request.IsSigning() && len(presignIds) > 0 {
-		w.callback.ConsumePresignIds(presignIds)
 	}
 
 	w.leaderFinalized(true, presignIds, selectedPids)
@@ -296,11 +284,6 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 			// We are one of the participants, execute the work
 			if err := w.executeWork(workType); err != nil {
 				log.Error("Error when executing work", err)
-			} else {
-				if w.request.IsSigning() && len(msg.PresignIds) > 0 {
-					// Consumes the presigns if this is a signing task.
-					w.callback.ConsumePresignIds(msg.PresignIds)
-				}
 			}
 		} else {
 			// We are not in the participant list. Terminate this work. Nothing else to do.

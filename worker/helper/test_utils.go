@@ -65,21 +65,11 @@ type MockWorkerCallback struct {
 	OnWorkFailedFunc           func(request *types.WorkRequest)
 	GetAvailablePresignsFunc   func(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
 	GetPresignOutputsFunc      func(presignIds []string) []*presign.LocalPresignData
-	GetUnavailableNodesFunc    func(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
-	ConsumePresignIdsFunc      func(presignIds []string)
 
 	workerIndex     int
 	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)
 	presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
 	signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData)
-}
-
-func (cb *MockWorkerCallback) GetUnavailableNodes(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
-	if cb.GetUnavailableNodesFunc != nil {
-		return cb.GetUnavailableNodesFunc(sentMsgNodes, pids)
-	}
-
-	return nil
 }
 
 func (cb *MockWorkerCallback) OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
@@ -118,13 +108,6 @@ func (cb *MockWorkerCallback) GetAvailablePresigns(count int, n int, allPids map
 	}
 
 	return nil, nil
-}
-
-func (cb *MockWorkerCallback) ConsumePresignIds(presignIds []string) {
-	if cb.ConsumePresignIdsFunc != nil {
-		cb.ConsumePresignIdsFunc(presignIds)
-	}
-
 }
 
 func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {

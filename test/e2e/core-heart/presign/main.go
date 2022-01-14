@@ -109,6 +109,10 @@ func main() {
 	pubkeys := getPublicKeys(n)
 
 	heart := core.NewHeart(heartConfig, mockClient)
+	if err := heart.Start(); err != nil {
+		panic(err)
+	}
+
 	heart.SetBootstrappedKeys(pubkeys)
 
 	encryptedKey := getEncrypted(privKey)

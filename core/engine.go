@@ -450,14 +450,6 @@ func (engine *DefaultEngine) GetAvailablePresigns(batchSize int, n int, allPids 
 	return engine.presignsManager.GetAvailablePresigns(batchSize, n, allPids)
 }
 
-func (engine *DefaultEngine) ConsumePresignIds(presignIds []string) {
-	engine.presignsManager.ConsumePresignIds(presignIds)
-}
-
-func (engine *DefaultEngine) GetUnavailableNodes(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
-	return engine.presignsManager.GetUnavailableNodes(sentMsgNodes, pids)
-}
-
 func (engine *DefaultEngine) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {
 	loaded, err := engine.db.LoadPresign(presignIds)
 	if err != nil {

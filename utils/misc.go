@@ -23,5 +23,7 @@ func KeccakHash32(s string) string {
 }
 
 func GetThreshold(n int) int {
-	return (n + 1) * 2 / 3
+	// t = n * 2/3.
+	// Threshold = t - 1
+	return (n+1)*2/3 - 1
 }
