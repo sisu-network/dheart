@@ -111,7 +111,7 @@ func keygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan *
 
 	// Add request
 	workId := "keygen0"
-	request := types.NewKeygenRequest("ecdsa", workId, n, pids, helper.LoadPreparams(index), n-1)
+	request := types.NewKeygenRequest("ecdsa", workId, pids, helper.LoadPreparams(index), n-1)
 	err := engine.AddRequest(request)
 	if err != nil {
 		panic(err)
@@ -188,7 +188,7 @@ func main() {
 	workId := "keysign"
 	messages := []string{"First message", "second message"}
 
-	request := types.NewSigningRequest(workId, n, pids, messages)
+	request := types.NewSigningRequest(workId, pids, messages)
 	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
 	if err != nil {
 		panic(err)

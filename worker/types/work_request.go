@@ -30,8 +30,9 @@ type WorkRequest struct {
 	Messages []string // TODO: Make this a byte array
 }
 
-func NewKeygenRequest(keyType, workId string, n int, PIDs tss.SortedPartyIDs, keygenInput *keygen.LocalPreParams, threshold int) *WorkRequest {
+func NewKeygenRequest(keyType, workId string, PIDs tss.SortedPartyIDs, keygenInput *keygen.LocalPreParams, threshold int) *WorkRequest {
 	// Note: we only support ecdsa for now
+	n := len(PIDs)
 	request := baseRequest(EcdsaKeygen, workId, n, PIDs, 1)
 	request.KeygenInput = keygenInput
 	request.Threshold = threshold
@@ -40,15 +41,19 @@ func NewKeygenRequest(keyType, workId string, n int, PIDs tss.SortedPartyIDs, ke
 	return request
 }
 
-func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInputs *keygen.LocalPartySaveData, forcedPresign bool, batchSize int) *WorkRequest {
+func NewPresignRequest(workId string, PIDs tss.SortedPartyIDs, presignInputs *keygen.LocalPartySaveData, forcedPresign bool, batchSize int) *WorkRequest {
+	n := len(PIDs)
+
 	request := baseRequest(EcdsaPresign, workId, n, PIDs, batchSize)
 	request.PresignInput = presignInputs
+	request.Threshold = (n + 1) * 2 / 3
 	request.ForcedPresign = forcedPresign
 
 	return request
 }
 
-func NewSigningRequest(workId string, n int, PIDs tss.SortedPartyIDs, messages []string) *WorkRequest {
+func NewSigningRequest(workId string, PIDs tss.SortedPartyIDs, messages []string) *WorkRequest {
+	n := len(PIDs)
 	request := baseRequest(EcdsaSigning, workId, n, PIDs, len(messages))
 	request.Messages = messages
 

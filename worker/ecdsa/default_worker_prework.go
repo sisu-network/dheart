@@ -144,6 +144,8 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 	return nil, nil, errors.New("cannot find enough members for this work")
 }
 
+// checkEnoughParticipants is a function called by the leader in the election to see if we have
+// enough nodes to participate and find a common presign set.
 func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyID) {
 	if w.availableParties.getLength() < w.request.N {
 		return false, nil, make([]*tss.PartyID, 0)
@@ -262,6 +264,8 @@ func (w *DefaultWorker) onPreExecutionResponse(tssMsg *commonTypes.TssMessage) e
 // We either start execution or finish this work.
 func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 	if msg.Success {
+		// TODO: Check validity of the presign ids. Make sure it is never used.
+
 		// Check if we are in the list of participants or not
 		join := false
 		pIDs := make([]*tss.PartyID, 0, len(msg.Pids))
