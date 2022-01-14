@@ -284,6 +284,15 @@ func (h *Heart) BlockEnd(blockHeight int64) error {
 		return nil
 	}
 
+	// This operation can take time. Do it in a separate go routine and return no error immediately.
+	go h.doPresign(blockHeight)
+
+	return nil
+}
+
+// --- End of Server API  /
+
+func (h *Heart) doPresign(blockHeight int64) {
 	nodes := NewNodes(h.tPubKeys)
 	pids := make([]*tss.PartyID, len(h.tPubKeys))
 	for i, node := range nodes {
@@ -297,12 +306,10 @@ func (h *Heart) BlockEnd(blockHeight int64) error {
 
 	if err != nil {
 		log.Error("Cannot get presign input, err = ", err)
-		return err
 	}
 
 	if presignInput == nil {
 		log.Info("Cannot find presign input. Presign cannot be executed until keygen has finished running.")
-		return nil
 	}
 
 	activeWorkerCount := h.engine.GetActiveWorkerCount()
@@ -319,8 +326,4 @@ func (h *Heart) BlockEnd(blockHeight int64) error {
 			log.Error("Failed to add presign request to engine, err = ", err)
 		}
 	}
-
-	return nil
 }
-
-// --- End of Server API  /
