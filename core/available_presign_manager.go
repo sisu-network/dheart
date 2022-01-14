@@ -121,7 +121,7 @@ func (m *AvailPresignManager) AddPresign(workId string, partyIds []*tss.PartyID,
 	m.lock.Unlock()
 }
 
-func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
+func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
 	selectedPidstring := ""
 	var selectedAps []*common.AvailablePresign
 
@@ -168,7 +168,7 @@ func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []
 	selectedPids := make([]*tss.PartyID, len(pidStrings))
 
 	for i, pidString := range pidStrings {
-		for _, p := range pids {
+		for _, p := range allPids {
 			if p.Id == pidString {
 				selectedPids[i] = p
 				break

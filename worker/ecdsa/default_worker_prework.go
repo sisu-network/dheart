@@ -154,7 +154,7 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 
 	if w.request.IsSigning() {
 		// Check if we can find a presign list that match this of nodes.
-		presignIds, selectedPids := w.callback.GetAvailablePresigns(w.batchSize, w.request.N, w.availableParties.getPartyList(w.request.N))
+		presignIds, selectedPids := w.callback.GetAvailablePresigns(w.batchSize, w.request.N, w.availableParties.getAllPartiesMap())
 		if len(presignIds) == w.batchSize {
 			log.Info("checkEnoughParticipants: presignIds = ", presignIds, " batchSize = ", w.batchSize)
 			// Announce this as success and return

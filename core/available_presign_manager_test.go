@@ -24,7 +24,7 @@ func getMokDbForAvailManager(presignPids, pids []string) db.Database {
 	}
 }
 
-func TestAvailManagerHappyCase(t *testing.T) {
+func TestAvailPresignManager_HappyCase(t *testing.T) {
 	t.Parallel()
 
 	selectedPids := "2,3,5"
@@ -42,7 +42,7 @@ func TestAvailManagerHappyCase(t *testing.T) {
 	assert.Equal(t, 3, len(availManager.available))
 
 	// Get and consumes 3 presigns
-	presignIds, selectedPIDs := availManager.GetAvailablePresigns(3, 3, partyIds)
+	presignIds, selectedPIDs := availManager.GetAvailablePresigns(3, 3, getPartyIdMap(partyIds))
 	assert.Equal(t, 3, len(presignIds))
 	assert.Equal(t, 3, len(selectedPIDs))
 
@@ -64,7 +64,7 @@ func TestAvailManagerHappyCase(t *testing.T) {
 	assert.Equal(t, 2, len(availManager.available))
 }
 
-func TestAvailManagerNotFound(t *testing.T) {
+func TestAvailPresignManager_NotFound(t *testing.T) {
 	t.Parallel()
 
 	presignPids := []string{"work0-0", "work0-1", "work1-0", "work1-1", "work2-0"}
@@ -79,14 +79,14 @@ func TestAvailManagerNotFound(t *testing.T) {
 	assert.NoError(t, availManager.Load())
 	assert.Equal(t, 3, len(availManager.available))
 
-	presignIds, _ := availManager.GetAvailablePresigns(3, 3, partyIds)
+	presignIds, _ := availManager.GetAvailablePresigns(3, 3, getPartyIdMap(partyIds))
 	assert.Equal(t, 0, len(presignIds))
 
 	assert.Equal(t, 0, len(availManager.inUse))
 	assert.Equal(t, 3, len(availManager.available))
 }
 
-func TestAvailManagerPresignNotUsed(t *testing.T) {
+func TestAvailPresignManager_NotUsed(t *testing.T) {
 	t.Parallel()
 
 	selectedPids := "2,3,5"
@@ -99,7 +99,7 @@ func TestAvailManagerPresignNotUsed(t *testing.T) {
 	availManager := NewAvailPresignManager(mockDb)
 	assert.NoError(t, availManager.Load())
 
-	presignIds, _ := availManager.GetAvailablePresigns(3, 3, partyIds)
+	presignIds, _ := availManager.GetAvailablePresigns(3, 3, getPartyIdMap(partyIds))
 	assert.Equal(t, 3, len(presignIds))
 
 	// Update status
@@ -130,7 +130,7 @@ func TestAvailPresignManager_GetUnavailablePresigns(t *testing.T) {
 	assert.Equal(t, 3, len(availManager.available))
 
 	// Get and consumes 3 presigns
-	availManager.GetAvailablePresigns(3, 3, partyIds)
+	availManager.GetAvailablePresigns(3, 3, getPartyIdMap(partyIds))
 	sentNodes := map[string]*tss.PartyID{
 		"2": partyIds[0],
 		"3": partyIds[1],

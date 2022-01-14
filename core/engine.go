@@ -446,8 +446,8 @@ func (engine *DefaultEngine) OnWorkFailed(request *types.WorkRequest) {
 	worker.Stop()
 }
 
-func (engine *DefaultEngine) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
-	return engine.presignsManager.GetAvailablePresigns(batchSize, n, pids)
+func (engine *DefaultEngine) GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
+	return engine.presignsManager.GetAvailablePresigns(batchSize, n, allPids)
 }
 
 func (engine *DefaultEngine) ConsumePresignIds(presignIds []string) {
