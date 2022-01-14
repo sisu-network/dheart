@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
@@ -31,7 +30,7 @@ type WorkRequest struct {
 	Messages []string // TODO: Make this a byte array
 }
 
-func NewKeygenRequest(keyType, workId string, PIDs tss.SortedPartyIDs, keygenInput *keygen.LocalPreParams, threshold int) *WorkRequest {
+func NewKeygenRequest(keyType, workId string, PIDs tss.SortedPartyIDs, threshold int, keygenInput *keygen.LocalPreParams) *WorkRequest {
 	// Note: we only support ecdsa for now
 	n := len(PIDs)
 	request := baseRequest(EcdsaKeygen, workId, n, PIDs, 1)
@@ -42,22 +41,24 @@ func NewKeygenRequest(keyType, workId string, PIDs tss.SortedPartyIDs, keygenInp
 	return request
 }
 
-func NewPresignRequest(workId string, PIDs tss.SortedPartyIDs, presignInputs *keygen.LocalPartySaveData, forcedPresign bool, batchSize int) *WorkRequest {
+func NewPresignRequest(workId string, PIDs tss.SortedPartyIDs, threshold int, presignInputs *keygen.LocalPartySaveData, forcedPresign bool, batchSize int) *WorkRequest {
 	n := len(PIDs)
 
 	request := baseRequest(EcdsaPresign, workId, n, PIDs, batchSize)
 	request.PresignInput = presignInputs
-	request.Threshold = utils.GetThreshold(n)
+	request.Threshold = threshold
 	request.ForcedPresign = forcedPresign
 
 	return request
 }
 
-func NewSigningRequest(workId string, PIDs tss.SortedPartyIDs, messages []string) *WorkRequest {
+// the presignInputs param is optional
+func NewSigningRequest(workId string, PIDs tss.SortedPartyIDs, threshold int, messages []string, presignInput *keygen.LocalPartySaveData) *WorkRequest {
 	n := len(PIDs)
 	request := baseRequest(EcdsaSigning, workId, n, PIDs, len(messages))
+	request.PresignInput = presignInput
 	request.Messages = messages
-	request.Threshold = utils.GetThreshold(n)
+	request.Threshold = threshold
 
 	return request
 }

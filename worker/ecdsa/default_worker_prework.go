@@ -28,6 +28,8 @@ func (w *DefaultWorker) preExecution() {
 	leader := worker.ChooseLeader(request.WorkId, request.AllParties)
 	w.availableParties.add(w.myPid, 1)
 
+	fmt.Println("leader = ", leader)
+
 	// Step2: If this node is the leader, sends check availability to everyone.
 	if w.myPid.Id == leader.Id {
 		w.doPreExecutionAsLeader()
@@ -148,7 +150,7 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 // checkEnoughParticipants is a function called by the leader in the election to see if we have
 // enough nodes to participate and find a common presign set.
 func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyID) {
-	if w.availableParties.getLength() < w.request.Threshold {
+	if w.availableParties.getLength() < w.request.Threshold+1 {
 		return false, nil, make([]*tss.PartyID, 0)
 	}
 

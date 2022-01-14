@@ -69,7 +69,6 @@ func generateEthTx() *etypes.Transaction {
 func TestSigningEndToEnd(t *testing.T) {
 	wrapper := helper.LoadPresignSavedData(0)
 	n := len(wrapper.Outputs)
-	batchSize := len(wrapper.Outputs[0])
 
 	// Batch should have the same set of party ids.
 	pIDs := wrapper.Outputs[0][0].PartyIds
@@ -87,15 +86,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := &types.WorkRequest{
-			WorkId:     "Signing0",
-			WorkType:   types.EcdsaSigning,
-			BatchSize:  batchSize,
-			AllParties: helper.CopySortedPartyIds(pIDs),
-			Threshold:  len(pIDs) - 1,
-			Messages:   signingMsgs,
-			N:          n,
-		}
+		request := types.NewSigningRequest("Signing0", helper.CopySortedPartyIds(pIDs), len(pIDs)-1, signingMsgs, nil)
 
 		workerIndex := i
 
@@ -116,8 +107,8 @@ func TestSigningEndToEnd(t *testing.T) {
 					}
 				},
 
-				GetAvailablePresignsFunc: func(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
-					return make([]string, batchSize), pids
+				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
+					return make([]string, batchSize), flattenPidMaps(allPids)
 				},
 
 				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
@@ -146,7 +137,6 @@ func TestSigningEndToEnd(t *testing.T) {
 
 func TestSigning_PresignAndSign(t *testing.T) {
 	n := 4
-	batchSize := 1
 
 	// Batch should have the same set of party ids.
 	pIDs := helper.GetTestPartyIds(n)
@@ -161,16 +151,13 @@ func TestSigning_PresignAndSign(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := &types.WorkRequest{
-			WorkId:       "Signing0",
-			WorkType:     types.EcdsaSigning,
-			BatchSize:    batchSize,
-			PresignInput: presignInputs[i],
-			AllParties:   helper.CopySortedPartyIds(pIDs),
-			Threshold:    len(pIDs) - 1,
-			Messages:     signingMsgs,
-			N:            n,
-		}
+		request := types.NewSigningRequest(
+			"Signing0",
+			helper.CopySortedPartyIds(pIDs),
+			len(pIDs)-1,
+			signingMsgs,
+			presignInputs[i],
+		)
 
 		workerIndex := i
 
@@ -191,7 +178,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 					}
 				},
 
-				GetAvailablePresignsFunc: func(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
+				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
 					return nil, nil
 				},
 
@@ -219,7 +206,6 @@ func TestSigning_PresignAndSign(t *testing.T) {
 func TestSigning_PreExecutionTimeout(t *testing.T) {
 	wrapper := helper.LoadPresignSavedData(0)
 	n := len(wrapper.Outputs)
-	batchSize := len(wrapper.Outputs[0])
 
 	// Batch should have the same set of party ids.
 	pIDs := wrapper.Outputs[0][0].PartyIds
@@ -230,15 +216,13 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := &types.WorkRequest{
-			WorkId:     fmt.Sprintf("Signing_0"),
-			WorkType:   types.EcdsaSigning,
-			BatchSize:  batchSize,
-			AllParties: helper.CopySortedPartyIds(pIDs),
-			Threshold:  len(pIDs) - 1,
-			Messages:   []string{signingMsg},
-			N:          n,
-		}
+		request := types.NewSigningRequest(
+			"Signing0",
+			helper.CopySortedPartyIds(pIDs),
+			len(pIDs)-1,
+			[]string{signingMsg},
+			nil,
+		)
 
 		worker := NewSigningWorker(
 			request,
@@ -271,7 +255,6 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 func TestSigning_ExecutionTimeout(t *testing.T) {
 	wrapper := helper.LoadPresignSavedData(0)
 	n := len(wrapper.Outputs)
-	batchSize := len(wrapper.Outputs[0])
 
 	// Batch should have the same set of party ids.
 	pIDs := wrapper.Outputs[0][0].PartyIds
@@ -282,15 +265,13 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := &types.WorkRequest{
-			WorkId:     fmt.Sprintf("Signing_0"),
-			WorkType:   types.EcdsaSigning,
-			BatchSize:  batchSize,
-			AllParties: helper.CopySortedPartyIds(pIDs),
-			Threshold:  len(pIDs) - 1,
-			Messages:   []string{signingMsg},
-			N:          n,
-		}
+		request := types.NewSigningRequest(
+			"Signing0",
+			helper.CopySortedPartyIds(pIDs),
+			len(pIDs)-1,
+			[]string{signingMsg},
+			nil,
+		)
 
 		workerIndex := i
 
@@ -306,8 +287,8 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 					}
 				},
 
-				GetAvailablePresignsFunc: func(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
-					return make([]string, batchSize), pids
+				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
+					return make([]string, batchSize), flattenPidMaps(allPids)
 				},
 
 				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {

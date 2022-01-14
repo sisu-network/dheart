@@ -233,7 +233,7 @@ func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey
 
 	h.engine.AddNodes(nodes)
 
-	request := types.NewKeygenRequest(keyType, workId, sorted, nil, utils.GetThreshold(n))
+	request := types.NewKeygenRequest(keyType, workId, sorted, utils.GetThreshold(n), nil)
 
 	return h.engine.AddRequest(request)
 }
@@ -262,14 +262,14 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 		workId = utils.KeccakHash32(workId)
 		signMessages[i] = string(req.KeysignMessages[i].BytesToSign)
 	}
-	workRequest := types.NewSigningRequest(workId, sorted, signMessages)
 
+	// TODO: Load multiple input here.
 	presignInput, err := h.db.LoadKeygenData(req.KeyType)
 	if err != nil {
 		return err
 	}
+	workRequest := types.NewSigningRequest(workId, sorted, utils.GetThreshold(sorted.Len()), signMessages, presignInput)
 
-	workRequest.PresignInput = presignInput
 	err = h.engine.AddRequest(workRequest)
 
 	h.keysignRequests[workRequest.WorkId] = req
@@ -320,7 +320,7 @@ func (h *Heart) doPresign(blockHeight int64) {
 		workId := "presign_" + keygenType + "_" + strconv.FormatInt(blockHeight, 10)
 		log.Info("Presign workId = ", workId)
 
-		presignRequest := types.NewPresignRequest(workId, sorted, presignInput, false, MaxBatchSize)
+		presignRequest := types.NewPresignRequest(workId, sorted, utils.GetThreshold(len(sorted)), presignInput, false, MaxBatchSize)
 		err = h.engine.AddRequest(presignRequest)
 		if err != nil {
 			log.Error("Failed to add presign request to engine, err = ", err)

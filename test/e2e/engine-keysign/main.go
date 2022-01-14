@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/ecdsa"
+
 	"crypto/elliptic"
 	"database/sql"
 	"flag"
@@ -16,6 +17,7 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	htypes "github.com/sisu-network/dheart/types"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
@@ -106,12 +108,12 @@ func getDb(index int) db.Database {
 	return dbInstance
 }
 
-func keygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan *htypes.KeygenResult) *htypes.KeygenResult {
+func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan *htypes.KeygenResult) *htypes.KeygenResult {
 	n := len(pids)
 
 	// Add request
 	workId := "keygen0"
-	request := types.NewKeygenRequest("ecdsa", workId, pids, helper.LoadPreparams(index), n-1)
+	request := types.NewKeygenRequest("ecdsa", workId, pids, n-1, helper.LoadPreparams(index))
 	err := engine.AddRequest(request)
 	if err != nil {
 		panic(err)
@@ -181,19 +183,18 @@ func main() {
 	time.Sleep(time.Second * 3)
 
 	// Keygen
-	keygenResult := keygen(pids, index, engine, keygenCh)
+	keygenResult := doKeygen(pids, index, engine, keygenCh)
 	log.Info("Doing keysign now!")
 
 	// Keysign
 	workId := "keysign"
 	messages := []string{"First message", "second message"}
 
-	request := types.NewSigningRequest(workId, pids, messages)
 	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
 	if err != nil {
 		panic(err)
 	}
-	request.PresignInput = presignInput
+	request := types.NewSigningRequest(workId, pids, utils.GetThreshold(len(pids)), messages, presignInput)
 
 	err = engine.AddRequest(request)
 	if err != nil {

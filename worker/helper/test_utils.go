@@ -63,7 +63,7 @@ type MockWorkerCallback struct {
 	OnWorkSigningFinishedFunc  func(request *types.WorkRequest, data []*libCommon.SignatureData)
 	OnPreExecutionFinishedFunc func(request *types.WorkRequest)
 	OnWorkFailedFunc           func(request *types.WorkRequest)
-	GetAvailablePresignsFunc   func(count int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID)
+	GetAvailablePresignsFunc   func(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
 	GetPresignOutputsFunc      func(presignIds []string) []*presign.LocalPresignData
 	GetUnavailableNodesFunc    func(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
 	ConsumePresignIdsFunc      func(presignIds []string)
@@ -112,9 +112,9 @@ func (cb *MockWorkerCallback) OnWorkFailed(request *types.WorkRequest) {
 	}
 }
 
-func (cb *MockWorkerCallback) GetAvailablePresigns(count int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
+func (cb *MockWorkerCallback) GetAvailablePresigns(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
 	if cb.GetAvailablePresignsFunc != nil {
-		return cb.GetAvailablePresignsFunc(count, n, pids)
+		return cb.GetAvailablePresignsFunc(count, n, allPids)
 	}
 
 	return nil, nil

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Do not remove
 // func TestPresignBigTest(t *testing.T) {
 // 	fmt.Printf("START: ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
 // 	for i := 0; i < 3; i++ {
@@ -25,7 +26,7 @@ import (
 // 	fmt.Printf("END: ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
 // }
 
-func TestPresignEndToEnd(t *testing.T) {
+func TestPresign_EndToEnd(t *testing.T) {
 	n := 4
 	batchSize := 1
 
@@ -41,15 +42,14 @@ func TestPresignEndToEnd(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := &types.WorkRequest{
-			WorkId:       "Presign0",
-			WorkType:     types.EcdsaPresign,
-			AllParties:   helper.CopySortedPartyIds(pIDs),
-			BatchSize:    batchSize,
-			PresignInput: presignInputs[i],
-			Threshold:    len(pIDs) - 1,
-			N:            n,
-		}
+		request := types.NewPresignRequest(
+			"Presign0",
+			helper.CopySortedPartyIds(pIDs),
+			len(pIDs)-1,
+			presignInputs[i],
+			false,
+			batchSize,
+		)
 
 		workerIndex := i
 
@@ -103,15 +103,14 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := &types.WorkRequest{
-			WorkId:       "Presign0",
-			WorkType:     types.EcdsaPresign,
-			AllParties:   helper.CopySortedPartyIds(pIDs),
-			BatchSize:    batchSize,
-			PresignInput: presignInputs[i],
-			Threshold:    len(pIDs) - 1,
-			N:            n,
-		}
+		request := types.NewPresignRequest(
+			"Presign0",
+			helper.CopySortedPartyIds(pIDs),
+			len(pIDs)-1,
+			presignInputs[i],
+			false,
+			batchSize,
+		)
 
 		worker := NewPresignWorker(
 			request,
@@ -153,15 +152,14 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := &types.WorkRequest{
-			WorkId:       "Presign0",
-			WorkType:     types.EcdsaPresign,
-			AllParties:   helper.CopySortedPartyIds(pIDs),
-			BatchSize:    batchSize,
-			PresignInput: presignInputs[i],
-			Threshold:    len(pIDs) - 1,
-			N:            n,
-		}
+		request := types.NewPresignRequest(
+			"Presign0",
+			helper.CopySortedPartyIds(pIDs),
+			len(pIDs)-1,
+			presignInputs[i],
+			false,
+			batchSize,
+		)
 
 		worker := NewPresignWorker(
 			request,
