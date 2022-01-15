@@ -134,7 +134,7 @@ func main() {
 	case <-time.After(time.Second * 30):
 		panic("Time out")
 	case result := <-presignResult:
-		if result.Success {
+		if result.Outcome == types.OutcomeSuccess {
 			log.Info("Presign Test Passed")
 		} else {
 			log.Info("Test result failed, culprits = ", result.Culprits)
@@ -160,7 +160,7 @@ func main() {
 	case <-time.After(time.Second * 30):
 		panic("Time out")
 	case result := <-signingResult:
-		if result.Success {
+		if result.Outcome == types.OutcomeSuccess {
 			log.Info("Singing Test Passed")
 		} else {
 			log.Info("Test signing result failed, culprits = ", result.Culprits)

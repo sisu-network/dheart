@@ -163,7 +163,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 
 	// Everyone must have the same address, pubkey bytes
 	for i := range results {
-		if !results[i].Success {
+		if results[i].Outcome != types.OutcomeSuccess {
 			panic(fmt.Sprintf("Node %d failed to generate result", i))
 		}
 		if results[i].Address != results[0].Address {

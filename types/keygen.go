@@ -7,7 +7,8 @@ import (
 type KeygenResult struct {
 	KeyType     string
 	KeygenIndex int
-	Success     bool
+
+	Outcome     OutcomeType
 	PubKeyBytes []byte
 	Address     string
 	Culprits    []*tss.PartyID

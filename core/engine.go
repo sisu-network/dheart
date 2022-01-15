@@ -237,7 +237,7 @@ func (engine *DefaultEngine) OnWorkKeygenFinished(request *types.WorkRequest, ou
 	result := htypes.KeygenResult{
 		KeyType:     request.KeygenType,
 		PubKeyBytes: publicKeyBytes,
-		Success:     true,
+		Outcome:     htypes.OutcomeSuccess,
 		Address:     address,
 	}
 
@@ -252,7 +252,7 @@ func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, p
 	engine.presignsManager.AddPresign(request.WorkId, pids, data)
 
 	result := htypes.PresignResult{
-		Success: true,
+		Outcome: htypes.OutcomeSuccess,
 	}
 
 	engine.callback.OnWorkPresignFinished(&result)
@@ -425,7 +425,22 @@ func (engine *DefaultEngine) GetActiveWorkerCount() int {
 }
 
 func (engine *DefaultEngine) OnPreExecutionFinished(request *types.WorkRequest) {
-	// TODO: implements this
+	switch request.WorkType {
+	case types.EcdsaKeygen:
+		// This should not happen as in keygen all nodes should be selected.
+
+	case types.EcdsaPresign:
+		result := &htypes.PresignResult{
+			Outcome: htypes.OutcometNotSelected,
+		}
+		engine.callback.OnWorkPresignFinished(result)
+
+	case types.EcdsaSigning:
+		// result := &htypes.KeysignResult{
+		// 	Outcome: htypes.OutcometNotSelected,
+		// }
+		// engine.callback.OnWorkSigningFinished(result)
+	}
 }
 
 func (engine *DefaultEngine) OnWorkFailed(request *types.WorkRequest) {

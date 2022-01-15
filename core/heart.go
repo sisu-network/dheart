@@ -130,7 +130,7 @@ func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCom
 	// TODO: handle multiple tx here.
 
 	result := &htypes.KeysignResult{
-		Success:    true,
+		Outcome:    htypes.OutcomeSuccess,
 		Request:    clientRequest,
 		Signatures: signatures,
 	}
@@ -145,20 +145,20 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 	case types.EcdsaKeygen, types.EddsaKeygen:
 		result := htypes.KeygenResult{
 			KeyType:  request.KeygenType,
-			Success:  false,
+			Outcome:  htypes.OutcomeFailure,
 			Culprits: culprits,
 		}
 		h.client.PostKeygenResult(&result)
 	case types.EcdsaPresign, types.EddsaPresign:
 		result := htypes.PresignResult{
-			Success:  false,
+			Outcome:  htypes.OutcomeFailure,
 			Culprits: culprits,
 		}
 		h.client.PostPresignResult(&result)
 	case types.EcdsaSigning, types.EddsaSigning:
 		result := htypes.KeysignResult{
 			Request:  clientRequest,
-			Success:  false,
+			Outcome:  htypes.OutcomeFailure,
 			Culprits: culprits,
 		}
 		h.client.PostKeysignResult(&result)

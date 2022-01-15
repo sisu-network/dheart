@@ -27,7 +27,7 @@ func (api *ApiHandler) CheckHealth() {
 
 func (a *ApiHandler) KeygenResult(result *types.KeygenResult) bool {
 	log.Info("There is a Keygen Result")
-	log.Info("Success = ", result.Success)
+	log.Info("Success = ", result.Outcome)
 
 	if a.keygenCh != nil {
 		a.keygenCh <- result
