@@ -1,7 +1,6 @@
 package ecdsa
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -24,7 +23,6 @@ func startAllWorkers(workers []worker.Worker) {
 	}
 
 	wg.Wait()
-	fmt.Println("Done starting all workers")
 }
 
 // debug function to get worker index from its id

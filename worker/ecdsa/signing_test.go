@@ -368,9 +368,6 @@ func doTestThreshold(t *testing.T) {
 	// Batch should have the same set of party ids.
 	pIDs := helper.GetTestPartyIds(n)
 
-	fmt.Println("pids = ", pIDs)
-	fmt.Println("output = ", selectedPids)
-
 	outCh := make(chan *common.TssMessage)
 	workers := make([]worker.Worker, n)
 	done := make(chan bool)
@@ -428,11 +425,8 @@ func doTestThreshold(t *testing.T) {
 					}
 
 					if !found {
-						fmt.Println("EEEE Not found!")
 						return []string{}, []*tss.PartyID{}
 					}
-
-					fmt.Println("selectedPids = ", selectedPids)
 
 					return make([]string, batchSize), selectedPids
 				},
@@ -443,8 +437,6 @@ func doTestThreshold(t *testing.T) {
 							return wrapper.Outputs[i]
 						}
 					}
-
-					fmt.Println("Cannot find pid = ", myPid)
 
 					return nil
 				},

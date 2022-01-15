@@ -28,8 +28,6 @@ func (w *DefaultWorker) preExecution() {
 	leader := worker.ChooseLeader(request.WorkId, request.AllParties)
 	w.availableParties.add(w.myPid, 1)
 
-	fmt.Println("leader = ", leader)
-
 	// Step2: If this node is the leader, sends check availability to everyone.
 	if w.myPid.Id == leader.Id {
 		w.doPreExecutionAsLeader()
@@ -138,8 +136,6 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 			}
 		}
 
-		fmt.Println("AAAA CHecking .....")
-
 		if ok, presignIds, selectedPids := w.checkEnoughParticipants(); ok {
 			return presignIds, selectedPids, nil
 		}
@@ -151,13 +147,9 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 // checkEnoughParticipants is a function called by the leader in the election to see if we have
 // enough nodes to participate and find a common presign set.
 func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyID) {
-	fmt.Println("available parties = ", w.availableParties.getLength(), w.request.Threshold+1)
-
 	if w.availableParties.getLength() < w.request.GetMinPartyCount() {
 		return false, nil, make([]*tss.PartyID, 0)
 	}
-
-	fmt.Println("BBBBB 00000")
 
 	if w.request.IsSigning() {
 		// Check if we can find a presign list that match this of nodes.
@@ -173,8 +165,6 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 	} else {
 		// Choose top parties with highest computing power.
 		topParties, _ := w.availableParties.getTopParties(w.request.GetMinPartyCount())
-
-		fmt.Println("BBBBB Choosing top parties", len(topParties), topParties)
 
 		w.batchSize = w.request.BatchSize
 
@@ -272,8 +262,6 @@ func (w *DefaultWorker) onPreExecutionResponse(tssMsg *commonTypes.TssMessage) e
 // memberFinalized is called when all the participants have been finalized by the leader.
 // We either start execution or finish this work.
 func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
-	fmt.Println("CCCC Member finalized.....")
-
 	if msg.Success {
 		// TODO: Check validity of the presign ids. Make sure it is never used.
 
@@ -286,8 +274,6 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 			}
 			pIDs = append(pIDs, helper.GetPidFromString(participant, w.allParties))
 		}
-
-		fmt.Println("CCCC join = ", join)
 
 		w.pIDs = tss.SortPartyIDs(pIDs)
 		w.pIDsMap = pidsToMap(w.pIDs)
@@ -308,9 +294,6 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 				log.Error("Error when executing work", err)
 			}
 		} else {
-			fmt.Println("CCCCC OnNodeNotSelected", w.myPid.Id)
-			fmt.Println("CCCCC msg.Pids", msg.Pids)
-
 			// We are not in the participant list. Terminate this work. Nothing else to do.
 			w.callback.OnNodeNotSelected(w.request)
 		}

@@ -277,7 +277,7 @@ func deploySignedTx(keygenResult *types.KeygenResult, txs []*etypes.Transaction)
 			beforeTxBalance = balance
 			break
 		}
-		log.Info("Balance is 0. Keep waiting...")
+		log.Info("Balance is 0. Keep waiting for funding...")
 	}
 
 	for _, tx := range txs {

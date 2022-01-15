@@ -259,7 +259,7 @@ func TestPresign_Threshold(t *testing.T) {
 
 	verifyPubKey(t, threshold+1, batchSize, presignOutputs)
 
-	helper.SavePresignData(n, presignOutputs, 2)
+	// helper.SavePresignData(n, presignOutputs, 2)
 }
 
 func verifyPubKey(t *testing.T, n, batchSize int, presignOutputs [][]*presign.LocalPresignData) {

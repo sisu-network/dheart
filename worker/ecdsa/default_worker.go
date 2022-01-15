@@ -425,8 +425,6 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 			return fmt.Errorf("error when processing execution response %w", err)
 		}
 	case common.TssMessage_PRE_EXEC_OUTPUT:
-		fmt.Println("CCCCCC", len(w.pIDs))
-
 		if len(w.pIDs) == 0 {
 			// This output of workParticipantCh is called only once. We do checking for pids length to
 			// make sure we only send message to this channel once.
