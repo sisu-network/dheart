@@ -424,7 +424,8 @@ func (engine *DefaultEngine) GetActiveWorkerCount() int {
 	return len(engine.workers)
 }
 
-func (engine *DefaultEngine) OnPreExecutionFinished(request *types.WorkRequest) {
+// OnNodeNotSelected is called when this node is not selected by the leader in the election round.
+func (engine *DefaultEngine) OnNodeNotSelected(request *types.WorkRequest) {
 	switch request.WorkType {
 	case types.EcdsaKeygen:
 		// This should not happen as in keygen all nodes should be selected.

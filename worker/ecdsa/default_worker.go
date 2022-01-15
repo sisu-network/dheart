@@ -40,7 +40,7 @@ type WorkerCallback interface {
 
 	GetPresignOutputs(presignIds []string) []*presign.LocalPresignData
 
-	OnPreExecutionFinished(request *types.WorkRequest)
+	OnNodeNotSelected(request *types.WorkRequest)
 
 	OnWorkFailed(request *types.WorkRequest)
 

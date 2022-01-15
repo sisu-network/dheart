@@ -287,7 +287,7 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 			}
 		} else {
 			// We are not in the participant list. Terminate this work. Nothing else to do.
-			w.callback.OnPreExecutionFinished(w.request)
+			w.callback.OnNodeNotSelected(w.request)
 		}
 	} else { // msg.Success == false
 		// This work fails because leader cannot find enough participants.

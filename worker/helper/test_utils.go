@@ -58,13 +58,13 @@ var (
 )
 
 type MockWorkerCallback struct {
-	OnWorkKeygenFinishedFunc   func(request *types.WorkRequest, data []*keygen.LocalPartySaveData)
-	OnWorkPresignFinishedFunc  func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
-	OnWorkSigningFinishedFunc  func(request *types.WorkRequest, data []*libCommon.SignatureData)
-	OnPreExecutionFinishedFunc func(request *types.WorkRequest)
-	OnWorkFailedFunc           func(request *types.WorkRequest)
-	GetAvailablePresignsFunc   func(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
-	GetPresignOutputsFunc      func(presignIds []string) []*presign.LocalPresignData
+	OnWorkKeygenFinishedFunc  func(request *types.WorkRequest, data []*keygen.LocalPartySaveData)
+	OnWorkPresignFinishedFunc func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
+	OnWorkSigningFinishedFunc func(request *types.WorkRequest, data []*libCommon.SignatureData)
+	OnNodeNotSelectedFunc     func(request *types.WorkRequest)
+	OnWorkFailedFunc          func(request *types.WorkRequest)
+	GetAvailablePresignsFunc  func(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
+	GetPresignOutputsFunc     func(presignIds []string) []*presign.LocalPresignData
 
 	workerIndex     int
 	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)
@@ -90,9 +90,9 @@ func (cb *MockWorkerCallback) OnWorkSigningFinished(request *types.WorkRequest, 
 	}
 }
 
-func (cb *MockWorkerCallback) OnPreExecutionFinished(request *types.WorkRequest) {
-	if cb.OnPreExecutionFinishedFunc != nil {
-		cb.OnPreExecutionFinishedFunc(request)
+func (cb *MockWorkerCallback) OnNodeNotSelected(request *types.WorkRequest) {
+	if cb.OnNodeNotSelectedFunc != nil {
+		cb.OnNodeNotSelectedFunc(request)
 	}
 }
 
@@ -151,7 +151,7 @@ func (cb *MockEngineCallback) OnWorkFailed(request *types.WorkRequest, culprits 
 	}
 }
 
-func (cb *MockEngineCallback) OnPreExecutionFinished(workId string) {
+func (cb *MockEngineCallback) OnNodeNotSelected(workId string) {
 	// Do nothing.
 }
 
