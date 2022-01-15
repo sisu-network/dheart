@@ -74,7 +74,7 @@ type DefaultWorker struct {
 	preExecutionCache *worker.MessageCache
 
 	// Execution
-	threshold  int
+	// threshold  int
 	jobs       []*Job
 	jobsLock   *sync.RWMutex
 	dispatcher interfaces.MessageDispatcher
@@ -123,7 +123,6 @@ func NewKeygenWorker(
 
 	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
-	w.threshold = request.Threshold
 	w.keygenOutputs = make([]*keygen.LocalPartySaveData, request.BatchSize)
 	w.curRound = message.Keygen1
 
@@ -246,7 +245,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 		}
 	}
 
-	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.threshold)
+	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.request.Threshold)
 
 	jobs := make([]*Job, w.batchSize)
 	log.Info("batchSize = ", w.batchSize)
@@ -426,6 +425,8 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 			return fmt.Errorf("error when processing execution response %w", err)
 		}
 	case common.TssMessage_PRE_EXEC_OUTPUT:
+		fmt.Println("CCCCCC", len(w.pIDs))
+
 		if len(w.pIDs) == 0 {
 			// This output of workParticipantCh is called only once. We do checking for pids length to
 			// make sure we only send message to this channel once.

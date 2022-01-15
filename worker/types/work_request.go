@@ -101,6 +101,15 @@ func (request *WorkRequest) Validate() error {
 	return nil
 }
 
+// GetMinPartyCount returns the minimum number of parties needed to do this job.
+func (request *WorkRequest) GetMinPartyCount() int {
+	if request.IsKeygen() {
+		return request.N
+	}
+
+	return request.Threshold + 1
+}
+
 func (request *WorkRequest) GetPriority() int {
 	// Keygen
 	if request.WorkType == EcdsaKeygen || request.WorkType == EddsaKeygen {

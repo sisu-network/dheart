@@ -104,6 +104,17 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 		timeDiff := end.Sub(now)
 		select {
 		case <-time.After(timeDiff):
+			// Time out, this returns failure except for 1 case:
+			//
+			// If this is a signing task and we have enough online (>= threshold + 1) but cannot find
+			// the presigns set to do the signing, we have to do the presign first before doing signing
+			if w.request.IsSigning() {
+				// We have to do presign + signing ƒrom online nodes since we cannot find appropriate presign data.
+				parties := w.availableParties.getPartyList(w.request.Threshold + 1)
+				if len(parties) >= w.request.Threshold+1 {
+					return nil, parties, nil
+				}
+			}
 			return nil, nil, errors.New("timeout waiting for member response")
 
 		case tssMsg := <-w.memberResponseCh:
@@ -127,6 +138,8 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 			}
 		}
 
+		fmt.Println("AAAA CHecking .....")
+
 		if ok, presignIds, selectedPids := w.checkEnoughParticipants(); ok {
 			return presignIds, selectedPids, nil
 		}
@@ -138,9 +151,13 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 // checkEnoughParticipants is a function called by the leader in the election to see if we have
 // enough nodes to participate and find a common presign set.
 func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyID) {
-	if w.availableParties.getLength() < w.request.Threshold+1 {
+	fmt.Println("available parties = ", w.availableParties.getLength(), w.request.Threshold+1)
+
+	if w.availableParties.getLength() < w.request.GetMinPartyCount() {
 		return false, nil, make([]*tss.PartyID, 0)
 	}
+
+	fmt.Println("BBBBB 00000")
 
 	if w.request.IsSigning() {
 		// Check if we can find a presign list that match this of nodes.
@@ -150,13 +167,14 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 			// Announce this as success and return
 			return true, presignIds, selectedPids
 		} else {
-			// We have to do presign + signing ƒrom online nodes since we cannot find appropriate presign data.
-			parties := w.availableParties.getPartyList(w.request.N)
-			return true, nil, parties
+			// Otherwise, keep waiting
+			return false, nil, make([]*tss.PartyID, 0)
 		}
 	} else {
 		// Choose top parties with highest computing power.
-		topParties, _ := w.availableParties.getTopParties(w.request.N)
+		topParties, _ := w.availableParties.getTopParties(w.request.GetMinPartyCount())
+
+		fmt.Println("BBBBB Choosing top parties", len(topParties), topParties)
 
 		w.batchSize = w.request.BatchSize
 
@@ -173,17 +191,17 @@ func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selec
 	}
 
 	// Get list of parties
-	pIDs := w.availableParties.getPartyList(w.request.N)
+	pIDs := w.availableParties.getPartyList(w.request.GetMinPartyCount())
 	w.pIDs = tss.SortPartyIDs(pIDs)
 	w.pIDsMap = pidsToMap(w.pIDs)
 
 	// Broadcast success to everyone
 	msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, true, presignIds, w.pIDs)
-	go w.dispatcher.BroadcastMessage(w.pIDs, msg)
+	go w.dispatcher.BroadcastMessage(w.allParties, msg)
 
 	workType := w.jobType
 	if w.request.IsSigning() {
-		if presignIds != nil && len(presignIds) > 0 {
+		if len(presignIds) > 0 {
 			w.signingInput = w.callback.GetPresignOutputs(presignIds)
 			if w.signingInput != nil && len(w.signingInput) > 0 {
 				log.Info("Found a set of presign input")
@@ -254,6 +272,8 @@ func (w *DefaultWorker) onPreExecutionResponse(tssMsg *commonTypes.TssMessage) e
 // memberFinalized is called when all the participants have been finalized by the leader.
 // We either start execution or finish this work.
 func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
+	fmt.Println("CCCC Member finalized.....")
+
 	if msg.Success {
 		// TODO: Check validity of the presign ids. Make sure it is never used.
 
@@ -266,6 +286,8 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 			}
 			pIDs = append(pIDs, helper.GetPidFromString(participant, w.allParties))
 		}
+
+		fmt.Println("CCCC join = ", join)
 
 		w.pIDs = tss.SortPartyIDs(pIDs)
 		w.pIDsMap = pidsToMap(w.pIDs)
@@ -286,6 +308,7 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 				log.Error("Error when executing work", err)
 			}
 		} else {
+			fmt.Println("CCCCC OnNodeNotSelected")
 			// We are not in the participant list. Terminate this work. Nothing else to do.
 			w.callback.OnNodeNotSelected(w.request)
 		}
