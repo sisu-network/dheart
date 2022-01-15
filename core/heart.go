@@ -18,9 +18,7 @@ import (
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
-	libchain "github.com/sisu-network/lib/chain"
 	"github.com/sisu-network/lib/log"
-	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -115,25 +113,9 @@ func (h *Heart) OnWorkPresignFinished(result *htypes.PresignResult) {
 	h.client.PostPresignResult(result)
 }
 
-func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult) {
 	clientRequest := h.keysignRequests[request.WorkId]
-
-	signatures := make([][]byte, len(data))
-
-	for i, sig := range data {
-		signatures[i] = sig.Signature
-		if libchain.IsETHBasedChain(clientRequest.KeysignMessages[i].OutChain) {
-			signatures[i] = append(signatures[i], data[i].SignatureRecovery[0])
-		}
-	}
-
-	// TODO: handle multiple tx here.
-
-	result := &htypes.KeysignResult{
-		Outcome:    htypes.OutcomeSuccess,
-		Request:    clientRequest,
-		Signatures: signatures,
-	}
+	result.Request = clientRequest
 
 	h.client.PostKeysignResult(result)
 }
@@ -257,10 +239,12 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	// TODO: Find unique workId
 	workId := ""
 	signMessages := make([]string, len(req.KeysignMessages)) // TODO: make this a byte array
+	chains := make([]string, len(req.KeysignMessages))
 	for i, msg := range req.KeysignMessages {
 		workId = workId + msg.OutChain + msg.OutHash
 		workId = utils.KeccakHash32(workId)
-		signMessages[i] = string(req.KeysignMessages[i].BytesToSign)
+		signMessages[i] = string(msg.BytesToSign)
+		chains[i] = msg.OutChain
 	}
 
 	// TODO: Load multiple input here.
@@ -268,7 +252,14 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	if err != nil {
 		return err
 	}
-	workRequest := types.NewSigningRequest(workId, sorted, utils.GetThreshold(sorted.Len()), signMessages, presignInput)
+	workRequest := types.NewSigningRequest(
+		workId,
+		sorted,
+		utils.GetThreshold(sorted.Len()),
+		signMessages,
+		chains,
+		presignInput,
+	)
 
 	err = h.engine.AddRequest(workRequest)
 

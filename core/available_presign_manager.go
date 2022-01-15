@@ -22,15 +22,13 @@ type AvailPresignManager struct {
 	// Set of presign data that being used by a worker. In case the worker fails, we know which
 	// nodes are using the presigns.
 	// map between: list of pids (string) -> array of available presigns.
-	inUse map[string][]*common.AvailablePresign
-	lock  *sync.RWMutex
+	lock *sync.RWMutex
 }
 
 func NewAvailPresignManager(db db.Database) *AvailPresignManager {
 	return &AvailPresignManager{
 		db:        db,
 		available: make(map[string][]*common.AvailablePresign),
-		inUse:     make(map[string][]*common.AvailablePresign),
 		lock:      &sync.RWMutex{},
 	}
 }

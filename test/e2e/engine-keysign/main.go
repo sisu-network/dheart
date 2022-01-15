@@ -24,19 +24,18 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
-	libCommon "github.com/sisu-network/tss-lib/common"
 )
 
 type EngineCallback struct {
 	keygenDataCh  chan *htypes.KeygenResult
 	presignDataCh chan *htypes.PresignResult
-	signingDataCh chan []*libCommon.SignatureData
+	signingDataCh chan *htypes.KeysignResult
 }
 
 func NewEngineCallback(
 	keygenDataCh chan *htypes.KeygenResult,
 	presignDataCh chan *htypes.PresignResult,
-	signingDataCh chan []*libCommon.SignatureData,
+	signingDataCh chan *htypes.KeysignResult,
 ) *EngineCallback {
 	return &EngineCallback{
 		keygenDataCh, presignDataCh, signingDataCh,
@@ -51,9 +50,9 @@ func (cb *EngineCallback) OnWorkPresignFinished(result *htypes.PresignResult) {
 	cb.presignDataCh <- result
 }
 
-func (cb *EngineCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+func (cb *EngineCallback) OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult) {
 	if cb.signingDataCh != nil {
-		cb.signingDataCh <- data
+		cb.signingDataCh <- result
 	}
 }
 
@@ -167,7 +166,7 @@ func main() {
 
 	// Create new engine
 	keygenCh := make(chan *htypes.KeygenResult)
-	keysignch := make(chan []*libCommon.SignatureData)
+	keysignch := make(chan *htypes.KeysignResult)
 	cb := NewEngineCallback(keygenCh, nil, keysignch)
 	database := getDb(index)
 
@@ -189,21 +188,22 @@ func main() {
 	// Keysign
 	workId := "keysign"
 	messages := []string{"First message", "second message"}
+	chains := []string{"eth", "eth"}
 
 	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
 	if err != nil {
 		panic(err)
 	}
-	request := types.NewSigningRequest(workId, pids, utils.GetThreshold(len(pids)), messages, presignInput)
+	request := types.NewSigningRequest(workId, pids, utils.GetThreshold(len(pids)), messages, chains, presignInput)
 
 	err = engine.AddRequest(request)
 	if err != nil {
 		panic(err)
 	}
 
-	var signatures []*libCommon.SignatureData
+	var result *htypes.KeysignResult
 	select {
-	case signatures = <-keysignch:
+	case result = <-keysignch:
 	case <-time.After(time.Second * 20):
 		panic("Keygen timeout")
 	}
@@ -216,7 +216,16 @@ func main() {
 			Y:     y,
 		}
 
-		verifySignature(&pk, msg, new(big.Int).SetBytes(signatures[i].R), new(big.Int).SetBytes(signatures[i].S))
+		sig := result.Signatures[i]
+		if len(sig) != 65 {
+			panic(fmt.Sprintf("Signature length is not correct. actual length = %d", len(sig)))
+		}
+		sig = sig[:64]
+
+		r := sig[:32]
+		s := sig[32:]
+
+		verifySignature(&pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
 	}
 
 	log.Info("Verification succeeded!")

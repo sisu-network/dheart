@@ -28,6 +28,7 @@ type WorkRequest struct {
 
 	// Used for signing
 	Messages []string // TODO: Make this a byte array
+	Chains   []string
 }
 
 func NewKeygenRequest(keyType, workId string, PIDs tss.SortedPartyIDs, threshold int, keygenInput *keygen.LocalPreParams) *WorkRequest {
@@ -53,11 +54,12 @@ func NewPresignRequest(workId string, PIDs tss.SortedPartyIDs, threshold int, pr
 }
 
 // the presignInputs param is optional
-func NewSigningRequest(workId string, PIDs tss.SortedPartyIDs, threshold int, messages []string, presignInput *keygen.LocalPartySaveData) *WorkRequest {
+func NewSigningRequest(workId string, PIDs tss.SortedPartyIDs, threshold int, messages []string, chains []string, presignInput *keygen.LocalPartySaveData) *WorkRequest {
 	n := len(PIDs)
 	request := baseRequest(EcdsaSigning, workId, n, PIDs, len(messages))
 	request.PresignInput = presignInput
 	request.Messages = messages
+	request.Chains = chains
 	request.Threshold = threshold
 
 	return request

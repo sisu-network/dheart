@@ -86,7 +86,14 @@ func TestSigningEndToEnd(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := types.NewSigningRequest("Signing0", helper.CopySortedPartyIds(pIDs), len(pIDs)-1, signingMsgs, nil)
+		request := types.NewSigningRequest(
+			"Signing0",
+			helper.CopySortedPartyIds(pIDs),
+			len(pIDs)-1,
+			signingMsgs,
+			[]string{"eth"},
+			nil,
+		)
 
 		workerIndex := i
 
@@ -156,6 +163,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 			helper.CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
 			signingMsgs,
+			[]string{"eth"},
 			presignInputs[i],
 		)
 
@@ -221,6 +229,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 			helper.CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
 			[]string{signingMsg},
+			[]string{"eth"},
 			nil,
 		)
 
@@ -270,6 +279,7 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 			helper.CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
 			[]string{signingMsg},
+			[]string{"eth"},
 			nil,
 		)
 

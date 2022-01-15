@@ -46,7 +46,6 @@ func TestAvailPresignManager_HappyCase(t *testing.T) {
 	assert.Equal(t, 3, len(selectedPIDs))
 
 	// We should have 1 pid string in use (2,3,5) and 2 available pid strings: (1,2,3) and (3,4,5)
-	assert.Equal(t, 1, len(availManager.inUse))
 	assert.Equal(t, 2, len(availManager.available))
 
 	// Update status
@@ -77,7 +76,6 @@ func TestAvailPresignManager_NotFound(t *testing.T) {
 	presignIds, _ := availManager.GetAvailablePresigns(3, 3, getPartyIdMap(partyIds))
 	assert.Equal(t, 0, len(presignIds))
 
-	assert.Equal(t, 0, len(availManager.inUse))
 	assert.Equal(t, 3, len(availManager.available))
 }
 

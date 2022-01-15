@@ -12,8 +12,6 @@ import (
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
-
-	libCommon "github.com/sisu-network/tss-lib/common"
 )
 
 type EngineCallback struct {
@@ -40,7 +38,7 @@ func (cb *EngineCallback) OnWorkPresignFinished(result *htypes.PresignResult) {
 	cb.presignDataCh <- result
 }
 
-func (cb *EngineCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+func (cb *EngineCallback) OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult) {
 }
 
 func (cb *EngineCallback) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {

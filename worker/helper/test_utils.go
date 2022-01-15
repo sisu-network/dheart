@@ -2,6 +2,7 @@ package helper
 
 import (
 	"encoding/hex"
+
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	htypes "github.com/sisu-network/dheart/types"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -123,7 +126,7 @@ func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*presign.
 type MockEngineCallback struct {
 	OnWorkKeygenFinishedFunc  func(result *dtypes.KeygenResult)
 	OnWorkPresignFinishedFunc func(result *dtypes.PresignResult)
-	OnWorkSigningFinishedFunc func(request *types.WorkRequest, data []*libCommon.SignatureData)
+	OnWorkSigningFinishedFunc func(request *types.WorkRequest, result *htypes.KeysignResult)
 	OnWorkFailedFunc          func(request *types.WorkRequest, culprits []*tss.PartyID)
 }
 
@@ -139,9 +142,9 @@ func (cb *MockEngineCallback) OnWorkPresignFinished(result *dtypes.PresignResult
 	}
 }
 
-func (cb *MockEngineCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+func (cb *MockEngineCallback) OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult) {
 	if cb.OnWorkSigningFinishedFunc != nil {
-		cb.OnWorkSigningFinishedFunc(request, data)
+		cb.OnWorkSigningFinishedFunc(request, result)
 	}
 }
 

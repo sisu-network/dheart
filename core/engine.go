@@ -10,6 +10,7 @@ import (
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
+	libchain "github.com/sisu-network/lib/chain"
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
@@ -61,7 +62,7 @@ type EngineCallback interface {
 
 	OnWorkPresignFinished(result *htypes.PresignResult)
 
-	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData)
+	OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult)
 
 	OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID)
 }
@@ -264,7 +265,21 @@ func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, p
 func (engine *DefaultEngine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
 	log.Info("Signing finished for workId ", request.WorkId)
 
-	engine.callback.OnWorkSigningFinished(request, data)
+	signatures := make([][]byte, len(data))
+
+	for i, sig := range data {
+		signatures[i] = sig.Signature
+		if libchain.IsETHBasedChain(request.Chains[i]) {
+			signatures[i] = append(signatures[i], data[i].SignatureRecovery[0])
+		}
+	}
+
+	result := &htypes.KeysignResult{
+		Outcome:    htypes.OutcomeSuccess,
+		Signatures: signatures,
+	}
+
+	engine.callback.OnWorkSigningFinished(request, result)
 
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
@@ -437,10 +452,10 @@ func (engine *DefaultEngine) OnNodeNotSelected(request *types.WorkRequest) {
 		engine.callback.OnWorkPresignFinished(result)
 
 	case types.EcdsaSigning:
-		// result := &htypes.KeysignResult{
-		// 	Outcome: htypes.OutcometNotSelected,
-		// }
-		// engine.callback.OnWorkSigningFinished(result)
+		result := &htypes.KeysignResult{
+			Outcome: htypes.OutcometNotSelected,
+		}
+		engine.callback.OnWorkSigningFinished(request, result)
 	}
 }
 
