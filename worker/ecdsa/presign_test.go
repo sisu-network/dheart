@@ -189,7 +189,8 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 	assert.EqualValues(t, 4, numFailedWorkers)
 }
 
-func TestPresign_NodeNotSelected(t *testing.T) {
+// Runs test when we have a strict threshold < n - 1.
+func TestPresign_Threshold(t *testing.T) {
 	n := 4
 	threshold := 2
 	batchSize := 1
@@ -257,6 +258,8 @@ func TestPresign_NodeNotSelected(t *testing.T) {
 	assert.Equal(t, threshold+1, len(presignOutputs), "Presign output length is not correct")
 
 	verifyPubKey(t, threshold+1, batchSize, presignOutputs)
+
+	helper.SavePresignData(n, presignOutputs, 2)
 }
 
 func verifyPubKey(t *testing.T, n, batchSize int, presignOutputs [][]*presign.LocalPresignData) {

@@ -163,7 +163,7 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 		// Check if we can find a presign list that match this of nodes.
 		presignIds, selectedPids := w.callback.GetAvailablePresigns(w.batchSize, w.request.N, w.availableParties.getAllPartiesMap())
 		if len(presignIds) == w.batchSize {
-			log.Info("checkEnoughParticipants: presignIds = ", presignIds, " batchSize = ", w.batchSize)
+			log.Info("checkEnoughParticipants: presignIds = ", presignIds, " batchSize = ", w.batchSize, " selectedPids = ", selectedPids)
 			// Announce this as success and return
 			return true, presignIds, selectedPids
 		} else {
@@ -191,8 +191,8 @@ func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selec
 	}
 
 	// Get list of parties
-	pIDs := w.availableParties.getPartyList(w.request.GetMinPartyCount())
-	w.pIDs = tss.SortPartyIDs(pIDs)
+	// pIDs := w.availableParties.getPartyList(w.request.GetMinPartyCount())
+	w.pIDs = tss.SortPartyIDs(selectedPids)
 	w.pIDsMap = pidsToMap(w.pIDs)
 
 	// Broadcast success to everyone
@@ -308,7 +308,9 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 				log.Error("Error when executing work", err)
 			}
 		} else {
-			fmt.Println("CCCCC OnNodeNotSelected")
+			fmt.Println("CCCCC OnNodeNotSelected", w.myPid.Id)
+			fmt.Println("CCCCC msg.Pids", msg.Pids)
+
 			// We are not in the participant list. Terminate this work. Nothing else to do.
 			w.callback.OnNodeNotSelected(w.request)
 		}
