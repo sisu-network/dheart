@@ -67,30 +67,19 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 	// Waits for all members to respond.
 	presignIds, selectedPids, err := w.waitForMemberResponse()
 	if err != nil {
-		// Only blame nodes that are chosen and don't send messages in time and the leader.
 		var culprits []*tss.PartyID
-		if w.request.IsSigning() {
-			// Only get unavailable presign when the round is signing
-			culprits = w.callback.GetUnavailablePresigns(w.availableParties.getAllPartiesMap(), w.allParties)
-		} else {
-			// Blame nodes that does not send messages
-			for _, party := range w.allParties {
-				if ok := w.availableParties.hasPartyId(party.Id); !ok {
-					culprits = append(culprits, party)
-				}
+		// Blame nodes that do not send messages
+		for _, party := range w.allParties {
+			if ok := w.availableParties.hasPartyId(party.Id); !ok {
+				culprits = append(culprits, party)
 			}
 		}
-
 		w.blameMgr.AddPreExecutionCulprit(append(culprits, w.myPid))
 
 		log.Error("Leader: error while waiting for member response, err = ", err)
 		w.leaderFinalized(false, nil, nil)
 		w.callback.OnWorkFailed(w.request)
 		return
-	}
-
-	if w.request.IsSigning() && len(presignIds) > 0 {
-		w.callback.ConsumePresignIds(presignIds)
 	}
 
 	w.leaderFinalized(true, presignIds, selectedPids)
@@ -113,6 +102,17 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 		timeDiff := end.Sub(now)
 		select {
 		case <-time.After(timeDiff):
+			// Time out, this returns failure except for 1 case:
+			//
+			// If this is a signing task and we have enough online (>= threshold + 1) but cannot find
+			// the presigns set to do the signing, we have to do the presign first before doing signing
+			if w.request.IsSigning() {
+				// We have to do presign + signing ƒrom online nodes since we cannot find appropriate presign data.
+				parties := w.availableParties.getPartyList(w.request.Threshold + 1)
+				if len(parties) >= w.request.Threshold+1 {
+					return nil, parties, nil
+				}
+			}
 			return nil, nil, errors.New("timeout waiting for member response")
 
 		case tssMsg := <-w.memberResponseCh:
@@ -144,26 +144,27 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 	return nil, nil, errors.New("cannot find enough members for this work")
 }
 
+// checkEnoughParticipants is a function called by the leader in the election to see if we have
+// enough nodes to participate and find a common presign set.
 func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyID) {
-	if w.availableParties.getLength() < w.request.N {
+	if w.availableParties.getLength() < w.request.GetMinPartyCount() {
 		return false, nil, make([]*tss.PartyID, 0)
 	}
 
 	if w.request.IsSigning() {
 		// Check if we can find a presign list that match this of nodes.
-		presignIds, selectedPids := w.callback.GetAvailablePresigns(w.batchSize, w.request.N, w.availableParties.getPartyList(w.request.N))
+		presignIds, selectedPids := w.callback.GetAvailablePresigns(w.batchSize, w.request.N, w.availableParties.getAllPartiesMap())
 		if len(presignIds) == w.batchSize {
-			log.Info("checkEnoughParticipants: presignIds = ", presignIds, " batchSize = ", w.batchSize)
+			log.Info("checkEnoughParticipants: presignIds = ", presignIds, " batchSize = ", w.batchSize, " selectedPids = ", selectedPids)
 			// Announce this as success and return
 			return true, presignIds, selectedPids
 		} else {
-			// We have to do presign + signing ƒrom online nodes since we cannot find appropriate presign data.
-			parties := w.availableParties.getPartyList(w.request.N)
-			return true, nil, parties
+			// Otherwise, keep waiting
+			return false, nil, make([]*tss.PartyID, 0)
 		}
 	} else {
 		// Choose top parties with highest computing power.
-		topParties, _ := w.availableParties.getTopParties(w.request.N)
+		topParties, _ := w.availableParties.getTopParties(w.request.GetMinPartyCount())
 
 		w.batchSize = w.request.BatchSize
 
@@ -180,17 +181,17 @@ func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selec
 	}
 
 	// Get list of parties
-	pIDs := w.availableParties.getPartyList(w.request.N)
-	w.pIDs = tss.SortPartyIDs(pIDs)
+	// pIDs := w.availableParties.getPartyList(w.request.GetMinPartyCount())
+	w.pIDs = tss.SortPartyIDs(selectedPids)
 	w.pIDsMap = pidsToMap(w.pIDs)
 
 	// Broadcast success to everyone
 	msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, true, presignIds, w.pIDs)
-	go w.dispatcher.BroadcastMessage(w.pIDs, msg)
+	go w.dispatcher.BroadcastMessage(w.allParties, msg)
 
 	workType := w.jobType
 	if w.request.IsSigning() {
-		if presignIds != nil && len(presignIds) > 0 {
+		if len(presignIds) > 0 {
 			w.signingInput = w.callback.GetPresignOutputs(presignIds)
 			if w.signingInput != nil && len(w.signingInput) > 0 {
 				log.Info("Found a set of presign input")
@@ -262,6 +263,8 @@ func (w *DefaultWorker) onPreExecutionResponse(tssMsg *commonTypes.TssMessage) e
 // We either start execution or finish this work.
 func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 	if msg.Success {
+		// TODO: Check validity of the presign ids. Make sure it is never used.
+
 		// Check if we are in the list of participants or not
 		join := false
 		pIDs := make([]*tss.PartyID, 0, len(msg.Pids))
@@ -289,15 +292,10 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 			// We are one of the participants, execute the work
 			if err := w.executeWork(workType); err != nil {
 				log.Error("Error when executing work", err)
-			} else {
-				if w.request.IsSigning() && len(msg.PresignIds) > 0 {
-					// Consumes the presigns if this is a signing task.
-					w.callback.ConsumePresignIds(msg.PresignIds)
-				}
 			}
 		} else {
 			// We are not in the participant list. Terminate this work. Nothing else to do.
-			w.callback.OnPreExecutionFinished(w.request)
+			w.callback.OnNodeNotSelected(w.request)
 		}
 	} else { // msg.Success == false
 		// This work fails because leader cannot find enough participants.

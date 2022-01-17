@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Do not remove
 // func TestPresignBigTest(t *testing.T) {
 // 	fmt.Printf("START: ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
 // 	for i := 0; i < 3; i++ {
@@ -25,7 +26,7 @@ import (
 // 	fmt.Printf("END: ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
 // }
 
-func TestPresignEndToEnd(t *testing.T) {
+func TestPresign_EndToEnd(t *testing.T) {
 	n := 4
 	batchSize := 1
 
@@ -41,15 +42,14 @@ func TestPresignEndToEnd(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := &types.WorkRequest{
-			WorkId:       "Presign0",
-			WorkType:     types.EcdsaPresign,
-			AllParties:   helper.CopySortedPartyIds(pIDs),
-			BatchSize:    batchSize,
-			PresignInput: presignInputs[i],
-			Threshold:    len(pIDs) - 1,
-			N:            n,
-		}
+		request := types.NewPresignRequest(
+			"Presign0",
+			helper.CopySortedPartyIds(pIDs),
+			len(pIDs)-1,
+			presignInputs[i],
+			false,
+			batchSize,
+		)
 
 		workerIndex := i
 
@@ -103,15 +103,14 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := &types.WorkRequest{
-			WorkId:       "Presign0",
-			WorkType:     types.EcdsaPresign,
-			AllParties:   helper.CopySortedPartyIds(pIDs),
-			BatchSize:    batchSize,
-			PresignInput: presignInputs[i],
-			Threshold:    len(pIDs) - 1,
-			N:            n,
-		}
+		request := types.NewPresignRequest(
+			"Presign0",
+			helper.CopySortedPartyIds(pIDs),
+			len(pIDs)-1,
+			presignInputs[i],
+			false,
+			batchSize,
+		)
 
 		worker := NewPresignWorker(
 			request,
@@ -153,15 +152,14 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := &types.WorkRequest{
-			WorkId:       "Presign0",
-			WorkType:     types.EcdsaPresign,
-			AllParties:   helper.CopySortedPartyIds(pIDs),
-			BatchSize:    batchSize,
-			PresignInput: presignInputs[i],
-			Threshold:    len(pIDs) - 1,
-			N:            n,
-		}
+		request := types.NewPresignRequest(
+			"Presign0",
+			helper.CopySortedPartyIds(pIDs),
+			len(pIDs)-1,
+			presignInputs[i],
+			false,
+			batchSize,
+		)
 
 		worker := NewPresignWorker(
 			request,
@@ -189,6 +187,79 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 	runAllWorkers(workers, outCh, done)
 
 	assert.EqualValues(t, 4, numFailedWorkers)
+}
+
+// Runs test when we have a strict threshold < n - 1.
+func TestPresign_Threshold(t *testing.T) {
+	n := 4
+	threshold := 2
+	batchSize := 1
+
+	pIDs := helper.GetTestPartyIds(n)
+
+	presignInputs := helper.LoadKeygenSavedData(pIDs)
+	outCh := make(chan *common.TssMessage)
+	workers := make([]worker.Worker, n)
+	done := make(chan bool)
+	finishedWorkerCount := 0
+
+	presignOutputs := make([][]*presign.LocalPresignData, 0) // n * batchSize
+	outputLock := &sync.Mutex{}
+
+	for i := 0; i < n; i++ {
+		request := types.NewPresignRequest(
+			"Presign0",
+			helper.CopySortedPartyIds(pIDs),
+			threshold,
+			presignInputs[i],
+			false,
+			batchSize,
+		)
+
+		worker := NewPresignWorker(
+			request,
+			pIDs[i],
+			helper.NewTestDispatcher(outCh, 0, 0),
+			helper.NewMockDatabase(),
+			&helper.MockWorkerCallback{
+				OnWorkPresignFinishedFunc: func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+					outputLock.Lock()
+					defer outputLock.Unlock()
+
+					presignOutputs = append(presignOutputs, data)
+					finishedWorkerCount += 1
+					if finishedWorkerCount == n {
+						done <- true
+					}
+				},
+				OnNodeNotSelectedFunc: func(request *types.WorkRequest) {
+					outputLock.Lock()
+					defer outputLock.Unlock()
+
+					finishedWorkerCount += 1
+					if finishedWorkerCount == n {
+						done <- true
+					}
+				},
+			},
+			10*time.Minute,
+			1,
+		)
+
+		workers[i] = worker
+	}
+
+	// Start all workers
+	startAllWorkers(workers)
+
+	// Run all workers
+	runAllWorkers(workers, outCh, done)
+
+	assert.Equal(t, threshold+1, len(presignOutputs), "Presign output length is not correct")
+
+	verifyPubKey(t, threshold+1, batchSize, presignOutputs)
+
+	// helper.SavePresignData(n, presignOutputs, 2)
 }
 
 func verifyPubKey(t *testing.T, n, batchSize int, presignOutputs [][]*presign.LocalPresignData) {

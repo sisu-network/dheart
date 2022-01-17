@@ -120,3 +120,12 @@ func getPartyIdsFromStrings(pids []string) []*tss.PartyID {
 
 	return partyIds
 }
+
+func getPartyIdMap(partyIds []*tss.PartyID) map[string]*tss.PartyID {
+	m := make(map[string]*tss.PartyID)
+	for _, partyId := range partyIds {
+		m[partyId.Id] = partyId
+	}
+
+	return m
+}

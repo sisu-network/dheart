@@ -21,3 +21,9 @@ func KeccakHash32(s string) string {
 
 	return encoded
 }
+
+func GetThreshold(n int) int {
+	// t = n * 2/3.
+	// Threshold = t - 1
+	return (n+1)*2/3 - 1
+}

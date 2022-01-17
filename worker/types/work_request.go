@@ -28,10 +28,12 @@ type WorkRequest struct {
 
 	// Used for signing
 	Messages []string // TODO: Make this a byte array
+	Chains   []string
 }
 
-func NewKeygenRequest(keyType, workId string, n int, PIDs tss.SortedPartyIDs, keygenInput *keygen.LocalPreParams, threshold int) *WorkRequest {
+func NewKeygenRequest(keyType, workId string, PIDs tss.SortedPartyIDs, threshold int, keygenInput *keygen.LocalPreParams) *WorkRequest {
 	// Note: we only support ecdsa for now
+	n := len(PIDs)
 	request := baseRequest(EcdsaKeygen, workId, n, PIDs, 1)
 	request.KeygenInput = keygenInput
 	request.Threshold = threshold
@@ -40,17 +42,25 @@ func NewKeygenRequest(keyType, workId string, n int, PIDs tss.SortedPartyIDs, ke
 	return request
 }
 
-func NewPresignRequest(workId string, n int, PIDs tss.SortedPartyIDs, presignInputs *keygen.LocalPartySaveData, forcedPresign bool, batchSize int) *WorkRequest {
+func NewPresignRequest(workId string, PIDs tss.SortedPartyIDs, threshold int, presignInputs *keygen.LocalPartySaveData, forcedPresign bool, batchSize int) *WorkRequest {
+	n := len(PIDs)
+
 	request := baseRequest(EcdsaPresign, workId, n, PIDs, batchSize)
 	request.PresignInput = presignInputs
+	request.Threshold = threshold
 	request.ForcedPresign = forcedPresign
 
 	return request
 }
 
-func NewSigningRequest(workId string, n int, PIDs tss.SortedPartyIDs, messages []string) *WorkRequest {
+// the presignInputs param is optional
+func NewSigningRequest(workId string, PIDs tss.SortedPartyIDs, threshold int, messages []string, chains []string, presignInput *keygen.LocalPartySaveData) *WorkRequest {
+	n := len(PIDs)
 	request := baseRequest(EcdsaSigning, workId, n, PIDs, len(messages))
+	request.PresignInput = presignInput
 	request.Messages = messages
+	request.Chains = chains
+	request.Threshold = threshold
 
 	return request
 }
@@ -89,6 +99,15 @@ func (request *WorkRequest) Validate() error {
 		return errors.New("Invalid request type")
 	}
 	return nil
+}
+
+// GetMinPartyCount returns the minimum number of parties needed to do this job.
+func (request *WorkRequest) GetMinPartyCount() int {
+	if request.IsKeygen() {
+		return request.N
+	}
+
+	return request.Threshold + 1
 }
 
 func (request *WorkRequest) GetPriority() int {

@@ -19,52 +19,18 @@ type AvailPresignManager struct {
 	// map between: list of pids (string) -> array of available presigns.
 	available map[string][]*common.AvailablePresign
 
-	// Set of presign data that being used by a worker. In case the worker fails, this list of presigns
-	// are added back to the available pool.
+	// Set of presign data that being used by a worker. In case the worker fails, we know which
+	// nodes are using the presigns.
 	// map between: list of pids (string) -> array of available presigns.
-	inUse map[string][]*common.AvailablePresign
-	lock  *sync.RWMutex
+	lock *sync.RWMutex
 }
 
 func NewAvailPresignManager(db db.Database) *AvailPresignManager {
 	return &AvailPresignManager{
 		db:        db,
 		available: make(map[string][]*common.AvailablePresign),
-		inUse:     make(map[string][]*common.AvailablePresign),
 		lock:      &sync.RWMutex{},
 	}
-}
-
-// GetUnavailablePresigns returns a list of choosen nodes that has not sent messages
-func (m *AvailPresignManager) GetUnavailablePresigns(sentNodes map[string]*tss.PartyID, allParties []*tss.PartyID) []*tss.PartyID {
-	// Nodes that are chosen.
-	m.lock.RLock()
-	pids := make([]string, 0, len(m.inUse))
-	for _, v := range m.inUse {
-		if len(v) > 0 {
-			pids = append(pids, v[0].Pids...)
-		}
-	}
-	m.lock.RUnlock()
-
-	// Nodes that are chosen but don't send messages.
-	missingIDs := make(map[string]struct{}, 0)
-	for _, pid := range pids {
-		if _, found := sentNodes[pid]; !found {
-			missingIDs[pid] = struct{}{}
-		}
-	}
-
-	missing := make([]*tss.PartyID, 0, len(missingIDs))
-	for id := range missingIDs {
-		for _, pid := range allParties {
-			if pid.Id == id {
-				missing = append(missing, pid)
-			}
-		}
-	}
-
-	return missing
 }
 
 func (m *AvailPresignManager) Load() error {
@@ -117,46 +83,64 @@ func (m *AvailPresignManager) AddPresign(workId string, partyIds []*tss.PartyID,
 	}
 
 	m.lock.Lock()
-	m.available[pidString] = arr
+	if ap, ok := m.available[pidString]; ok {
+		ap = append(ap, arr...)
+		m.available[pidString] = ap
+	} else {
+		m.available[pidString] = arr
+	}
 	m.lock.Unlock()
 }
 
-func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
+// GetAvailablePresigns returns a list of presigns with size batchSize for a list of parties. It
+// immediately consumes the presign set (i.e. the set is longer available.) to avoid dpulicated
+// usage of presign.
+func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
 	selectedPidstring := ""
 	var selectedAps []*common.AvailablePresign
 
-	m.lock.Lock()
+	m.lock.RLock()
 	for pidString, apArr := range m.available {
-		if len(apArr) >= batchSize && len(apArr[0].Pids) == n {
-			// We found this available pid string.
+		pids := strings.Split(pidString, ",")
+		ok := true
+		for _, pid := range pids {
+			if _, found := allPids[pid]; !found {
+				ok = false
+				break
+			}
+		}
+
+		if ok && len(apArr) >= batchSize {
+			// We found this.
 			selectedPidstring = pidString
-			selectedAps = apArr[:batchSize]
-
-			// Remove this available presigns from the list.
-			if batchSize < len(apArr)-1 {
-				m.available[pidString] = apArr[batchSize+1:]
-			} else {
-				m.available[pidString] = make([]*common.AvailablePresign, 0)
-			}
-			if len(m.available[pidString]) == 0 {
-				delete(m.available, pidString)
-			}
-
-			// Update the inUse list
-			inUse := m.inUse[selectedPidstring]
-			if inUse == nil {
-				m.inUse[selectedPidstring] = make([]*common.AvailablePresign, 0)
-			}
-			inUse = append(inUse, selectedAps...)
-			m.inUse[selectedPidstring] = inUse
 			break
 		}
 	}
-	m.lock.Unlock()
+	m.lock.RUnlock()
 
 	if selectedPidstring == "" {
 		return []string{}, []*tss.PartyID{}
 	}
+
+	// 2. Remove the selected presigns from the available set.
+	m.lock.Lock()
+	if selectedPidstring != "" {
+		apArr := m.available[selectedPidstring]
+
+		if len(apArr) >= batchSize { // We check again here in case other routine has consume this apArr
+			selectedAps = apArr[:batchSize]
+			// Remove this available presigns from the list.
+			m.available[selectedPidstring] = apArr[batchSize:]
+
+			if len(m.available[selectedPidstring]) == 0 {
+				delete(m.available, selectedPidstring)
+			}
+		} else {
+			return []string{}, []*tss.PartyID{}
+		}
+	}
+
+	m.lock.Unlock()
 
 	// Get selected pids
 	presignIds := make([]string, len(selectedAps))
@@ -168,7 +152,7 @@ func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []
 	selectedPids := make([]*tss.PartyID, len(pidStrings))
 
 	for i, pidString := range pidStrings {
-		for _, p := range pids {
+		for _, p := range allPids {
 			if p.Id == pidString {
 				selectedPids[i] = p
 				break
@@ -176,74 +160,12 @@ func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, pids []
 		}
 	}
 
-	return presignIds, selectedPids
-}
-
-func (m *AvailPresignManager) ConsumePresignIds(presignIds []string) {
-	// TODO: call the updateUsage
-	if len(presignIds) == 0 {
-		log.Error("Presign is empty")
-		return
-	}
-
+	// Update the DB.
 	err := m.db.UpdatePresignStatus(presignIds)
 	if err != nil {
 		log.Error("Cannot update presign status, err = ", err)
-	}
-}
-
-func (m *AvailPresignManager) updateUsage(pidsString string, aps []*common.AvailablePresign, used bool) {
-	m.lock.Lock()
-
-	// 1. This presign set has been used, remove them from presignsInUse set.
-	arr := m.inUse[pidsString]
-	if arr == nil {
-		log.Error("Cannot find presign in use set with pids", pidsString)
-		m.lock.Unlock()
-		return
+		return []string{}, []*tss.PartyID{}
 	}
 
-	newInUse := make([]*common.AvailablePresign, 0)
-	for _, inUse := range arr {
-		found := false
-		for _, ap := range aps {
-			if inUse.PresignId == ap.PresignId {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			newInUse = append(newInUse, inUse)
-		}
-	}
-
-	if len(newInUse) == 0 {
-		delete(m.inUse, pidsString)
-	} else {
-		m.inUse[pidsString] = newInUse
-	}
-
-	if !used {
-		// This presign set is not used. Move all of its element back to the available pool.
-		arr := m.available[pidsString]
-		if arr == nil {
-			arr = make([]*common.AvailablePresign, 0)
-		}
-		arr = append(aps, arr...)
-		m.available[pidsString] = arr
-	}
-	m.lock.Unlock()
-
-	if used {
-		presignIds := make([]string, len(aps))
-		for i, ap := range aps {
-			presignIds[i] = ap.PresignId
-		}
-
-		err := m.db.UpdatePresignStatus(presignIds)
-		if err != nil {
-			log.Error("Failed to update presign staus, err =", err)
-		}
-	}
+	return presignIds, selectedPids
 }

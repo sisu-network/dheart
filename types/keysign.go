@@ -16,12 +16,9 @@ type KeysignMessage struct {
 }
 
 type KeysignResult struct {
-	Request *KeysignRequest
-
-	Success   bool
-	ErrMesage string
-
+	Outcome    OutcomeType
+	Request    *KeysignRequest
+	ErrMesage  string
 	Signatures [][]byte
-
-	Culprits []*tss.PartyID
+	Culprits   []*tss.PartyID
 }

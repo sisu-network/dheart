@@ -36,15 +36,11 @@ var (
 type WorkerCallback interface {
 	// GetAvailablePresigns returns a list of presign output that will be used for signing. The presign's
 	// party ids should match the pids params passed into the function.
-	GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID)
-
-	ConsumePresignIds(presignIds []string)
-
-	GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
+	GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
 
 	GetPresignOutputs(presignIds []string) []*presign.LocalPresignData
 
-	OnPreExecutionFinished(request *types.WorkRequest)
+	OnNodeNotSelected(request *types.WorkRequest)
 
 	OnWorkFailed(request *types.WorkRequest)
 
@@ -78,7 +74,7 @@ type DefaultWorker struct {
 	preExecutionCache *worker.MessageCache
 
 	// Execution
-	threshold  int
+	// threshold  int
 	jobs       []*Job
 	jobsLock   *sync.RWMutex
 	dispatcher interfaces.MessageDispatcher
@@ -127,7 +123,6 @@ func NewKeygenWorker(
 
 	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
-	w.threshold = request.Threshold
 	w.keygenOutputs = make([]*keygen.LocalPartySaveData, request.BatchSize)
 	w.curRound = message.Keygen1
 
@@ -250,7 +245,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 		}
 	}
 
-	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.threshold)
+	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.request.Threshold)
 
 	jobs := make([]*Job, w.batchSize)
 	log.Info("batchSize = ", w.batchSize)

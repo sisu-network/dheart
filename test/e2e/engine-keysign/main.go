@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/ecdsa"
+
 	"crypto/elliptic"
 	"database/sql"
 	"flag"
@@ -16,25 +17,25 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	htypes "github.com/sisu-network/dheart/types"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
-	libCommon "github.com/sisu-network/tss-lib/common"
 )
 
 type EngineCallback struct {
 	keygenDataCh  chan *htypes.KeygenResult
 	presignDataCh chan *htypes.PresignResult
-	signingDataCh chan []*libCommon.SignatureData
+	signingDataCh chan *htypes.KeysignResult
 }
 
 func NewEngineCallback(
 	keygenDataCh chan *htypes.KeygenResult,
 	presignDataCh chan *htypes.PresignResult,
-	signingDataCh chan []*libCommon.SignatureData,
+	signingDataCh chan *htypes.KeysignResult,
 ) *EngineCallback {
 	return &EngineCallback{
 		keygenDataCh, presignDataCh, signingDataCh,
@@ -49,9 +50,9 @@ func (cb *EngineCallback) OnWorkPresignFinished(result *htypes.PresignResult) {
 	cb.presignDataCh <- result
 }
 
-func (cb *EngineCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+func (cb *EngineCallback) OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult) {
 	if cb.signingDataCh != nil {
-		cb.signingDataCh <- data
+		cb.signingDataCh <- result
 	}
 }
 
@@ -106,12 +107,12 @@ func getDb(index int) db.Database {
 	return dbInstance
 }
 
-func keygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan *htypes.KeygenResult) *htypes.KeygenResult {
+func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan *htypes.KeygenResult) *htypes.KeygenResult {
 	n := len(pids)
 
 	// Add request
 	workId := "keygen0"
-	request := types.NewKeygenRequest("ecdsa", workId, n, pids, helper.LoadPreparams(index), n-1)
+	request := types.NewKeygenRequest("ecdsa", workId, pids, n-1, helper.LoadPreparams(index))
 	err := engine.AddRequest(request)
 	if err != nil {
 		panic(err)
@@ -165,7 +166,7 @@ func main() {
 
 	// Create new engine
 	keygenCh := make(chan *htypes.KeygenResult)
-	keysignch := make(chan []*libCommon.SignatureData)
+	keysignch := make(chan *htypes.KeysignResult)
 	cb := NewEngineCallback(keygenCh, nil, keysignch)
 	database := getDb(index)
 
@@ -181,28 +182,28 @@ func main() {
 	time.Sleep(time.Second * 3)
 
 	// Keygen
-	keygenResult := keygen(pids, index, engine, keygenCh)
+	keygenResult := doKeygen(pids, index, engine, keygenCh)
 	log.Info("Doing keysign now!")
 
 	// Keysign
 	workId := "keysign"
 	messages := []string{"First message", "second message"}
+	chains := []string{"eth", "eth"}
 
-	request := types.NewSigningRequest(workId, n, pids, messages)
 	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
 	if err != nil {
 		panic(err)
 	}
-	request.PresignInput = presignInput
+	request := types.NewSigningRequest(workId, pids, utils.GetThreshold(len(pids)), messages, chains, presignInput)
 
 	err = engine.AddRequest(request)
 	if err != nil {
 		panic(err)
 	}
 
-	var signatures []*libCommon.SignatureData
+	var result *htypes.KeysignResult
 	select {
-	case signatures = <-keysignch:
+	case result = <-keysignch:
 	case <-time.After(time.Second * 20):
 		panic("Keygen timeout")
 	}
@@ -215,7 +216,16 @@ func main() {
 			Y:     y,
 		}
 
-		verifySignature(&pk, msg, new(big.Int).SetBytes(signatures[i].R), new(big.Int).SetBytes(signatures[i].S))
+		sig := result.Signatures[i]
+		if len(sig) != 65 {
+			panic(fmt.Sprintf("Signature length is not correct. actual length = %d", len(sig)))
+		}
+		sig = sig[:64]
+
+		r := sig[:32]
+		s := sig[32:]
+
+		verifySignature(&pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
 	}
 
 	log.Info("Verification succeeded!")

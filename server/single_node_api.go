@@ -76,7 +76,7 @@ func (api *SingleNodeApi) KeyGen(keygenId string, keyType string, tPubKeys []typ
 
 			result := types.KeygenResult{
 				KeyType:     keyType,
-				Success:     true,
+				Outcome:     types.OutcomeSuccess,
 				PubKeyBytes: publicKeyBytes,
 				Address:     address,
 			}
@@ -127,7 +127,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 
 			result := &types.KeysignResult{
 				Request:    req,
-				Success:    true,
+				Outcome:    types.OutcomeSuccess,
 				Signatures: signatures,
 			}
 
@@ -137,7 +137,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 		log.Error("Cannot do key gen. Err =", err)
 		api.c.PostKeysignResult(&types.KeysignResult{
 			Request:   req,
-			Success:   false,
+			Outcome:   types.OutcomeFailure,
 			ErrMesage: err.Error(),
 		})
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
+	"github.com/sisu-network/tss-lib/tss"
 )
 
 func startAllWorkers(workers []worker.Worker) {
@@ -79,4 +80,16 @@ func processMsgWithPanicOnFail(w worker.Worker, tssMsg *common.TssMessage) {
 			panic(err)
 		}
 	}(w, tssMsg)
+}
+
+func flattenPidMaps(m map[string]*tss.PartyID) []*tss.PartyID {
+	pids := make([]*tss.PartyID, len(m))
+	index := 0
+
+	for _, partyId := range m {
+		pids[index] = partyId
+		index++
+	}
+
+	return pids
 }

@@ -10,6 +10,7 @@ import (
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
+	libchain "github.com/sisu-network/lib/chain"
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
@@ -61,7 +62,7 @@ type EngineCallback interface {
 
 	OnWorkPresignFinished(result *htypes.PresignResult)
 
-	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData)
+	OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult)
 
 	OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID)
 }
@@ -237,7 +238,7 @@ func (engine *DefaultEngine) OnWorkKeygenFinished(request *types.WorkRequest, ou
 	result := htypes.KeygenResult{
 		KeyType:     request.KeygenType,
 		PubKeyBytes: publicKeyBytes,
-		Success:     true,
+		Outcome:     htypes.OutcomeSuccess,
 		Address:     address,
 	}
 
@@ -252,7 +253,7 @@ func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, p
 	engine.presignsManager.AddPresign(request.WorkId, pids, data)
 
 	result := htypes.PresignResult{
-		Success: true,
+		Outcome: htypes.OutcomeSuccess,
 	}
 
 	engine.callback.OnWorkPresignFinished(&result)
@@ -264,7 +265,21 @@ func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, p
 func (engine *DefaultEngine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
 	log.Info("Signing finished for workId ", request.WorkId)
 
-	engine.callback.OnWorkSigningFinished(request, data)
+	signatures := make([][]byte, len(data))
+
+	for i, sig := range data {
+		signatures[i] = sig.Signature
+		if libchain.IsETHBasedChain(request.Chains[i]) {
+			signatures[i] = append(signatures[i], data[i].SignatureRecovery[0])
+		}
+	}
+
+	result := &htypes.KeysignResult{
+		Outcome:    htypes.OutcomeSuccess,
+		Signatures: signatures,
+	}
+
+	engine.callback.OnWorkSigningFinished(request, result)
 
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
@@ -424,8 +439,24 @@ func (engine *DefaultEngine) GetActiveWorkerCount() int {
 	return len(engine.workers)
 }
 
-func (engine *DefaultEngine) OnPreExecutionFinished(request *types.WorkRequest) {
-	// TODO: implements this
+// OnNodeNotSelected is called when this node is not selected by the leader in the election round.
+func (engine *DefaultEngine) OnNodeNotSelected(request *types.WorkRequest) {
+	switch request.WorkType {
+	case types.EcdsaKeygen:
+		// This should not happen as in keygen all nodes should be selected.
+
+	case types.EcdsaPresign:
+		result := &htypes.PresignResult{
+			Outcome: htypes.OutcometNotSelected,
+		}
+		engine.callback.OnWorkPresignFinished(result)
+
+	case types.EcdsaSigning:
+		result := &htypes.KeysignResult{
+			Outcome: htypes.OutcometNotSelected,
+		}
+		engine.callback.OnWorkSigningFinished(request, result)
+	}
 }
 
 func (engine *DefaultEngine) OnWorkFailed(request *types.WorkRequest) {
@@ -446,16 +477,8 @@ func (engine *DefaultEngine) OnWorkFailed(request *types.WorkRequest) {
 	worker.Stop()
 }
 
-func (engine *DefaultEngine) GetAvailablePresigns(batchSize int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
-	return engine.presignsManager.GetAvailablePresigns(batchSize, n, pids)
-}
-
-func (engine *DefaultEngine) ConsumePresignIds(presignIds []string) {
-	engine.presignsManager.ConsumePresignIds(presignIds)
-}
-
-func (engine *DefaultEngine) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
-	return engine.presignsManager.GetUnavailablePresigns(sentMsgNodes, pids)
+func (engine *DefaultEngine) GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
+	return engine.presignsManager.GetAvailablePresigns(batchSize, n, allPids)
 }
 
 func (engine *DefaultEngine) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {

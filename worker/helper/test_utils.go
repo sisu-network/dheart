@@ -2,6 +2,7 @@ package helper
 
 import (
 	"encoding/hex"
+
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	htypes "github.com/sisu-network/dheart/types"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -58,28 +61,18 @@ var (
 )
 
 type MockWorkerCallback struct {
-	OnWorkKeygenFinishedFunc   func(request *types.WorkRequest, data []*keygen.LocalPartySaveData)
-	OnWorkPresignFinishedFunc  func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
-	OnWorkSigningFinishedFunc  func(request *types.WorkRequest, data []*libCommon.SignatureData)
-	OnPreExecutionFinishedFunc func(request *types.WorkRequest)
-	OnWorkFailedFunc           func(request *types.WorkRequest)
-	GetAvailablePresignsFunc   func(count int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID)
-	GetPresignOutputsFunc      func(presignIds []string) []*presign.LocalPresignData
-	GetUnavailablePresignsFunc func(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID
-	ConsumePresignIdsFunc      func(presignIds []string)
+	OnWorkKeygenFinishedFunc  func(request *types.WorkRequest, data []*keygen.LocalPartySaveData)
+	OnWorkPresignFinishedFunc func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
+	OnWorkSigningFinishedFunc func(request *types.WorkRequest, data []*libCommon.SignatureData)
+	OnNodeNotSelectedFunc     func(request *types.WorkRequest)
+	OnWorkFailedFunc          func(request *types.WorkRequest)
+	GetAvailablePresignsFunc  func(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
+	GetPresignOutputsFunc     func(presignIds []string) []*presign.LocalPresignData
 
 	workerIndex     int
 	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)
 	presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
 	signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData)
-}
-
-func (cb *MockWorkerCallback) GetUnavailablePresigns(sentMsgNodes map[string]*tss.PartyID, pids []*tss.PartyID) []*tss.PartyID {
-	if cb.GetUnavailablePresignsFunc != nil {
-		return cb.GetUnavailablePresignsFunc(sentMsgNodes, pids)
-	}
-
-	return nil
 }
 
 func (cb *MockWorkerCallback) OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
@@ -100,9 +93,9 @@ func (cb *MockWorkerCallback) OnWorkSigningFinished(request *types.WorkRequest, 
 	}
 }
 
-func (cb *MockWorkerCallback) OnPreExecutionFinished(request *types.WorkRequest) {
-	if cb.OnPreExecutionFinishedFunc != nil {
-		cb.OnPreExecutionFinishedFunc(request)
+func (cb *MockWorkerCallback) OnNodeNotSelected(request *types.WorkRequest) {
+	if cb.OnNodeNotSelectedFunc != nil {
+		cb.OnNodeNotSelectedFunc(request)
 	}
 }
 
@@ -112,19 +105,12 @@ func (cb *MockWorkerCallback) OnWorkFailed(request *types.WorkRequest) {
 	}
 }
 
-func (cb *MockWorkerCallback) GetAvailablePresigns(count int, n int, pids []*tss.PartyID) ([]string, []*tss.PartyID) {
+func (cb *MockWorkerCallback) GetAvailablePresigns(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
 	if cb.GetAvailablePresignsFunc != nil {
-		return cb.GetAvailablePresignsFunc(count, n, pids)
+		return cb.GetAvailablePresignsFunc(count, n, allPids)
 	}
 
 	return nil, nil
-}
-
-func (cb *MockWorkerCallback) ConsumePresignIds(presignIds []string) {
-	if cb.ConsumePresignIdsFunc != nil {
-		cb.ConsumePresignIdsFunc(presignIds)
-	}
-
 }
 
 func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {
@@ -140,7 +126,7 @@ func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*presign.
 type MockEngineCallback struct {
 	OnWorkKeygenFinishedFunc  func(result *dtypes.KeygenResult)
 	OnWorkPresignFinishedFunc func(result *dtypes.PresignResult)
-	OnWorkSigningFinishedFunc func(request *types.WorkRequest, data []*libCommon.SignatureData)
+	OnWorkSigningFinishedFunc func(request *types.WorkRequest, result *htypes.KeysignResult)
 	OnWorkFailedFunc          func(request *types.WorkRequest, culprits []*tss.PartyID)
 }
 
@@ -156,9 +142,9 @@ func (cb *MockEngineCallback) OnWorkPresignFinished(result *dtypes.PresignResult
 	}
 }
 
-func (cb *MockEngineCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+func (cb *MockEngineCallback) OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult) {
 	if cb.OnWorkSigningFinishedFunc != nil {
-		cb.OnWorkSigningFinishedFunc(request, data)
+		cb.OnWorkSigningFinishedFunc(request, result)
 	}
 }
 
@@ -168,7 +154,7 @@ func (cb *MockEngineCallback) OnWorkFailed(request *types.WorkRequest, culprits 
 	}
 }
 
-func (cb *MockEngineCallback) OnPreExecutionFinished(workId string) {
+func (cb *MockEngineCallback) OnNodeNotSelected(workId string) {
 	// Do nothing.
 }
 
