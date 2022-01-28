@@ -93,7 +93,6 @@ func resetDb(dbConfig config.DbConfig) error {
 func getDb(index int) db.Database {
 	dbConfig := config.GetLocalhostDbConfig()
 	dbConfig.Schema = fmt.Sprintf("dheart%d", index)
-	dbConfig.MigrationPath = "file://../../../db/migrations/"
 
 	resetDb(dbConfig)
 
