@@ -102,12 +102,11 @@ func testInsertingPresignData(database db.Database) {
 
 func main() {
 	config := &config.DbConfig{
-		Port:          3306,
-		Host:          "localhost",
-		Username:      "root",
-		Password:      "password",
-		Schema:        "dheart",
-		MigrationPath: "file://../../../db/migrations/",
+		Port:     3306,
+		Host:     "localhost",
+		Username: "root",
+		Password: "password",
+		Schema:   "dheart",
 	}
 
 	database := db.NewDatabase(config)

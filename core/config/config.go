@@ -6,12 +6,11 @@ import (
 )
 
 type DbConfig struct {
-	Host          string `toml:"host"`
-	Port          int    `toml:"port"`
-	Username      string `toml:"username"`
-	Password      string `toml:"password"`
-	Schema        string `toml:"schema"`
-	MigrationPath string `toml:"migration-path"`
+	Host     string `toml:"host"`
+	Port     int    `toml:"port"`
+	Username string `toml:"username"`
+	Password string `toml:"password"`
+	Schema   string `toml:"schema"`
 }
 
 type HeartConfig struct {
