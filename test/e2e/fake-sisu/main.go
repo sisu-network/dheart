@@ -109,6 +109,7 @@ func setPrivateKeys(nodes []*MockSisuNode) {
 				panic(err)
 			}
 			nodes[index].client.SetPrivKey(hex.EncodeToString(encrypt), nodes[index].privKey.Type())
+			nodes[index].client.SetSisuReady(true)
 		}(i)
 
 		wg.Done()

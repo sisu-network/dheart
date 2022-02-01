@@ -52,6 +52,17 @@ func (c *DheartClient) CheckHealth() error {
 	return nil
 }
 
+func (c *DheartClient) SetSisuReady(isReady bool) error {
+	var r interface{}
+	err := c.client.CallContext(context.Background(), &r, "tss_setSisuReady", isReady)
+	if err != nil {
+		log.Error("Cannot SetSisuReady, err = ", err)
+		return err
+	}
+
+	return nil
+}
+
 func (c *DheartClient) KeyGen(keygenId string, keygenType string, pubKeys []ctypes.PubKey) error {
 	// Wrap pubkeys
 	wrappers := make([]dTypes.PubKeyWrapper, len(pubKeys))

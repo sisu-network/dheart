@@ -30,12 +30,13 @@ const (
 
 // The dragon heart of this component.
 type Heart struct {
-	config   config.HeartConfig
-	db       db.Database
-	cm       p2p.ConnectionManager
-	engine   Engine
-	client   client.Client
-	tPubKeys []ctypes.PubKey
+	config      config.HeartConfig
+	db          db.Database
+	cm          p2p.ConnectionManager
+	engine      Engine
+	client      client.Client
+	isSisuReady bool
+	tPubKeys    []ctypes.PubKey
 
 	privateKey ctypes.PrivKey
 	aesKey     []byte
@@ -82,8 +83,6 @@ func (h *Heart) Run() error {
 	}
 
 	log.Info("Adding engine as listener for connection manager....")
-
-	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
 	h.engine.Init()
 
 	// Start connection manager.
@@ -169,9 +168,13 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 
 // --- Implements Server API  /
 
-// SetPrivKey receives encrypted private key from Sisu, decrypts it and start the engine,
-// network communication, etc.
+func (h *Heart) SetSisuReady(isReady bool) {
+	// Sisu is ready, we are now ready to process messages from network.
+	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
+}
 
+// SetPrivKey receives encrypted private key from Sisu, decrypts it and start the engine,
+// network communication, etc. This is only for integration testing.
 func (h *Heart) SetBootstrappedKeys(tPubKeys []ctypes.PubKey) {
 	if h.tPubKeys == nil {
 		h.tPubKeys = tPubKeys

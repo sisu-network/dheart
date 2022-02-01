@@ -46,6 +46,11 @@ func (api *SingleNodeApi) Init() {
 	}
 }
 
+// SetSisuReady implements Api interface.
+func (api *SingleNodeApi) SetSisuReady(isReady bool) {
+	// Do nothing.
+}
+
 // Empty function for checking health only.
 func (api *SingleNodeApi) CheckHealth() {
 }
