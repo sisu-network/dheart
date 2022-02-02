@@ -52,7 +52,7 @@ func (api *SingleNodeApi) SetSisuReady(isReady bool) {
 }
 
 // Empty function for checking health only.
-func (api *SingleNodeApi) CheckHealth() {
+func (api *SingleNodeApi) Ping(source string) {
 }
 
 func (api *SingleNodeApi) Version() string {

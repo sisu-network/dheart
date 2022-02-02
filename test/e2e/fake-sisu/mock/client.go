@@ -41,11 +41,11 @@ func (c *DheartClient) SetPrivKey(encodedKey string, keyType string) error {
 	return nil
 }
 
-func (c *DheartClient) CheckHealth() error {
+func (c *DheartClient) Ping() error {
 	var result interface{}
-	err := c.client.CallContext(context.Background(), &result, "tss_checkHealth")
+	err := c.client.CallContext(context.Background(), &result, "tss_ping")
 	if err != nil {
-		log.Error("Cannot check Dheart health, err = ", err)
+		log.Error("Cannot ping sisu, err = ", err)
 		return err
 	}
 

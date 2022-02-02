@@ -45,7 +45,7 @@ func (c *DefaultClient) TryDial() {
 		var err error
 		c.client, err = rpc.DialContext(context.Background(), c.url)
 		if err == nil {
-			if err := c.CheckHealth(); err == nil {
+			if err := c.Ping("dheart"); err == nil {
 				break
 			}
 		} else {
@@ -58,11 +58,11 @@ func (c *DefaultClient) TryDial() {
 	log.Info("Sisu server is connected")
 }
 
-func (c *DefaultClient) CheckHealth() error {
+func (c *DefaultClient) Ping(source string) error {
 	var result interface{}
-	err := c.client.CallContext(context.Background(), &result, "tss_checkHealth")
+	err := c.client.CallContext(context.Background(), &result, "tss_ping", source)
 	if err != nil {
-		log.Error("Cannot check dheart health, err = ", err)
+		log.Error("Cannot ping sisu, err = ", err)
 		return err
 	}
 

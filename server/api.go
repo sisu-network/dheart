@@ -16,6 +16,7 @@ type Api interface {
 	KeySign(req *types.KeysignRequest, tPubKeys []types.PubKeyWrapper) error
 	BlockEnd(blockHeight int64) error
 	SetSisuReady(isReady bool)
+	Ping(source string)
 }
 
 func GetApi(cfg config.HeartConfig, store store.Store, client client.Client) Api {

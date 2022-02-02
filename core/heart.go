@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
+	"sync/atomic"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
@@ -28,6 +29,10 @@ const (
 	TX_CACHE_SIZE = 2048
 )
 
+var (
+	ErrDheartNotReady = fmt.Errorf("dheart is not ready")
+)
+
 // The dragon heart of this component.
 type Heart struct {
 	config      config.HeartConfig
@@ -37,6 +42,7 @@ type Heart struct {
 	client      client.Client
 	isSisuReady bool
 	tPubKeys    []ctypes.PubKey
+	ready       atomic.Value
 
 	privateKey ctypes.PrivKey
 	aesKey     []byte
@@ -169,6 +175,8 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 // --- Implements Server API  /
 
 func (h *Heart) SetSisuReady(isReady bool) {
+	h.ready.Store(true)
+
 	// Sisu is ready, we are now ready to process messages from network.
 	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
 }
@@ -221,6 +229,10 @@ func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error 
 }
 
 func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey) error {
+	if h.ready.Load() != true {
+		return ErrDheartNotReady
+	}
+
 	// TODO: Check if our pubkey is one of the pubkeys.
 	n := len(tPubKeys)
 	h.tPubKeys = tPubKeys
@@ -246,6 +258,10 @@ func (h *Heart) getKey(requestType, chain, workdId string) string {
 }
 
 func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) error {
+	if h.ready.Load() != true {
+		return ErrDheartNotReady
+	}
+
 	n := len(tPubKeys)
 
 	nodes := NewNodes(tPubKeys)
@@ -283,6 +299,10 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 // Called at the end of Sisu's block. This could be a time when we can check our CPU resource and
 // does additional presign work.
 func (h *Heart) BlockEnd(blockHeight int64) error {
+	if h.ready.Load() != true {
+		return ErrDheartNotReady
+	}
+
 	if h.tPubKeys == nil || len(h.tPubKeys) == 0 {
 		return nil
 	}

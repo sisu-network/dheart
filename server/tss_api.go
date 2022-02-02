@@ -30,6 +30,10 @@ func (api *TssApi) Version() string {
 	return "1"
 }
 
+func (api *TssApi) Ping(source string) {
+	// Do nothing.
+}
+
 func (api *TssApi) KeyGen(keygenId string, chain string, keyWrappers []types.PubKeyWrapper) error {
 	if len(keyWrappers) == 0 {
 		return fmt.Errorf("invalid keys array cannot be empty")
