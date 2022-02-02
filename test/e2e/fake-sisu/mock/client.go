@@ -41,9 +41,9 @@ func (c *DheartClient) SetPrivKey(encodedKey string, keyType string) error {
 	return nil
 }
 
-func (c *DheartClient) Ping() error {
+func (c *DheartClient) Ping(source string) error {
 	var result interface{}
-	err := c.client.CallContext(context.Background(), &result, "tss_ping")
+	err := c.client.CallContext(context.Background(), &result, "tss_ping", source)
 	if err != nil {
 		log.Error("Cannot ping sisu, err = ", err)
 		return err
