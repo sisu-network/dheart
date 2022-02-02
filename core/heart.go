@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync/atomic"
+	"time"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
@@ -27,6 +28,7 @@ import (
 
 const (
 	TX_CACHE_SIZE = 2048
+	RETRY_TIMEOUT = time.Second * 3
 )
 
 var (
@@ -61,9 +63,17 @@ func NewHeart(config config.HeartConfig, client client.Client) *Heart {
 
 func (h *Heart) Start() error {
 	log.Info("Starting heart")
+
 	// Create db
-	if err := h.createDb(); err != nil {
-		panic(err)
+	for {
+		err := h.createDb()
+		if err == nil {
+			break
+		}
+
+		log.Error("failed to create db, err = ", err)
+
+		time.Sleep(RETRY_TIMEOUT)
 	}
 
 	if h.config.ShortcutPreparams {
@@ -75,8 +85,8 @@ func (h *Heart) Start() error {
 	return nil
 }
 
-func (h *Heart) Run() error {
-	log.Info("Running heart")
+func (h *Heart) initConnectionManager() error {
+	log.Info("Creating connection manager")
 
 	// Connection manager
 	h.cm = p2p.NewConnectionManager(h.config.Connection)
@@ -175,6 +185,8 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 // --- Implements Server API  /
 
 func (h *Heart) SetSisuReady(isReady bool) {
+	log.Info("Sisu ready state = ", isReady)
+
 	h.ready.Store(true)
 
 	// Sisu is ready, we are now ready to process messages from network.
@@ -220,7 +232,7 @@ func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error 
 		return fmt.Errorf("Unsupported key type: %s", tendermintKeyType)
 	}
 
-	err = h.Run()
+	err = h.initConnectionManager()
 	if err != nil {
 		log.Error("Failed to start heart, err =", err)
 	}
