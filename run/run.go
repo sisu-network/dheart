@@ -58,9 +58,9 @@ func SetupApiServer() {
 	handler.RegisterName("tss", serverApi)
 
 	s := server.NewServer(handler, "0.0.0.0", uint16(cfg.Port))
+	go s.Run()
 
 	go c.TryDial()
-	go s.Run()
 }
 
 func Run() {
