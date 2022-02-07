@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -62,7 +63,7 @@ func (c *DefaultClient) CheckHealth() error {
 	var result interface{}
 	err := c.client.CallContext(context.Background(), &result, "tss_checkHealth")
 	if err != nil {
-		log.Error("Cannot check dheart health, err = ", err)
+		log.Error("Cannot check sisu health, err = ", err)
 		return err
 	}
 
@@ -104,6 +105,8 @@ func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
 
 func (c *DefaultClient) PostKeysignResult(result *types.KeysignResult) error {
 	log.Debug("Sending keysign result to sisu server")
+	ccc, _ := json.Marshal(result)
+	log.Debug(string(ccc))
 
 	var r interface{}
 	err := c.client.CallContext(context.Background(), &r, "tss_keysignResult", result)
