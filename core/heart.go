@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
+	"sync/atomic"
+	"time"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
@@ -24,16 +26,23 @@ import (
 
 const (
 	TX_CACHE_SIZE = 2048
+	RETRY_TIMEOUT = time.Second * 3
+)
+
+var (
+	ErrDheartNotReady = fmt.Errorf("dheart is not ready")
 )
 
 // The dragon heart of this component.
 type Heart struct {
-	config   config.HeartConfig
-	db       db.Database
-	cm       p2p.ConnectionManager
-	engine   Engine
-	client   client.Client
-	tPubKeys []ctypes.PubKey
+	config      config.HeartConfig
+	db          db.Database
+	cm          p2p.ConnectionManager
+	engine      Engine
+	client      client.Client
+	isSisuReady bool
+	tPubKeys    []ctypes.PubKey
+	ready       atomic.Value
 
 	privateKey ctypes.PrivKey
 	aesKey     []byte
@@ -52,9 +61,17 @@ func NewHeart(config config.HeartConfig, client client.Client) *Heart {
 
 func (h *Heart) Start() error {
 	log.Info("Starting heart")
+
 	// Create db
-	if err := h.createDb(); err != nil {
-		panic(err)
+	for {
+		err := h.createDb()
+		if err == nil {
+			break
+		}
+
+		log.Error("failed to create db, err = ", err)
+
+		time.Sleep(RETRY_TIMEOUT)
 	}
 
 	if h.config.ShortcutPreparams {
@@ -66,8 +83,8 @@ func (h *Heart) Start() error {
 	return nil
 }
 
-func (h *Heart) Run() error {
-	log.Info("Running heart")
+func (h *Heart) initConnectionManager() error {
+	log.Info("Creating connection manager")
 
 	// Connection manager
 	h.cm = p2p.NewConnectionManager(h.config.Connection)
@@ -80,8 +97,6 @@ func (h *Heart) Run() error {
 	}
 
 	log.Info("Adding engine as listener for connection manager....")
-
-	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
 	h.engine.Init()
 
 	// Start connection manager.
@@ -151,9 +166,17 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 
 // --- Implements Server API  /
 
-// SetPrivKey receives encrypted private key from Sisu, decrypts it and start the engine,
-// network communication, etc.
+func (h *Heart) SetSisuReady(isReady bool) {
+	log.Info("Sisu ready state = ", isReady)
 
+	h.ready.Store(true)
+
+	// Sisu is ready, we are now ready to process messages from network.
+	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
+}
+
+// SetPrivKey receives encrypted private key from Sisu, decrypts it and start the engine,
+// network communication, etc. This is only for integration testing.
 func (h *Heart) SetBootstrappedKeys(tPubKeys []ctypes.PubKey) {
 	if h.tPubKeys == nil {
 		h.tPubKeys = tPubKeys
@@ -191,7 +214,7 @@ func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error 
 		return fmt.Errorf("Unsupported key type: %s", tendermintKeyType)
 	}
 
-	err = h.Run()
+	err = h.initConnectionManager()
 	if err != nil {
 		log.Error("Failed to start heart, err =", err)
 	}
@@ -200,6 +223,10 @@ func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error 
 }
 
 func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey) error {
+	if h.ready.Load() != true {
+		return ErrDheartNotReady
+	}
+
 	// TODO: Check if our pubkey is one of the pubkeys.
 	n := len(tPubKeys)
 	h.tPubKeys = tPubKeys
@@ -225,6 +252,10 @@ func (h *Heart) getKey(requestType, chain, workdId string) string {
 }
 
 func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) error {
+	if h.ready.Load() != true {
+		return ErrDheartNotReady
+	}
+
 	n := len(tPubKeys)
 
 	nodes := NewNodes(tPubKeys)
@@ -271,6 +302,10 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 // Called at the end of Sisu's block. This could be a time when we can check our CPU resource and
 // does additional presign work.
 func (h *Heart) BlockEnd(blockHeight int64) error {
+	if h.ready.Load() != true {
+		return ErrDheartNotReady
+	}
+
 	if h.tPubKeys == nil || len(h.tPubKeys) == 0 {
 		return nil
 	}

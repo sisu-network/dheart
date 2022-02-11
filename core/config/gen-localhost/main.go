@@ -18,12 +18,11 @@ func genLocalhostConfig() {
 	cfg.SisuServerUrl = "http://0.0.0.0:25456"
 
 	cfg.Db = config.DbConfig{
-		Host:          "0.0.0.0",
-		Port:          3306,
-		Username:      "root",
-		Password:      "password",
-		Schema:        "dheart",
-		MigrationPath: "file://db/migrations/",
+		Host:     "0.0.0.0",
+		Port:     3306,
+		Username: "root",
+		Password: "password",
+		Schema:   "dheart",
 	}
 
 	configFilePath := filepath.Join(cfg.HomeDir, "./dheart.toml")

@@ -72,7 +72,6 @@ func main() {
 
 	dbConfig := config.GetLocalhostDbConfig()
 	dbConfig.Schema = fmt.Sprintf("dheart%d", index)
-	dbConfig.MigrationPath = "file://../../../../db/migrations/"
 
 	cfg := config.HeartConfig{
 		UseOnMemory: false,

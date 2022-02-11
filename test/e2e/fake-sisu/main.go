@@ -49,12 +49,12 @@ func loadConfigEnv(filenames ...string) {
 	}
 }
 
-func createNodes(index int, n int, keygenCh chan *types.KeygenResult, keysignCh chan *types.KeysignResult) *MockSisuNode {
+func createNodes(index int, n int, keygenCh chan *types.KeygenResult, keysignCh chan *types.KeysignResult, pingCh chan string) *MockSisuNode {
 	port := 25456 + index
 	heartPort := 5678 + index
 
 	handler := ethRpc.NewServer()
-	handler.RegisterName("tss", mock.NewApi(keygenCh, keysignCh))
+	handler.RegisterName("tss", mock.NewApi(keygenCh, keysignCh, pingCh))
 
 	s := mock.NewServer(handler, "0.0.0.0", uint16(port))
 
@@ -92,7 +92,23 @@ func generateEthTx() *etypes.Transaction {
 	return rawTx
 }
 
-func setPrivateKeys(nodes []*MockSisuNode) {
+func waitForDheartPings(pingChs []chan string) {
+	log.Info("waiting for all dheart instances to ping")
+
+	wg := &sync.WaitGroup{}
+	wg.Add(len(pingChs))
+	for _, ch := range pingChs {
+		go func(pingCh chan string) {
+			<-pingCh
+			wg.Done()
+		}(ch)
+	}
+
+	wg.Wait()
+	log.Info("Received all ping from all dheart instances")
+}
+
+func bootstrapNetwork(nodes []*MockSisuNode) {
 	n := len(nodes)
 	wg := new(sync.WaitGroup)
 	wg.Add(n)
@@ -108,7 +124,9 @@ func setPrivateKeys(nodes []*MockSisuNode) {
 			if err != nil {
 				panic(err)
 			}
+			nodes[index].client.Ping("sisu")
 			nodes[index].client.SetPrivKey(hex.EncodeToString(encrypt), nodes[index].privKey.Type())
+			nodes[index].client.SetSisuReady(true)
 		}(i)
 
 		wg.Done()
@@ -326,24 +344,27 @@ func main() {
 
 	keygenChs := make([]chan *types.KeygenResult, n)
 	keysignChs := make([]chan *types.KeysignResult, n)
+	pingChs := make([]chan string, n)
 	tendermintPubKeys := make([]ctypes.PubKey, n)
 	nodes := make([]*MockSisuNode, n)
 
 	for i := 0; i < n; i++ {
 		keygenChs[i] = make(chan *types.KeygenResult)
 		keysignChs[i] = make(chan *types.KeysignResult)
+		pingChs[i] = make(chan string)
 
-		nodes[i] = createNodes(i, n, keygenChs[i], keysignChs[i])
+		nodes[i] = createNodes(i, n, keygenChs[i], keysignChs[i], pingChs[i])
 
 		go nodes[i].server.Run()
 
 		tendermintPubKeys[i] = nodes[i].privKey.PubKey()
 	}
 
-	time.Sleep(time.Second)
+	// Waits for all the dheart to send ping messages
+	waitForDheartPings(pingChs)
 
 	// Set private keys
-	setPrivateKeys(nodes)
+	bootstrapNetwork(nodes)
 
 	keygenResult := keygen(nodes, tendermintPubKeys, keygenChs)
 	log.Info("All keygen tasks finished")

@@ -8,14 +8,12 @@ import (
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/lib/log"
 
-	common "github.com/sisu-network/dheart/common"
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/types"
 )
 
 type TssApi struct {
-	isSetup bool
-	heart   *core.Heart
+	heart *core.Heart
 }
 
 func NewTssApi(heart *core.Heart) *TssApi {
@@ -30,6 +28,10 @@ func (api *TssApi) Init() {
 
 func (api *TssApi) Version() string {
 	return "1"
+}
+
+func (api *TssApi) Ping(source string) {
+	// Do nothing.
 }
 
 func (api *TssApi) KeyGen(keygenId string, chain string, keyWrappers []types.PubKeyWrapper) error {
@@ -54,15 +56,10 @@ func (api *TssApi) KeyGen(keygenId string, chain string, keyWrappers []types.Pub
 	return api.heart.Keygen(keygenId, chain, pubKeys)
 }
 
-// This function should only call one during the entire process cycle. If the caller wants to
-// call the second time, this tss process should be restarted.
-func (api *TssApi) Setup(configs []common.ChainConfig) error {
-	if api.isSetup {
-		return fmt.Errorf("Setup function should only be called once.")
-	}
-	api.isSetup = true
-
-	return nil
+// SetSisuReady sets the Sisu's readiness state. This informs dheart that Sisu is ready and dheart
+// can be fully functional.
+func (api *TssApi) SetSisuReady(isReady bool) {
+	api.heart.SetSisuReady(isReady)
 }
 
 func (api *TssApi) SetPrivKey(encodedKey string, keyType string) error {
