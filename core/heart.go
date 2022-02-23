@@ -21,6 +21,7 @@ import (
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
+	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -78,6 +79,29 @@ func (h *Heart) Start() error {
 		log.Info("Loading preloaded preparams (we must be in dev mode)")
 		// Save precomputed preparams in the db. Only use this in local dev mode to speed up dev time.
 		preloadPreparams(h.db, h.config)
+	} else {
+		preparams, err := h.db.LoadPreparams()
+		if err == db.ErrNotFound {
+			log.Info("Start generating preparams....")
+			timeout := 60 * 5 * time.Second // 5 minutes
+			start := time.Now()
+			preparams, err = keygen.GeneratePreParams(timeout)
+			log.Info("Generating time = ", time.Now().Sub(start))
+			if err != nil {
+				log.Error("Cannot generate preparams. err = ", err)
+				panic(err)
+			}
+
+			err = h.db.SavePreparams(preparams)
+			if err != nil {
+				log.Error("cannot save preparams, err = ", err)
+				panic(err)
+			}
+		} else if err != nil {
+			panic(err)
+		} else if err == nil {
+			log.Info("Preparams was generated.")
+		}
 	}
 
 	return nil
