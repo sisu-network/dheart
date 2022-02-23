@@ -80,12 +80,12 @@ func (h *Heart) Start() error {
 		// Save precomputed preparams in the db. Only use this in local dev mode to speed up dev time.
 		preloadPreparams(h.db, h.config)
 	} else {
-		preparams, err := h.db.LoadPreparams()
+		_, err := h.db.LoadPreparams()
 		if err == db.ErrNotFound {
 			log.Info("Start generating preparams....")
 			timeout := 60 * 5 * time.Second // 5 minutes
 			start := time.Now()
-			preparams, err = keygen.GeneratePreParams(timeout)
+			preparams, err := keygen.GeneratePreParams(timeout)
 			log.Info("Generating time = ", time.Now().Sub(start))
 			if err != nil {
 				log.Error("Cannot generate preparams. err = ", err)
