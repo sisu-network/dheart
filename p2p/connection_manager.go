@@ -17,6 +17,8 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	maddr "github.com/multiformats/go-multiaddr"
 	"github.com/sisu-network/lib/log"
+
+	types "github.com/sisu-network/dheart/p2p/types"
 )
 
 const (
@@ -26,22 +28,8 @@ const (
 	TimeoutConnecting             = time.Second * 20
 )
 
-type P2PMessage struct {
-	FromPeerId string
-	Data       []byte
-}
-
-type ConnectionsConfig struct {
-	Host           string `toml:"host"`
-	Port           int    `toml:"port"`
-	Rendezvous     string `toml:"rendezvous"`
-	Protocol       protocol.ID
-	BootstrapPeers []string `toml:"peers"`
-	PrivateKeyType string
-}
-
 type P2PDataListener interface {
-	OnNetworkMessage(message *P2PMessage)
+	OnNetworkMessage(message *types.P2PMessage)
 }
 
 type ConnectionManager interface {
@@ -57,7 +45,7 @@ type ConnectionManager interface {
 
 // DefaultConnectionManager implements ConnectionManager interface.
 type DefaultConnectionManager struct {
-	config           ConnectionsConfig
+	config           types.ConnectionsConfig
 	myNetworkId      peer.ID
 	host             host.Host
 	port             int
@@ -69,7 +57,7 @@ type DefaultConnectionManager struct {
 	statusManager    StatusManager
 }
 
-func NewConnectionManager(config ConnectionsConfig) ConnectionManager {
+func NewConnectionManager(config types.ConnectionsConfig) ConnectionManager {
 	return &DefaultConnectionManager{
 		config:           config,
 		rendezvous:       config.Rendezvous,
@@ -108,7 +96,7 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) e
 	log.Info("cm.config.BootstrapPeers = ", cm.config.BootstrapPeers)
 	cm.bootstrapPeers = make([]maddr.Multiaddr, len(cm.config.BootstrapPeers))
 	for i, peerString := range cm.config.BootstrapPeers {
-		peer, err := maddr.NewMultiaddr(peerString)
+		peer, err := maddr.NewMultiaddr(peerString.Address)
 		if err != nil {
 			return err
 		}
@@ -192,7 +180,7 @@ func (cm *DefaultConnectionManager) handleStream(stream network.Stream) {
 			}
 
 			go func(peerIDString string, dataBuf []byte) {
-				listener.OnNetworkMessage(&P2PMessage{
+				listener.OnNetworkMessage(&types.P2PMessage{
 					FromPeerId: peerIDString,
 					Data:       dataBuf,
 				})

@@ -2,7 +2,7 @@ package config
 
 import (
 	"github.com/BurntSushi/toml"
-	"github.com/sisu-network/dheart/p2p"
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 )
 
 type DbConfig struct {
@@ -20,8 +20,8 @@ type HeartConfig struct {
 	SisuServerUrl     string `toml:"sisu-server-url"`
 	Port              int    `toml:"port"`
 
-	Db         DbConfig              `toml:"db"`
-	Connection p2p.ConnectionsConfig `toml:"connection"`
+	Db         DbConfig                   `toml:"db"`
+	Connection p2ptypes.ConnectionsConfig `toml:"connection"`
 
 	// Key to decrypt data sent over network.
 	AesKey []byte

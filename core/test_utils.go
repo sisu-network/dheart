@@ -11,13 +11,14 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/sisu-network/dheart/p2p"
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
 type p2pDataWrapper struct {
-	msg *p2p.P2PMessage
+	msg *p2ptypes.P2PMessage
 	To  string
 }
 
@@ -40,7 +41,7 @@ func (mock *MockConnectionManager) Start(privKeyBytes []byte, keyType string) er
 
 // Sends an array of byte to a particular peer.
 func (mock *MockConnectionManager) WriteToStream(toPeerId peer.ID, protocolId protocol.ID, msg []byte) error {
-	p2pMsg := &p2p.P2PMessage{
+	p2pMsg := &p2ptypes.P2PMessage{
 		FromPeerId: mock.fromPeerString,
 		Data:       msg,
 	}

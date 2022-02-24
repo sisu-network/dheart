@@ -92,6 +92,7 @@ func (h *Heart) initConnectionManager() error {
 	// Engine
 	myNode := NewNode(h.privateKey.PubKey())
 	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey, NewDefaultEngineConfig())
+
 	if h.tPubKeys != nil {
 		h.engine.AddNodes(NewNodes(h.tPubKeys))
 	}
@@ -109,6 +110,10 @@ func (h *Heart) initConnectionManager() error {
 	}
 
 	return nil
+}
+
+func (h *Heart) loadPeers() {
+
 }
 
 func (h *Heart) createDb() error {

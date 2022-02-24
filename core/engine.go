@@ -17,6 +17,7 @@ import (
 	"github.com/sisu-network/dheart/core/signer"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
@@ -50,7 +51,7 @@ type Engine interface {
 
 	AddRequest(request *types.WorkRequest) error
 
-	OnNetworkMessage(message *p2p.P2PMessage)
+	OnNetworkMessage(message *p2ptypes.P2PMessage)
 
 	ProcessNewMessage(tssMsg *commonTypes.TssMessage) error
 
@@ -408,7 +409,7 @@ func (engine *DefaultEngine) getSignedMessageBytes(tssMessage *common.TssMessage
 }
 
 // OnNetworkMessage implements P2PDataListener interface.
-func (engine *DefaultEngine) OnNetworkMessage(message *p2p.P2PMessage) {
+func (engine *DefaultEngine) OnNetworkMessage(message *p2ptypes.P2PMessage) {
 	node := engine.getNodeFromPeerId(message.FromPeerId)
 	if node == nil {
 		log.Error("Cannot find node from peer id ", message.FromPeerId)

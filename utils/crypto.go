@@ -6,7 +6,12 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
+
+	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sisu-network/lib/log"
@@ -83,4 +88,24 @@ func GetSigWithRecoveryId(hash []byte, sig []byte, publicKey []byte) []byte {
 	log.Critical("cannot find recovery id value", hex.EncodeToString(hash), hex.EncodeToString(sig), hex.EncodeToString(publicKey))
 
 	return nil
+}
+
+func GetCosmosPubKey(keyType string, keyBytes []byte) (ctypes.PubKey, error) {
+	var pubKey ctypes.PubKey
+
+	switch keyType {
+	case "ed25519":
+		pubKey = &ed25519.PubKey{
+			Key: keyBytes,
+		}
+	case "secp256k1":
+		pubKey = &secp256k1.PubKey{Key: keyBytes}
+
+	default:
+		err := fmt.Errorf("Unsupported pub key type %s", pubKey.Type())
+		log.Error(err)
+		return nil, err
+	}
+
+	return pubKey, nil
 }
