@@ -13,6 +13,7 @@ import (
 	"github.com/golang-migrate/migrate/database/mysql"
 	_ "github.com/golang-migrate/migrate/source/file"
 	"github.com/sisu-network/dheart/core/config"
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
@@ -45,6 +46,9 @@ type Database interface {
 
 	LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error)
 	UpdatePresignStatus(presignIds []string) error
+
+	SavePeers([]*p2ptypes.Peer) error
+	LoadPeers() []*p2ptypes.Peer
 }
 
 type dbLogger struct {
@@ -396,4 +400,45 @@ func (d *SqlDatabase) UpdatePresignStatus(presignIds []string) error {
 
 	_, err := d.db.Exec(query, interfaceArr...)
 	return err
+}
+
+func (d *SqlDatabase) SavePeers(peers []*p2ptypes.Peer) error {
+	query := "INSERT INTO peers (`address`, pubkey, pubkey_type) VALUES "
+	query = query + getQueryQuestionMark(len(peers), 3)
+
+	_, err := d.db.Exec(query)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *SqlDatabase) LoadPeers() []*p2ptypes.Peer {
+	peers := make([]*p2ptypes.Peer, 0)
+	query := fmt.Sprintf("SELECT `address`, pubkey, pubkey_type FROM peers")
+
+	rows, err := d.db.Query(query)
+	if err != nil {
+		log.Error("failed to load peers")
+		return peers
+	}
+
+	for rows.Next() {
+		var nullableAddress, nullablePubkey, nullableKeytype sql.NullString
+
+		if err := rows.Scan(&nullableAddress, &nullablePubkey, &nullableKeytype); err != nil {
+			log.Error("LoadPeers: Cannot unmarshall data", err)
+			continue
+		}
+
+		peer := &p2ptypes.Peer{
+			Address:    nullableAddress.String,
+			PubKey:     nullablePubkey.String,
+			PubKeyType: nullablePubkey.String,
+		}
+		peers = append(peers, peer)
+	}
+
+	return peers
 }

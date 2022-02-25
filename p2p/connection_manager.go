@@ -93,9 +93,9 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) e
 	}
 
 	// Initialize peers
-	log.Info("cm.config.BootstrapPeers = ", cm.config.BootstrapPeers)
-	cm.bootstrapPeers = make([]maddr.Multiaddr, len(cm.config.BootstrapPeers))
-	for i, peerString := range cm.config.BootstrapPeers {
+	log.Info("cm.config.BootstrapPeers = ", cm.config.Peers)
+	cm.bootstrapPeers = make([]maddr.Multiaddr, len(cm.config.Peers))
+	for i, peerString := range cm.config.Peers {
 		peer, err := maddr.NewMultiaddr(peerString.Address)
 		if err != nil {
 			return err

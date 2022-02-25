@@ -35,14 +35,14 @@ var (
 
 // The dragon heart of this component.
 type Heart struct {
-	config      config.HeartConfig
-	db          db.Database
-	cm          p2p.ConnectionManager
-	engine      Engine
-	client      client.Client
-	isSisuReady bool
-	tPubKeys    []ctypes.PubKey
-	ready       atomic.Value
+	config     config.HeartConfig
+	db         db.Database
+	cm         p2p.ConnectionManager
+	engine     Engine
+	client     client.Client
+	valPubkeys []ctypes.PubKey
+
+	ready atomic.Value
 
 	privateKey ctypes.PrivKey
 	aesKey     []byte
@@ -93,12 +93,13 @@ func (h *Heart) initConnectionManager() error {
 	myNode := NewNode(h.privateKey.PubKey())
 	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey, NewDefaultEngineConfig())
 
-	if h.tPubKeys != nil {
-		h.engine.AddNodes(NewNodes(h.tPubKeys))
+	if h.valPubkeys != nil {
+		h.engine.AddNodes(NewNodes(h.valPubkeys))
 	}
 
 	log.Info("Adding engine as listener for connection manager....")
 	h.engine.Init()
+	h.loadPeers(h.engine)
 
 	// Start connection manager.
 	err := h.cm.Start(h.privateKey.Bytes(), h.privateKey.Type())
@@ -112,8 +113,39 @@ func (h *Heart) initConnectionManager() error {
 	return nil
 }
 
-func (h *Heart) loadPeers() {
+func (h *Heart) loadPeers(engine Engine) {
+	peers := h.db.LoadPeers()
+	if len(peers) == 0 && len(h.config.Connection.Peers) > 0 {
+		// Save peers to db
+		peers = h.config.Connection.Peers
+		h.db.SavePeers(peers)
+	}
 
+	fmt.Println("Peer length = ", len(peers))
+
+	pubkeys := make([]ctypes.PubKey, 0)
+	for _, peer := range peers {
+		bz, err := hex.DecodeString(peer.PubKey)
+		if err != nil {
+			log.Error("loadPeers: cannot decode pubkey")
+			continue
+		}
+
+		pubkey, err := utils.GetCosmosPubKey(peer.PubKeyType, bz)
+		if err != nil {
+			log.Error("loadPeers: get cosmos pubkey with type: ", peer.PubKeyType)
+			continue
+		}
+
+		node := NewNode(pubkey)
+		fmt.Println("Peer id = ", node.PeerId)
+
+		pubkeys = append(pubkeys, pubkey)
+	}
+	h.valPubkeys = pubkeys
+
+	// Add pubkeys to engine
+	engine.AddNodes(NewNodes(pubkeys))
 }
 
 func (h *Heart) createDb() error {
@@ -180,11 +212,12 @@ func (h *Heart) SetSisuReady(isReady bool) {
 	h.cm.AddListener(p2p.TSSProtocolID, h.engine) // Add engine to listener
 }
 
+// TODO: remove this function
 // SetPrivKey receives encrypted private key from Sisu, decrypts it and start the engine,
 // network communication, etc. This is only for integration testing.
 func (h *Heart) SetBootstrappedKeys(tPubKeys []ctypes.PubKey) {
-	if h.tPubKeys == nil {
-		h.tPubKeys = tPubKeys
+	if h.valPubkeys == nil {
+		h.valPubkeys = tPubKeys
 	}
 }
 
@@ -234,7 +267,7 @@ func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey
 
 	// TODO: Check if our pubkey is one of the pubkeys.
 	n := len(tPubKeys)
-	h.tPubKeys = tPubKeys
+	h.valPubkeys = tPubKeys
 
 	nodes := NewNodes(tPubKeys)
 	// For keygen, workId is the same as keygenId
@@ -311,7 +344,7 @@ func (h *Heart) BlockEnd(blockHeight int64) error {
 		return ErrDheartNotReady
 	}
 
-	if h.tPubKeys == nil || len(h.tPubKeys) == 0 {
+	if h.valPubkeys == nil || len(h.valPubkeys) == 0 {
 		return nil
 	}
 
@@ -324,8 +357,8 @@ func (h *Heart) BlockEnd(blockHeight int64) error {
 // --- End of Server API  /
 
 func (h *Heart) doPresign(blockHeight int64) {
-	nodes := NewNodes(h.tPubKeys)
-	pids := make([]*tss.PartyID, len(h.tPubKeys))
+	nodes := NewNodes(h.valPubkeys)
+	pids := make([]*tss.PartyID, len(h.valPubkeys))
 	for i, node := range nodes {
 		pids[i] = node.PartyId
 	}

@@ -206,10 +206,10 @@ func GetMockConnectionConfig(n, index int, keyType string) (p2ptypes.Connections
 	}
 
 	return p2ptypes.ConnectionsConfig{
-		Host:           "0.0.0.0",
-		Port:           TEST_PORT_BASE * (index + 1),
-		Rendezvous:     "rendezvous",
-		Protocol:       TSSProtocolID,
-		BootstrapPeers: peers,
+		Host:       "0.0.0.0",
+		Port:       TEST_PORT_BASE * (index + 1),
+		Rendezvous: "rendezvous",
+		Protocol:   TSSProtocolID,
+		Peers:      peers,
 	}, privateKey
 }

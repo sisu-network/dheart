@@ -3,6 +3,8 @@ package helper
 import (
 	"encoding/hex"
 
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
+
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -213,6 +215,14 @@ func (m *MockDatabase) LoadKeygenData(chain string) (*keygen.LocalPartySaveData,
 }
 
 func (m *MockDatabase) UpdatePresignStatus(presignIds []string) error {
+	return nil
+}
+
+func (m *MockDatabase) SavePeers([]*p2ptypes.Peer) error {
+	return nil
+}
+
+func (m *MockDatabase) LoadPeers() []*p2ptypes.Peer {
 	return nil
 }
 
