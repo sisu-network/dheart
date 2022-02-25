@@ -121,8 +121,6 @@ func (h *Heart) loadPeers(engine Engine) {
 		h.db.SavePeers(peers)
 	}
 
-	fmt.Println("Peer length = ", len(peers))
-
 	pubkeys := make([]ctypes.PubKey, 0)
 	for _, peer := range peers {
 		bz, err := hex.DecodeString(peer.PubKey)
@@ -136,9 +134,6 @@ func (h *Heart) loadPeers(engine Engine) {
 			log.Error("loadPeers: get cosmos pubkey with type: ", peer.PubKeyType)
 			continue
 		}
-
-		node := NewNode(pubkey)
-		fmt.Println("Peer id = ", node.PeerId)
 
 		pubkeys = append(pubkeys, pubkey)
 	}

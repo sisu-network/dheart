@@ -20,5 +20,3 @@ port = 5678
   host = "127.0.0.1"
   port = 28300
   rendezvous = "rendezvous"
-  peers = ["/ip4/127.0.0.1/tcp/28301/p2p/16Uiu2HAmU1oJ2Wqc91foPEvVuGzFNQ3QZWecgS2Y5tw3jRKmq1Wp"]
-
