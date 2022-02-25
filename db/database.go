@@ -188,6 +188,7 @@ func (d *SqlDatabase) LoadPreparams() (*keygen.LocalPreParams, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	if !rows.Next() {
 		return nil, ErrNotFound
@@ -250,6 +251,7 @@ func (d *SqlDatabase) LoadKeygenData(keyType string) (*keygen.LocalPartySaveData
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	result := &keygen.LocalPartySaveData{}
 	if rows.Next() {
@@ -318,6 +320,7 @@ func (d *SqlDatabase) GetAvailablePresignShortForm() ([]string, []string, error)
 	if err != nil {
 		return nil, nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var presignId, pid string
@@ -361,6 +364,7 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	// 2. Scan every rows and save it to loaded array
 	results := make([]*presign.LocalPresignData, 0)
@@ -423,6 +427,7 @@ func (d *SqlDatabase) LoadPeers() []*p2ptypes.Peer {
 		log.Error("failed to load peers")
 		return peers
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var nullableAddress, nullablePubkey, nullableKeytype sql.NullString
