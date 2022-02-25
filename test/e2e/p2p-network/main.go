@@ -7,20 +7,21 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/sisu-network/dheart/p2p"
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	"github.com/sisu-network/lib/log"
 )
 
 type SimpleListener struct {
-	dataChan chan *p2p.P2PMessage
+	dataChan chan *p2ptypes.P2PMessage
 }
 
-func NewSimpleListener(dataChan chan *p2p.P2PMessage) *SimpleListener {
+func NewSimpleListener(dataChan chan *p2ptypes.P2PMessage) *SimpleListener {
 	return &SimpleListener{
 		dataChan: dataChan,
 	}
 }
 
-func (listener *SimpleListener) OnNetworkMessage(message *p2p.P2PMessage) {
+func (listener *SimpleListener) OnNetworkMessage(message *p2ptypes.P2PMessage) {
 	log.Verbose("There is a new message from", message.FromPeerId)
 	log.Verbose(string(message.Data))
 	listener.dataChan <- message
@@ -44,7 +45,7 @@ func main() {
 	config, privateKey := p2p.GetMockSecp256k1Config(n, index)
 	cm := p2p.NewConnectionManager(config)
 
-	dataChan := make(chan *p2p.P2PMessage)
+	dataChan := make(chan *p2ptypes.P2PMessage)
 
 	cm.AddListener(p2p.TSSProtocolID, NewSimpleListener(dataChan))
 

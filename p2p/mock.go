@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
 	maddr "github.com/multiformats/go-multiaddr"
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 )
 
 const (
@@ -178,15 +179,15 @@ func GetMockEd25519Peers(n int) []peer.ID {
 	return peerIds
 }
 
-func GetMockSecp256k1Config(n, index int) (ConnectionsConfig, []byte) {
+func GetMockSecp256k1Config(n, index int) (p2ptypes.ConnectionsConfig, []byte) {
 	return GetMockConnectionConfig(n, index, "secp256k1")
 }
 
-func GetMockConnectionConfig(n, index int, keyType string) (ConnectionsConfig, []byte) {
+func GetMockConnectionConfig(n, index int, keyType string) (p2ptypes.ConnectionsConfig, []byte) {
 	peerIds := GetMockPeers(n, keyType)
 
 	privateKey := GetPrivateKeyBytes(index, keyType)
-	peers := make([]string, 0)
+	peers := make([]*p2ptypes.Peer, 0)
 
 	// create peers
 	for i := 0; i < n; i++ {
@@ -197,14 +198,18 @@ func GetMockConnectionConfig(n, index int, keyType string) (ConnectionsConfig, [
 		port := TEST_PORT_BASE * (i + 1)
 		peerId := peerIds[i]
 
-		peers = append(peers, fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, peerId))
+		peer := &p2ptypes.Peer{
+			Address: fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, peerId),
+		}
+
+		peers = append(peers, peer)
 	}
 
-	return ConnectionsConfig{
-		Host:           "0.0.0.0",
-		Port:           TEST_PORT_BASE * (index + 1),
-		Rendezvous:     "rendezvous",
-		Protocol:       TSSProtocolID,
-		BootstrapPeers: peers,
+	return p2ptypes.ConnectionsConfig{
+		Host:       "0.0.0.0",
+		Port:       TEST_PORT_BASE * (index + 1),
+		Rendezvous: "rendezvous",
+		Protocol:   TSSProtocolID,
+		Peers:      peers,
 	}, privateKey
 }

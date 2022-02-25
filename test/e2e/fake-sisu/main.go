@@ -124,12 +124,13 @@ func bootstrapNetwork(nodes []*MockSisuNode) {
 			if err != nil {
 				panic(err)
 			}
+
 			nodes[index].client.Ping("sisu")
 			nodes[index].client.SetPrivKey(hex.EncodeToString(encrypt), nodes[index].privKey.Type())
 			nodes[index].client.SetSisuReady(true)
-		}(i)
 
-		wg.Done()
+			wg.Done()
+		}(i)
 	}
 
 	wg.Wait()
