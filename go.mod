@@ -17,9 +17,9 @@ require (
 	github.com/libp2p/go-libp2p-core v0.8.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-kad-dht v0.11.1
-	github.com/logdna/logdna-go v1.0.2 // indirect
+	github.com/logdna/logdna-go v1.0.2
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/sisu-network/lib v0.0.1-alpha12
+	github.com/sisu-network/lib v0.0.1-alpha13
 	github.com/sisu-network/tss-lib v0.1.1
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7

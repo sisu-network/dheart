@@ -37,7 +37,6 @@ func SetupApiServer() {
 		panic(err)
 	}
 
-	log.Info("homeDir = ", homeDir)
 	if len(cfg.LogDNA.Secret) > 0 {
 		opts := logger.Options{
 			App:           cfg.LogDNA.AppName,
@@ -48,6 +47,7 @@ func SetupApiServer() {
 		setupLogger(cfg.LogDNA.Secret, opts)
 	}
 
+	log.Info("homeDir = ", homeDir)
 	aesKey, err := hex.DecodeString(os.Getenv("AES_KEY_HEX"))
 	if err != nil {
 		panic(err)

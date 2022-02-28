@@ -7,8 +7,8 @@ sisu-server-url = "http://0.0.0.0:25456"
 port = 5678
 
 [log_dna]
-secret = "a881617ba5f3f8045ef88d4e0eb35dfe"
-app_name = "deyes"
+secret = ""
+app_name = "dheart"
 host_name = "node0"
 flush_interval = "30s"
 max_buffer_len = 5
