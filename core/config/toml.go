@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"text/template"
+	"time"
 )
 
 const defaultConfigTemplate = `# This is a TOML config file.
@@ -52,4 +53,14 @@ func WriteConfigFile(configFilePath string, config HeartConfig) {
 	}
 
 	ioutil.WriteFile(configFilePath, buffer.Bytes(), 0600)
+}
+
+type duration struct {
+	time.Duration
+}
+
+func (d *duration) UnmarshalText(text []byte) error {
+	var err error
+	d.Duration, err = time.ParseDuration(string(text))
+	return err
 }

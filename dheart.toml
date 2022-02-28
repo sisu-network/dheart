@@ -6,6 +6,13 @@ use-on-memory = true
 sisu-server-url = "http://0.0.0.0:25456"
 port = 5678
 
+[log_dna]
+secret = ""
+app_name = "dheart"
+host_name = "node0"
+flush_interval = "30s"
+max_buffer_len = 5
+
 ###############################################################################
 ###                        Database Configuration                           ###
 ###############################################################################
@@ -20,3 +27,8 @@ port = 5678
   host = "127.0.0.1"
   port = 28300
   rendezvous = "rendezvous"
+
+[[connection.peers]]
+  address = "/dns/dheart0/tcp/28300/p2p/12D3KooWD6JaQEHnpeCKHZ1bYA9axESG1MyqTRWRLhkf7btYYpRk"
+  pubkey = "30a84ac6ed8306d5d5160c763cd90a0450eff4f77e3bc1f0fd2cff9abdca0d5f"
+  pubkey_type = "ed25519"

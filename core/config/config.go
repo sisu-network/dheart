@@ -3,6 +3,7 @@ package config
 import (
 	"github.com/BurntSushi/toml"
 	p2ptypes "github.com/sisu-network/dheart/p2p/types"
+	"github.com/sisu-network/lib/log"
 )
 
 type DbConfig struct {
@@ -22,6 +23,8 @@ type HeartConfig struct {
 
 	Db         DbConfig                   `toml:"db"`
 	Connection p2ptypes.ConnectionsConfig `toml:"connection"`
+
+	LogDNA log.LogDNAConfig `toml:"log_dna"`
 
 	// Key to decrypt data sent over network.
 	AesKey []byte
