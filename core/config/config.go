@@ -23,8 +23,18 @@ type HeartConfig struct {
 	Db         DbConfig                   `toml:"db"`
 	Connection p2ptypes.ConnectionsConfig `toml:"connection"`
 
+	LogDNA LogDNA `toml:"log_dna"`
+
 	// Key to decrypt data sent over network.
 	AesKey []byte
+}
+
+type LogDNA struct {
+	Secret        string   `toml:"secret"`
+	AppName       string   `toml:"app_name"`
+	HostName      string   `toml:"host_name"`
+	FlushInterval duration `toml:"flush_interval"`
+	MaxBufferLen  int      `toml:"max_buffer_len"`
 }
 
 func ReadConfig(path string) (HeartConfig, error) {
