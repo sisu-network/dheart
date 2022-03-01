@@ -359,6 +359,11 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 // Called at the end of Sisu's block. This could be a time when we can check our CPU resource and
 // does additional presign work.
 func (h *Heart) BlockEnd(blockHeight int64) error {
+	// Temporarily disable presign.
+	if true {
+		return nil
+	}
+
 	if h.ready.Load() != true {
 		return ErrDheartNotReady
 	}
