@@ -48,6 +48,8 @@ type Job struct {
 	callback JobCallback
 
 	timeOut time.Duration
+
+	getCurRoundFunc func() int
 }
 
 func NewKeygenJob(
@@ -57,6 +59,7 @@ func NewKeygenJob(
 	localPreparams *keygen.LocalPreParams,
 	callback JobCallback,
 	timeOut time.Duration,
+	getCurRoundFunc func() uint32,
 ) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan keygen.LocalPartySaveData, len(pIDs))
@@ -160,8 +163,17 @@ func (job *Job) startListening() {
 	endTime := time.Now().Add(job.timeOut)
 
 	// TODO: Add timeout and missing messages.
+	ticker := time.NewTicker(10 * time.Second)
 	for {
 		select {
+		case <-ticker.C:
+			// Every 10 seconds, check if job round is changed?
+			// If not, potentially we missed some messages from peers
+			// In this case, send request to ask broadcast/unicast message from peers and re-process this round
+
+			// defines new callback to request broadcast/unicast message:
+			// job.callback.OnRequestFromPeers()
+			//      - request msg from peer (params: msgType(included round) + from + to)
 		case <-time.After(endTime.Sub(time.Now())):
 			job.callback.OnJobTimeout()
 			return
