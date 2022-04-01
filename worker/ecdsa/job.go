@@ -3,6 +3,7 @@ package ecdsa
 import (
 	"crypto/elliptic"
 	"fmt"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"math/big"
 	"time"
 
@@ -29,6 +30,10 @@ type JobCallback interface {
 
 	// Called when this signing job finishes.
 	OnJobSignFinished(job *Job, data *libCommon.SignatureData)
+
+	// OnRequestTSSMessagesFromPeers potentially missed messages to process current round
+	// we need to request all TSS messages for this round from peers
+	OnRequestTSSMessagesFromPeers(job *Job, msgKey string, peers []peer.ID) error
 
 	// OnJobTimeout on job timeout
 	OnJobTimeout()
@@ -172,8 +177,7 @@ func (job *Job) startListening() {
 			// In this case, send request to ask broadcast/unicast message from peers and re-process this round
 
 			// defines new callback to request broadcast/unicast message:
-			// job.callback.OnRequestFromPeers()
-			//      - request msg from peer (params: msgType(included round) + from + to)
+			// OnRequestTSSMessagesFromPeers(job *Job, msgKey string, peers []peer.ID) error
 		case <-time.After(endTime.Sub(time.Now())):
 			job.callback.OnJobTimeout()
 			return
