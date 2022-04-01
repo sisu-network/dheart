@@ -54,7 +54,7 @@ type Job struct {
 
 	timeOut time.Duration
 
-	getCurRoundFunc func() int
+	getCurRoundFunc func() uint32
 }
 
 func NewKeygenJob(
@@ -73,14 +73,15 @@ func NewKeygenJob(
 	party := keygen.NewLocalParty(params, outCh, endCh, *localPreparams).(*keygen.LocalParty)
 
 	return &Job{
-		index:       index,
-		jobType:     wTypes.EcdsaKeygen,
-		party:       party,
-		outCh:       outCh,
-		endKeygenCh: endCh,
-		callback:    callback,
-		closeCh:     closeCh,
-		timeOut:     timeOut,
+		index:           index,
+		jobType:         wTypes.EcdsaKeygen,
+		party:           party,
+		outCh:           outCh,
+		endKeygenCh:     endCh,
+		callback:        callback,
+		closeCh:         closeCh,
+		timeOut:         timeOut,
+		getCurRoundFunc: getCurRoundFunc,
 	}
 }
 

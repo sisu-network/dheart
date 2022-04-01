@@ -24,6 +24,9 @@ message TssMessage {
 
     // A message sent from leader to everyone else with a list of participants to a tss work.
     PRE_EXEC_OUTPUT = 3;
+
+    // This type of message is used when a party missed broadcast/unicast TSS message
+    REQUEST_CACHED_TSS_MESSAGE = 4;
   }
 
   Type type = 1;
