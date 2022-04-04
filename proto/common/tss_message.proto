@@ -26,7 +26,7 @@ message TssMessage {
     PRE_EXEC_OUTPUT = 3;
 
     // When a party missed broadcast/unicast TSS messages, they ask them from peers
-    REQUEST_MESSAGE = 4;
+    ASK_MESSAGE_REQUEST = 4;
   }
 
   Type type = 1;
@@ -38,7 +38,7 @@ message TssMessage {
 
   AvailabilityResponseMessage availabilityResponseMessage = 6;
   PreExecOutputMessage preExecOutputMessage = 7;
-  RequestMessage requestMessage = 8;
+  AskRequestMessage askRequestMessage = 8;
 }
 
 message UpdateMessage {
@@ -71,6 +71,6 @@ message PreExecOutputMessage {
 }
 
 // If a party missed a TSS message then ask the peers
-message RequestMessage {
+message AskRequestMessage {
   string msgKey = 1;
 }

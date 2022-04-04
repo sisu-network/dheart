@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"github.com/sisu-network/lib/log"
 
 	"github.com/sisu-network/tss-lib/tss"
 )
@@ -13,11 +14,13 @@ func NewTssMessage(from, to, workId string, msgs []tss.Message, round string) (*
 	for i, msg := range msgs {
 		msgsBytes, routing, err := msg.WireBytes()
 		if err != nil {
+			log.Error("error when get wire bytes from tss message: ", err)
 			return nil, err
 		}
 
 		serialized, err := json.Marshal(routing)
 		if err != nil {
+			log.Error("error when serialized routing info: ", err)
 			return nil, err
 		}
 
@@ -68,8 +71,8 @@ func NewPreExecOutputMessage(from, to, workId string, success bool, presignIds [
 }
 
 func NewRequestMessage(from, to, workId, msgKey string) *TssMessage {
-	msg := baseMessage(TssMessage_REQUEST_MESSAGE, from, to, workId)
-	msg.RequestMessage = &RequestMessage{
+	msg := baseMessage(TssMessage_ASK_MESSAGE, from, to, workId)
+	msg.AskMessage = &AskMessage{
 		MsgKey: msgKey,
 	}
 

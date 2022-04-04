@@ -429,6 +429,11 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 			// make sure we only send message to this channel once.
 			w.preExecMsgCh <- tssMsg.PreExecOutputMessage
 		}
+	case common.TssMessage_ASK_MESSAGE:
+		if err := w.onAskRequest(tssMsg); err != nil {
+			return fmt.Errorf("error when processing ask message %w", err)
+		}
+
 	default:
 		// Don't call callback here because this can be from bad actor/corrupted.
 		return errors.New("invalid message " + tssMsg.Type.String())

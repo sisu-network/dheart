@@ -3,10 +3,10 @@ package ecdsa
 import (
 	"crypto/elliptic"
 	"fmt"
-	"github.com/sisu-network/dheart/core/message"
 	"math/big"
 	"time"
 
+	"github.com/sisu-network/dheart/core/message"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
@@ -188,9 +188,10 @@ func (job *Job) startListening() {
 
 			waitingForParties := job.party.WaitingFor()
 			msgTypes := message.GetAllMessageTypesByRound(currentRound)
+			// TODO: check duplicated request messages
 			for _, msgType := range msgTypes {
 				requestMsgKey := GetCacheMsgKey(msgType, job.party.PartyID().GetId(), "")
-				job.callback.OnRequestTSSMessageFromPeers(job, requestMsgKey, waitingForParties)
+				go job.callback.OnRequestTSSMessageFromPeers(job, requestMsgKey, waitingForParties)
 			}
 		case <-time.After(endTime.Sub(time.Now())):
 			job.callback.OnJobTimeout()

@@ -259,6 +259,23 @@ func (w *DefaultWorker) onPreExecutionResponse(tssMsg *commonTypes.TssMessage) e
 	return nil
 }
 
+func (w *DefaultWorker) onAskRequest(tssMsg *commonTypes.TssMessage) error {
+	msg, ok := w.monitor.GetMessage(tssMsg.AskMessage.GetMsgKey())
+	if !ok {
+		log.Warnf("cannot find message type %s from %s", msg.Type(), msg.GetFrom())
+		return nil
+	}
+
+	responseMsg, err := commonTypes.NewTssMessage(w.myPid.Id, tssMsg.From, w.workId, []tss.Message{msg}, msg.Type())
+	if err != nil {
+		log.Critical("error when build tss message", err)
+		return err
+	}
+
+	go w.dispatcher.UnicastMessage(msg.GetFrom(), responseMsg)
+	return nil
+}
+
 // memberFinalized is called when all the participants have been finalized by the leader.
 // We either start execution or finish this work.
 func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
