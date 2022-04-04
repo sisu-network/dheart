@@ -1,6 +1,7 @@
 package ecdsa
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/sisu-network/tss-lib/tss"
@@ -39,4 +40,17 @@ func (m *DefaultWorkerMonitor) GetMessage(msgKey string) (tss.Message, bool) {
 
 	msg, ok := m.MessageCache[msgKey]
 	return msg, ok
+}
+
+func GetCacheMsgKeyForTSSMsg(msg tss.Message) string {
+	to := ""
+	if !msg.IsBroadcast() {
+		to = msg.GetTo()[0].GetId()
+	}
+
+	return GetCacheMsgKey(msg.Type(), msg.GetFrom().GetId(), to)
+}
+
+func GetCacheMsgKey(tssMsgType, from, to string) string {
+	return strings.Join([]string{tssMsgType, from, to}, "-")
 }

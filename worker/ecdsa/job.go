@@ -3,6 +3,7 @@ package ecdsa
 import (
 	"crypto/elliptic"
 	"fmt"
+	"github.com/sisu-network/dheart/core/message"
 	"math/big"
 	"time"
 
@@ -169,6 +170,7 @@ func (job *Job) startListening() {
 
 	// TODO: Add timeout and missing messages.
 	ticker := time.NewTicker(10 * time.Second)
+	oldRound := job.getCurRoundFunc()
 	for {
 		select {
 		case <-ticker.C:
@@ -176,8 +178,20 @@ func (job *Job) startListening() {
 			// If not, potentially we missed some messages from peers
 			// In this case, send request to ask broadcast/unicast message from peers and re-process this round
 
-			// defines new callback to request broadcast/unicast message:
-			// OnRequestTSSMessagesFromPeers(job *Job, msgKey string, peers []peer.ID) error
+			// Check round number has changed or not
+			currentRound := job.getCurRoundFunc()
+			if currentRound != oldRound {
+				// Re-assign old round
+				oldRound = currentRound
+				continue
+			}
+
+			waitingForParties := job.party.WaitingFor()
+			msgTypes := message.GetAllMessageTypesByRound(currentRound)
+			for _, msgType := range msgTypes {
+				requestMsgKey := GetCacheMsgKey(msgType, job.party.PartyID().GetId(), "")
+				job.callback.OnRequestTSSMessageFromPeers(job, requestMsgKey, waitingForParties)
+			}
 		case <-time.After(endTime.Sub(time.Now())):
 			job.callback.OnJobTimeout()
 			return

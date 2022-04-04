@@ -8,6 +8,7 @@ import (
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -74,4 +75,45 @@ func NextRound(jobType wTypes.WorkType, curRound uint32) uint32 {
 	}
 
 	return curRound
+}
+
+func GetAllMessageTypesByRound(round uint32) []string {
+	switch round {
+	case Keygen1:
+		return []string{
+			string(proto.MessageName(&keygen.KGRound1Message{})),
+		}
+	case Keygen2:
+		return []string{
+			string(proto.MessageName(&keygen.KGRound2Message1{})),
+			string(proto.MessageName(&keygen.KGRound2Message2{})),
+		}
+	case Keygen3:
+		return []string{
+			string(proto.MessageName(&keygen.KGRound3Message{})),
+		}
+	case Presign1:
+		return []string{
+			string(proto.MessageName(&presign.PresignRound1Message1{})),
+			string(proto.MessageName(&presign.PresignRound1Message2{})),
+		}
+	case Presign2:
+		return []string{
+			string(proto.MessageName(&presign.PresignRound2Message{})),
+		}
+	case Presign3:
+		return []string{
+			string(proto.MessageName(&presign.PresignRound3Message{})),
+		}
+	case Presign4:
+		return []string{
+			string(proto.MessageName(&presign.PresignRound4Message{})),
+		}
+	case Sign1:
+		return []string{
+			string(proto.MessageName(&signing.SignRound1Message{})),
+		}
+	default:
+		return []string{}
+	}
 }

@@ -361,6 +361,9 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 	count := w.getCompletedJobCount(list)
 	w.jobOutputLock.Unlock()
 
+	cacheMsgKey := GetCacheMsgKeyForTSSMsg(msg)
+	w.monitor.StoreMessage(cacheMsgKey, msg)
+
 	if count == w.batchSize {
 		// We have completed all jobs for current round. Send the list to the dispatcher. Move the worker to next round.
 		dest := msg.GetTo()
