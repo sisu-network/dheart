@@ -67,6 +67,15 @@ func NewPreExecOutputMessage(from, to, workId string, success bool, presignIds [
 	return msg
 }
 
+func NewRequestMessage(from, to, workId, msgKey string) *TssMessage {
+	msg := baseMessage(TssMessage_REQUEST_MESSAGE, from, to, workId)
+	msg.RequestMessage = &RequestMessage{
+		MsgKey: msgKey,
+	}
+
+	return msg
+}
+
 func baseMessage(typez TssMessage_Type, from, to, workId string) *TssMessage {
 	return &TssMessage{
 		Type:   typez,

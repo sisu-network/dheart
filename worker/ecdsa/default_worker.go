@@ -109,6 +109,8 @@ type DefaultWorker struct {
 	curRound uint32
 
 	jobTimeout time.Duration
+
+	monitor Monitor
 }
 
 func NewKeygenWorker(
@@ -199,6 +201,7 @@ func baseWorker(
 		blameMgr:          blame.NewManager(),
 		jobTimeout:        timeOut,
 		maxJob:            maxJob,
+		monitor:           NewDefaultWorkerMonitor(),
 	}
 }
 
@@ -380,6 +383,14 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 		} else {
 			go w.dispatcher.UnicastMessage(dest[0], tssMsg)
 		}
+	}
+}
+
+// OnRequestTSSMessageFromPeers ask the peers to find missed message
+func (w *DefaultWorker) OnRequestTSSMessageFromPeers(_ *Job, msgKey string, pIDs []*tss.PartyID) {
+	msg := common.NewRequestMessage(w.myPid.Id, "", w.workId, msgKey)
+	for _, pid := range pIDs {
+		go w.dispatcher.UnicastMessage(pid, msg)
 	}
 }
 

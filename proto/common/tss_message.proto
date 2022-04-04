@@ -8,7 +8,7 @@ message TssMessage {
   enum Type {
     UPDATE_MESSAGES = 0;
 
-    // A message sent from leader to everyeone to check if anyone is available to participant
+    // A message sent from leader to everyone to check if anyone is available to participant
     // another optional (presign) tss work.
     AVAILABILITY_REQUEST = 1;
 
@@ -26,7 +26,7 @@ message TssMessage {
     PRE_EXEC_OUTPUT = 3;
 
     // When a party missed broadcast/unicast TSS messages, they ask them from peers
-    REQUEST_CACHED_TSS_MESSAGE = 4;
+    REQUEST_MESSAGE = 4;
   }
 
   Type type = 1;
@@ -38,6 +38,7 @@ message TssMessage {
 
   AvailabilityResponseMessage availabilityResponseMessage = 6;
   PreExecOutputMessage preExecOutputMessage = 7;
+  RequestMessage requestMessage = 8;
 }
 
 message UpdateMessage {
@@ -48,13 +49,13 @@ message UpdateMessage {
 
 // An answer from a party member to the leader to indicate its available for signing.
 message AvailabilityResponseMessage {
- enum ANSWER {
-   YES = 0;
-   NO = 1;
- }
+  enum ANSWER {
+    YES = 0;
+    NO = 1;
+  }
 
- ANSWER answer = 1;
- int32 maxJob = 2;
+  ANSWER answer = 1;
+  int32 maxJob = 2;
 }
 
 // A message from a leader to send to everyone with a list of participants for a particular work
@@ -67,4 +68,9 @@ message PreExecOutputMessage {
 
   // List of presign ids that will be used (only for signing)
   repeated string presign_ids = 3;
+}
+
+// If a party missed a TSS message then ask the peers
+message RequestMessage {
+  string msgKey = 1;
 }

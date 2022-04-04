@@ -3,7 +3,6 @@ package ecdsa
 import (
 	"crypto/elliptic"
 	"fmt"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"math/big"
 	"time"
 
@@ -31,9 +30,9 @@ type JobCallback interface {
 	// Called when this signing job finishes.
 	OnJobSignFinished(job *Job, data *libCommon.SignatureData)
 
-	// OnRequestTSSMessagesFromPeers potentially missed messages to process current round
-	// we need to request all TSS messages for this round from peers
-	OnRequestTSSMessagesFromPeers(job *Job, msgKey string, peers []peer.ID) error
+	// OnRequestTSSMessageFromPeers potentially missed message to process current round
+	// we need to request message for this round from peers
+	OnRequestTSSMessageFromPeers(job *Job, msgKey string, pIDs []*tss.PartyID)
 
 	// OnJobTimeout on job timeout
 	OnJobTimeout()

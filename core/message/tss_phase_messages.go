@@ -26,19 +26,13 @@ func GetMsgRound(content tss.MessageContent) (uint32, error) {
 	case *keygen.KGRound1Message:
 		return Keygen1, nil
 
-	case *keygen.KGRound2Message1:
-		return Keygen1, nil
-
-	case *keygen.KGRound2Message2:
+	case *keygen.KGRound2Message1, *keygen.KGRound2Message2:
 		return Keygen2, nil
 
 	case *keygen.KGRound3Message:
 		return Keygen3, nil
 
-	case *presign.PresignRound1Message1:
-		return Presign1, nil
-
-	case *presign.PresignRound1Message2:
+	case *presign.PresignRound1Message1, *presign.PresignRound1Message2:
 		return Presign1, nil
 
 	case *presign.PresignRound2Message:
