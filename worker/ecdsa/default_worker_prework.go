@@ -260,6 +260,7 @@ func (w *DefaultWorker) onPreExecutionResponse(tssMsg *commonTypes.TssMessage) e
 }
 
 func (w *DefaultWorker) onAskRequest(tssMsg *commonTypes.TssMessage) error {
+	log.Info("askMsg = ", tssMsg.AskMessage.MsgKey)
 	msg, ok := w.monitor.GetMessage(tssMsg.AskMessage.GetMsgKey())
 	if !ok {
 		log.Warnf("cannot find message type %s from %s", msg.Type(), msg.GetFrom())

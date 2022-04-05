@@ -97,7 +97,8 @@ type DefaultEngine struct {
 	config EngineConfig
 }
 
-func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback, privateKey ctypes.PrivKey, config EngineConfig) Engine {
+func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback,
+	privateKey ctypes.PrivKey, config EngineConfig) Engine {
 	return &DefaultEngine{
 		myNode:          myNode,
 		myPid:           myNode.PartyId,
@@ -248,7 +249,8 @@ func (engine *DefaultEngine) OnWorkKeygenFinished(request *types.WorkRequest, ou
 	engine.startNextWork()
 }
 
-func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+func (engine *DefaultEngine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID,
+	data []*presign.LocalPresignData) {
 	log.Info("Presign finished, request.WorkId = ", request.WorkId)
 
 	engine.presignsManager.AddPresign(request.WorkId, pids, data)
@@ -327,6 +329,7 @@ func (engine *DefaultEngine) getWorker(workId string) worker.Worker {
 
 // Broadcast a message to everyone in a list.
 func (engine *DefaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
+	log.Info("Broadcast here")
 	if tssMessage.To == engine.myPid.Id {
 		return
 	}
@@ -478,7 +481,8 @@ func (engine *DefaultEngine) OnWorkFailed(request *types.WorkRequest) {
 	worker.Stop()
 }
 
-func (engine *DefaultEngine) GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
+func (engine *DefaultEngine) GetAvailablePresigns(batchSize int, n int,
+	allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
 	return engine.presignsManager.GetAvailablePresigns(batchSize, n, allPids)
 }
 

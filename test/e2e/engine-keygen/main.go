@@ -5,14 +5,49 @@ import (
 	"math/big"
 	"time"
 
+	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/core"
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	htypes "github.com/sisu-network/dheart/types"
+	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 )
+
+type SlowEngine struct {
+	*core.DefaultEngine
+
+	countUnicast   int
+	countBroadcast int
+}
+
+func NewSlowEngine(myNode *core.Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback,
+	privateKey ctypes.PrivKey, config core.EngineConfig) core.Engine {
+	return core.NewEngine(myNode, cm, db, &callback, privateKey, config)
+}
+
+func (engine *SlowEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
+	if engine.countBroadcast%2 == 0 {
+		log.Info("Drop broadcast message")
+		return
+	}
+	engine.countBroadcast++
+
+	engine.BroadcastMessage(pIDs, tssMessage)
+}
+
+func (engine *SlowEngine) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
+	if engine.countUnicast%2 == 0 {
+		log.Info("Drop unicast message")
+		return
+	}
+	engine.countUnicast++
+
+	engine.UnicastMessage(dest, tssMessage)
+}
 
 type EngineCallback struct {
 	keygenDataCh  chan *htypes.KeygenResult
@@ -61,10 +96,12 @@ func getSortedPartyIds(n int) tss.SortedPartyIDs {
 
 func main() {
 	var index, n int
-	flag.IntVar(&index, "index", 0, "listening port")
-	flag.Parse()
+	var isSlowNode bool
 
-	n = 2
+	flag.IntVar(&index, "index", 0, "listening port")
+	flag.IntVar(&n, "n", 2, "number of nodes")
+	flag.BoolVar(&isSlowNode, "is-slow", false, "Use it when testing message caching mechanism")
+	flag.Parse()
 
 	config, privateKey := p2p.GetMockSecp256k1Config(n, index)
 	cm := p2p.NewConnectionManager(config)
@@ -91,6 +128,11 @@ func main() {
 	outCh := make(chan *htypes.KeygenResult)
 	cb := NewEngineCallback(outCh, nil, nil)
 	engine := core.NewEngine(nodes[index], cm, helper.NewMockDatabase(), cb, allKeys[index], core.NewDefaultEngineConfig())
+	if isSlowNode {
+		log.Info("Creating slow node")
+		engine = NewSlowEngine(nodes[index], cm, helper.NewMockDatabase(), *cb, allKeys[index], core.NewDefaultEngineConfig())
+	}
+
 	cm.AddListener(p2p.TSSProtocolID, engine)
 
 	// Add nodes

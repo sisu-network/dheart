@@ -391,6 +391,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 
 // OnRequestTSSMessageFromPeers ask the peers to find missed message
 func (w *DefaultWorker) OnRequestTSSMessageFromPeers(_ *Job, msgKey string, pIDs []*tss.PartyID) {
+	log.Info("Asking tss messages from peers...")
 	msg := common.NewRequestMessage(w.myPid.Id, "", w.workId, msgKey)
 	for _, pid := range pIDs {
 		go w.dispatcher.UnicastMessage(pid, msg)

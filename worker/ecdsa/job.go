@@ -169,7 +169,7 @@ func (job *Job) startListening() {
 	endTime := time.Now().Add(job.timeOut)
 
 	// TODO: Add timeout and missing messages.
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	oldRound := job.getCurRoundFunc()
 	for {
 		select {
@@ -185,6 +185,8 @@ func (job *Job) startListening() {
 				oldRound = currentRound
 				continue
 			}
+
+			log.Info("after 10 secs but the round number has not changed")
 
 			waitingForParties := job.party.WaitingFor()
 			msgTypes := message.GetAllMessageTypesByRound(currentRound)
@@ -202,9 +204,11 @@ func (job *Job) startListening() {
 			return
 
 		case msg := <-outCh:
+			log.Info("On Job Message")
 			job.callback.OnJobMessage(job, msg)
 
 		case data := <-job.endKeygenCh:
+			log.Info("Keygen finished")
 			job.callback.OnJobKeygenFinished(job, &data)
 			return
 
