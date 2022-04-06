@@ -53,8 +53,6 @@ type Job struct {
 	callback JobCallback
 
 	timeOut time.Duration
-
-	getCurRoundFunc func() uint32
 }
 
 func NewKeygenJob(
@@ -64,7 +62,6 @@ func NewKeygenJob(
 	localPreparams *keygen.LocalPreParams,
 	callback JobCallback,
 	timeOut time.Duration,
-	getCurRoundFunc func() uint32,
 ) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan keygen.LocalPartySaveData, len(pIDs))
@@ -81,7 +78,6 @@ func NewKeygenJob(
 		callback:        callback,
 		closeCh:         closeCh,
 		timeOut:         timeOut,
-		getCurRoundFunc: getCurRoundFunc,
 	}
 }
 

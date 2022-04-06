@@ -257,9 +257,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 	for i := range jobs {
 		switch w.jobType {
 		case wTypes.EcdsaKeygen:
-			jobs[i] = NewKeygenJob(i, w.pIDs, params, w.keygenInput, w, w.jobTimeout, func() uint32 {
-				return w.curRound
-			})
+			jobs[i] = NewKeygenJob(i, w.pIDs, params, w.keygenInput, w, w.jobTimeout)
 			nextJobType = wTypes.EcdsaKeygen
 
 		case wTypes.EcdsaPresign:
