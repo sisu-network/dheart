@@ -170,7 +170,7 @@ func (job *Job) startListening() {
 
 	// TODO: Add timeout and missing messages.
 	ticker := time.NewTicker(5 * time.Second)
-	oldRound := job.getCurRoundFunc()
+	oldRound := job.party.Round()
 	for {
 		select {
 		case <-ticker.C:
@@ -179,21 +179,27 @@ func (job *Job) startListening() {
 			// In this case, send request to ask broadcast/unicast message from peers and re-process this round
 
 			// Check round number has changed or not
-			currentRound := job.getCurRoundFunc()
+			currentRound := job.party.Round()
 			if currentRound != oldRound {
 				// Re-assign old round
 				oldRound = currentRound
 				continue
 			}
 
-			log.Info("after 10 secs but the round number has not changed")
-
+			log.Debug("after 10 secs but the round number has not changed")
+			log.Debug("Current round: ", currentRound, ", actually round: ", job.party.String())
 			waitingForParties := job.party.WaitingFor()
-			msgTypes := message.GetAllMessageTypesByRound(currentRound)
+			for _, p := range waitingForParties {
+				log.Debug("Waiting for parties ", p.GetId())
+			}
+			msgTypes := message.GetAllMessageTypesByRound(uint32(job.party.Round()))
+
 			// TODO: check duplicated request messages
 			for _, msgType := range msgTypes {
-				requestMsgKey := GetCacheMsgKey(msgType, job.party.PartyID().GetId(), "")
-				go job.callback.OnRequestTSSMessageFromPeers(job, requestMsgKey, waitingForParties)
+				for _, p := range waitingForParties {
+					requestMsgKey := GetCacheMsgKey(msgType, p.GetId(), "")
+					go job.callback.OnRequestTSSMessageFromPeers(job, requestMsgKey, []*tss.PartyID{p})
+				}
 			}
 		case <-time.After(endTime.Sub(time.Now())):
 			job.callback.OnJobTimeout()

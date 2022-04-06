@@ -168,6 +168,8 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 	// Make a copy of myPid since the index will be changed during the TSS work.
 	workPartyId := tss.NewPartyID(engine.myPid.Id, engine.myPid.Moniker, engine.myPid.KeyInt())
 
+	log.Debug("This party id is: ", workPartyId.GetId())
+
 	// Create a new worker.
 	switch request.WorkType {
 	case types.EcdsaKeygen:
@@ -329,7 +331,6 @@ func (engine *DefaultEngine) getWorker(workId string) worker.Worker {
 
 // Broadcast a message to everyone in a list.
 func (engine *DefaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
-	log.Info("Broadcast here")
 	if tssMessage.To == engine.myPid.Id {
 		return
 	}
@@ -365,6 +366,7 @@ func (engine *DefaultEngine) sendData(data []byte, pIDs []*tss.PartyID) {
 	engine.nodeLock.RLock()
 	for _, pid := range pIDs {
 		if pid.Id == engine.myPid.Id {
+			log.Debug("pid = ", pid.Id, " myPid = ", engine.myPid.Id)
 			// Don't send to ourself.
 			continue
 		}
@@ -381,7 +383,9 @@ func (engine *DefaultEngine) sendData(data []byte, pIDs []*tss.PartyID) {
 	engine.nodeLock.RUnlock()
 
 	// Write to stream
+	log.Debug("111111111")
 	for _, peerId := range peerIds {
+		log.Debug("22222222222")
 		engine.cm.WriteToStream(peerId, p2p.TSSProtocolID, data)
 	}
 }
@@ -431,6 +435,7 @@ func (engine *DefaultEngine) OnNetworkMessage(message *p2ptypes.P2PMessage) {
 		return
 	}
 
+	log.Debug("On network message")
 	if err := engine.ProcessNewMessage(tssMessage); err != nil {
 		log.Error("Error when process new message", err)
 	}

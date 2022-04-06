@@ -23,7 +23,7 @@ func TestEngineDelayStart(t *testing.T) {
 	privKeys, nodes, pIDs, savedData := getEngineTestData(n)
 
 	errCh := make(chan error)
-	outCh := make(chan *p2pDataWrapper)
+	outCh := make(chan *P2PDataWrapper)
 	engines := make([]Engine, n)
 	workId := "presign0"
 	done := make(chan bool)
@@ -89,7 +89,7 @@ func TestEngineJobTimeout(t *testing.T) {
 	privKeys, nodes, pIDs, savedData := getEngineTestData(n)
 
 	errCh := make(chan error)
-	outCh := make(chan *p2pDataWrapper)
+	outCh := make(chan *P2PDataWrapper)
 	engines := make([]Engine, n)
 	workId := "presign0"
 	done := make(chan bool)
@@ -150,7 +150,7 @@ func TestEngineJobTimeout(t *testing.T) {
 	runEngines(engines, workId, outCh, errCh, done, 2*time.Second)
 }
 
-func runEngines(engines []Engine, workId string, outCh chan *p2pDataWrapper, errCh chan error, done chan bool, delay time.Duration) {
+func runEngines(engines []Engine, workId string, outCh chan *P2PDataWrapper, errCh chan error, done chan bool, delay time.Duration) {
 	// Run all engines
 	for {
 		select {
@@ -166,7 +166,7 @@ func runEngines(engines []Engine, workId string, outCh chan *p2pDataWrapper, err
 				defaultEngine := engine.(*DefaultEngine)
 				if defaultEngine.myNode.PeerId.String() == p2pMsgWrapper.To {
 					signedMessage := &common.SignedMessage{}
-					if err := json.Unmarshal(p2pMsgWrapper.msg.Data, signedMessage); err != nil {
+					if err := json.Unmarshal(p2pMsgWrapper.Msg.Data, signedMessage); err != nil {
 						panic(err)
 					}
 

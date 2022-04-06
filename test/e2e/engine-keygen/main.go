@@ -1,52 +1,60 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"github.com/sisu-network/dheart/types/common"
 	"math/big"
 	"time"
 
-	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/sisu-network/dheart/core"
-	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
+	p2pTypes "github.com/sisu-network/dheart/p2p/types"
 	htypes "github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-type SlowEngine struct {
-	*core.DefaultEngine
-
-	countUnicast   int
-	countBroadcast int
+type SlowConnectionManager struct {
+	cm p2p.ConnectionManager
 }
 
-func NewSlowEngine(myNode *core.Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback,
-	privateKey ctypes.PrivKey, config core.EngineConfig) core.Engine {
-	return core.NewEngine(myNode, cm, db, &callback, privateKey, config)
+func (scm *SlowConnectionManager) Start(privKeyBytes []byte, keyType string) error {
+	return scm.cm.Start(privKeyBytes, keyType)
 }
 
-func (engine *SlowEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
-	if engine.countBroadcast%2 == 0 {
-		log.Info("Drop broadcast message")
-		return
+func (scm *SlowConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error {
+	signedMsg := &common.SignedMessage{}
+	if err := json.Unmarshal(msg, signedMsg); err != nil {
+		panic(err)
 	}
-	engine.countBroadcast++
 
-	engine.BroadcastMessage(pIDs, tssMessage)
+	if signedMsg.TssMessage.Type != common.TssMessage_UPDATE_MESSAGES {
+		log.Debug("This is not update message, process it")
+		return scm.cm.WriteToStream(pID, protocolId, msg)
+	}
+
+	if signedMsg.TssMessage.To == "" {
+		log.Debug("Drop broadcast msg")
+		return nil
+	}
+
+	log.Debug("Everything fine. Just process it")
+	return scm.cm.WriteToStream(pID, protocolId, msg)
 }
 
-func (engine *SlowEngine) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
-	if engine.countUnicast%2 == 0 {
-		log.Info("Drop unicast message")
-		return
-	}
-	engine.countUnicast++
+func (scm *SlowConnectionManager) AddListener(protocol protocol.ID, listener p2p.P2PDataListener) {
+	scm.cm.AddListener(protocol, listener)
+}
 
-	engine.UnicastMessage(dest, tssMessage)
+func NewSlowConnectionManager(config p2pTypes.ConnectionsConfig) p2p.ConnectionManager {
+	return &SlowConnectionManager{
+		cm: p2p.NewConnectionManager(config),
+	}
 }
 
 type EngineCallback struct {
@@ -105,7 +113,11 @@ func main() {
 
 	config, privateKey := p2p.GetMockSecp256k1Config(n, index)
 	cm := p2p.NewConnectionManager(config)
+	if isSlowNode {
+		cm = NewSlowConnectionManager(config)
+	}
 	err := cm.Start(privateKey, "secp256k1")
+
 	if err != nil {
 		panic(err)
 	}
@@ -128,11 +140,6 @@ func main() {
 	outCh := make(chan *htypes.KeygenResult)
 	cb := NewEngineCallback(outCh, nil, nil)
 	engine := core.NewEngine(nodes[index], cm, helper.NewMockDatabase(), cb, allKeys[index], core.NewDefaultEngineConfig())
-	if isSlowNode {
-		log.Info("Creating slow node")
-		engine = NewSlowEngine(nodes[index], cm, helper.NewMockDatabase(), *cb, allKeys[index], core.NewDefaultEngineConfig())
-	}
-
 	cm.AddListener(p2p.TSSProtocolID, engine)
 
 	// Add nodes

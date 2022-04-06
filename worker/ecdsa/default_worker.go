@@ -411,26 +411,33 @@ func (w *DefaultWorker) getCompletedJobCount(list []tss.Message) int {
 
 // Process incoming update message.
 func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
+	log.Debug("Process new messasge")
 	switch tssMsg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
+		log.Debug("Type TssMessage_UPDATE_MESSAGES")
+		log.Info("Processing Update message: ", tssMsg.From+"-"+tssMsg.To)
 		if err := w.processUpdateMessages(tssMsg); err != nil {
 			return fmt.Errorf("error when processing update message %w", err)
 		}
 	case common.TssMessage_AVAILABILITY_REQUEST:
+		log.Debug("Type TssMessage_AVAILABILITY_REQUEST")
 		if err := w.onPreExecutionRequest(tssMsg); err != nil {
 			return fmt.Errorf("error when processing execution request %w", err)
 		}
 	case common.TssMessage_AVAILABILITY_RESPONSE:
+		log.Debug("Type TssMessage_AVAILABILITY_RESPONSE")
 		if err := w.onPreExecutionResponse(tssMsg); err != nil {
 			return fmt.Errorf("error when processing execution response %w", err)
 		}
 	case common.TssMessage_PRE_EXEC_OUTPUT:
+		log.Debug("Type TssMessage_AVAILABILITY_RESPONSE")
 		if len(w.pIDs) == 0 {
 			// This output of workParticipantCh is called only once. We do checking for pids length to
 			// make sure we only send message to this channel once.
 			w.preExecMsgCh <- tssMsg.PreExecOutputMessage
 		}
 	case common.TssMessage_ASK_MESSAGE:
+		log.Debug("Type TssMessage_ASK_MESSAGE")
 		if err := w.onAskRequest(tssMsg); err != nil {
 			return fmt.Errorf("error when processing ask message %w", err)
 		}
@@ -599,6 +606,26 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 		log.Verbose(w.GetWorkId(), " Signing Done!")
 		w.callback.OnWorkSigningFinished(w.request, w.signingOutputs)
 	}
+}
+
+func (w *DefaultWorker) onAskRequest(tssMsg *commonTypes.TssMessage) error {
+	log.Info("askMsg = ", tssMsg.AskMessage.MsgKey, " from = ", tssMsg.From)
+	msg, ok := w.monitor.GetMessage(tssMsg.AskMessage.GetMsgKey())
+	if !ok {
+		log.Warnf("cannot find message type %s from %s", tssMsg.AskMessage.MsgKey, tssMsg.From)
+		return nil
+	}
+
+	responseMsg, err := commonTypes.NewTssMessage(w.myPid.Id, tssMsg.From, w.workId, []tss.Message{msg}, msg.Type())
+	if err != nil {
+		log.Critical("error when build tss message", err)
+		return err
+	}
+
+	log.Debug("Found asked msg, responding ...", responseMsg.Type)
+	log.Debug("Dest: ", w.pIDsMap[tssMsg.From].GetId())
+	go w.dispatcher.UnicastMessage(w.pIDsMap[tssMsg.From], responseMsg)
+	return nil
 }
 
 // Implements GetPartyId() of Worker interface.

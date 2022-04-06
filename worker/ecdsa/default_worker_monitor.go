@@ -4,6 +4,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -30,6 +31,7 @@ func (m *DefaultWorkerMonitor) StoreMessage(msgKey string, msg tss.Message) {
 	m.cacheLock.Lock()
 	defer m.cacheLock.Unlock()
 
+	log.Info("stored tss message with key ", msgKey)
 	m.MessageCache[msgKey] = msg
 }
 
