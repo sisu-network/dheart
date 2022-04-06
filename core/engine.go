@@ -383,9 +383,7 @@ func (engine *DefaultEngine) sendData(data []byte, pIDs []*tss.PartyID) {
 	engine.nodeLock.RUnlock()
 
 	// Write to stream
-	log.Debug("111111111")
 	for _, peerId := range peerIds {
-		log.Debug("22222222222")
 		engine.cm.WriteToStream(peerId, p2p.TSSProtocolID, data)
 	}
 }
@@ -435,7 +433,6 @@ func (engine *DefaultEngine) OnNetworkMessage(message *p2ptypes.P2PMessage) {
 		return
 	}
 
-	log.Debug("On network message")
 	if err := engine.ProcessNewMessage(tssMessage); err != nil {
 		log.Error("Error when process new message", err)
 	}

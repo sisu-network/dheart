@@ -414,8 +414,6 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 	log.Debug("Process new messasge")
 	switch tssMsg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
-		log.Debug("Type TssMessage_UPDATE_MESSAGES")
-		log.Info("Processing Update message: ", tssMsg.From+"-"+tssMsg.To)
 		if err := w.processUpdateMessages(tssMsg); err != nil {
 			return fmt.Errorf("error when processing update message %w", err)
 		}
@@ -486,6 +484,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 
 		updateMessage := tssMsg.UpdateMessages[i]
 		msg, err := tss.ParseWireMessage(updateMessage.Data, from, tssMsg.IsBroadcast())
+		log.Debug("msg.Type() = ", msg.Type())
 		if err != nil {
 			return fmt.Errorf("error when parsing wire message %w", err)
 		}
@@ -616,13 +615,17 @@ func (w *DefaultWorker) onAskRequest(tssMsg *commonTypes.TssMessage) error {
 		return nil
 	}
 
-	responseMsg, err := commonTypes.NewTssMessage(w.myPid.Id, tssMsg.From, w.workId, []tss.Message{msg}, msg.Type())
+	to := ""
+	if dest := msg.GetTo(); len(dest) > 0 {
+		to = dest[0].Id
+	}
+	responseMsg, err := commonTypes.NewTssMessage(w.myPid.Id, to, w.workId, []tss.Message{msg}, msg.Type())
 	if err != nil {
 		log.Critical("error when build tss message", err)
 		return err
 	}
 
-	log.Debug("Found asked msg, responding ...", responseMsg.Type)
+	log.Debug("Found asked msg, responding ...", responseMsg.Type, " isBroadcast = ", responseMsg.IsBroadcast())
 	log.Debug("Dest: ", w.pIDsMap[tssMsg.From].GetId())
 	go w.dispatcher.UnicastMessage(w.pIDsMap[tssMsg.From], responseMsg)
 	return nil

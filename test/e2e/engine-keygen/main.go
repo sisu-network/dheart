@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/sisu-network/dheart/types/common"
 	"math/big"
+	"math/rand"
+	"os"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -13,6 +14,7 @@ import (
 	"github.com/sisu-network/dheart/p2p"
 	p2pTypes "github.com/sisu-network/dheart/p2p/types"
 	htypes "github.com/sisu-network/dheart/types"
+	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
@@ -34,16 +36,15 @@ func (scm *SlowConnectionManager) WriteToStream(pID peer.ID, protocolId protocol
 	}
 
 	if signedMsg.TssMessage.Type != common.TssMessage_UPDATE_MESSAGES {
-		log.Debug("This is not update message, process it")
 		return scm.cm.WriteToStream(pID, protocolId, msg)
 	}
 
-	if signedMsg.TssMessage.To == "" {
-		log.Debug("Drop broadcast msg")
+	rd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	if rd.Intn(100)%2 == 0 {
+		log.Debug("Drop broadcast message")
 		return nil
 	}
 
-	log.Debug("Everything fine. Just process it")
 	return scm.cm.WriteToStream(pID, protocolId, msg)
 }
 
@@ -160,5 +161,14 @@ func main() {
 	select {
 	case result := <-outCh:
 		log.Info("Result ", result)
+	}
+
+	// Keep program run more 10 seconds
+	ticker := time.NewTicker(10 * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			os.Exit(0)
+		}
 	}
 }

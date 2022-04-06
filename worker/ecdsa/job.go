@@ -169,7 +169,7 @@ func (job *Job) startListening() {
 	endTime := time.Now().Add(job.timeOut)
 
 	// TODO: Add timeout and missing messages.
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	oldRound := job.party.Round()
 	for {
 		select {
@@ -187,7 +187,6 @@ func (job *Job) startListening() {
 			}
 
 			log.Debug("after 10 secs but the round number has not changed")
-			log.Debug("Current round: ", currentRound, ", actually round: ", job.party.String())
 			waitingForParties := job.party.WaitingFor()
 			for _, p := range waitingForParties {
 				log.Debug("Waiting for parties ", p.GetId())
@@ -199,6 +198,9 @@ func (job *Job) startListening() {
 				for _, p := range waitingForParties {
 					requestMsgKey := GetCacheMsgKey(msgType, p.GetId(), "")
 					go job.callback.OnRequestTSSMessageFromPeers(job, requestMsgKey, []*tss.PartyID{p})
+
+					p2pMsgKey := GetCacheMsgKey(msgType, p.GetId(), job.party.PartyID().GetId())
+					go job.callback.OnRequestTSSMessageFromPeers(job, p2pMsgKey, []*tss.PartyID{p})
 				}
 			}
 		case <-time.After(endTime.Sub(time.Now())):
@@ -210,7 +212,6 @@ func (job *Job) startListening() {
 			return
 
 		case msg := <-outCh:
-			log.Info("On Job Message")
 			job.callback.OnJobMessage(job, msg)
 
 		case data := <-job.endKeygenCh:
@@ -230,5 +231,6 @@ func (job *Job) startListening() {
 }
 
 func (job *Job) processMessage(msg tss.Message) *tss.Error {
+	log.Info("processMessage ...")
 	return helper.SharedPartyUpdater(job.party, msg)
 }
