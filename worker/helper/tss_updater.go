@@ -28,6 +28,5 @@ func SharedPartyUpdater(party tss.Party, msg tss.Message) *tss.Error {
 		return party.WrapError(err)
 	}
 
-	log.Debug("End of SharedPartyUpdater")
 	return nil
 }

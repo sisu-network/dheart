@@ -70,14 +70,14 @@ func NewKeygenJob(
 	party := keygen.NewLocalParty(params, outCh, endCh, *localPreparams).(*keygen.LocalParty)
 
 	return &Job{
-		index:           index,
-		jobType:         wTypes.EcdsaKeygen,
-		party:           party,
-		outCh:           outCh,
-		endKeygenCh:     endCh,
-		callback:        callback,
-		closeCh:         closeCh,
-		timeOut:         timeOut,
+		index:       index,
+		jobType:     wTypes.EcdsaKeygen,
+		party:       party,
+		outCh:       outCh,
+		endKeygenCh: endCh,
+		callback:    callback,
+		closeCh:     closeCh,
+		timeOut:     timeOut,
 	}
 }
 
@@ -165,7 +165,7 @@ func (job *Job) startListening() {
 	endTime := time.Now().Add(job.timeOut)
 
 	// TODO: Add timeout and missing messages.
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	oldRound := job.party.Round()
 	for {
 		select {
@@ -211,7 +211,6 @@ func (job *Job) startListening() {
 			job.callback.OnJobMessage(job, msg)
 
 		case data := <-job.endKeygenCh:
-			log.Info("Keygen finished")
 			job.callback.OnJobKeygenFinished(job, &data)
 			return
 
@@ -227,6 +226,5 @@ func (job *Job) startListening() {
 }
 
 func (job *Job) processMessage(msg tss.Message) *tss.Error {
-	log.Info("processMessage ...")
 	return helper.SharedPartyUpdater(job.party, msg)
 }

@@ -168,8 +168,6 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 	// Make a copy of myPid since the index will be changed during the TSS work.
 	workPartyId := tss.NewPartyID(engine.myPid.Id, engine.myPid.Moniker, engine.myPid.KeyInt())
 
-	log.Debug("This party id is: ", workPartyId.GetId())
-
 	// Create a new worker.
 	switch request.WorkType {
 	case types.EcdsaKeygen:
@@ -366,7 +364,6 @@ func (engine *DefaultEngine) sendData(data []byte, pIDs []*tss.PartyID) {
 	engine.nodeLock.RLock()
 	for _, pid := range pIDs {
 		if pid.Id == engine.myPid.Id {
-			log.Debug("pid = ", pid.Id, " myPid = ", engine.myPid.Id)
 			// Don't send to ourself.
 			continue
 		}

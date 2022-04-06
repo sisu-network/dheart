@@ -17,18 +17,18 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-type P2PDataWrapper struct {
-	Msg *p2ptypes.P2PMessage
+type p2pDataWrapper struct {
+	msg *p2ptypes.P2PMessage
 	To  string
 }
 
 // MockConnectionManager implements p2p.ConnectionManager for testing purposes.
 type MockConnectionManager struct {
-	msgCh          chan *P2PDataWrapper
+	msgCh          chan *p2pDataWrapper
 	fromPeerString string
 }
 
-func NewMockConnectionManager(fromPeerString string, msgCh chan *P2PDataWrapper) p2p.ConnectionManager {
+func NewMockConnectionManager(fromPeerString string, msgCh chan *p2pDataWrapper) p2p.ConnectionManager {
 	return &MockConnectionManager{
 		msgCh:          msgCh,
 		fromPeerString: fromPeerString,
@@ -46,8 +46,8 @@ func (mock *MockConnectionManager) WriteToStream(toPeerId peer.ID, protocolId pr
 		Data:       msg,
 	}
 
-	mock.msgCh <- &P2PDataWrapper{
-		Msg: p2pMsg,
+	mock.msgCh <- &p2pDataWrapper{
+		msg: p2pMsg,
 		To:  toPeerId.String(),
 	}
 	return nil
