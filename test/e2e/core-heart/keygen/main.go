@@ -60,7 +60,7 @@ func main() {
 
 	helper.ResetDb(index)
 
-	run.LoadConfigEnv("/Users/sonltcoder/go/src/github.com/sisu-network/dheart/.env")
+	run.LoadConfigEnv("../../../../.env")
 
 	done := make(chan bool)
 	mockClient := &mock.MockClient{
