@@ -372,6 +372,8 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 
 		atomic.StoreUint32(&w.curRound, message.NextRound(w.jobType, w.curRound))
 
+		log.Verbose("Sending message ", msg.Type(), " to ", dest)
+
 		if dest == nil {
 			// broadcast
 			go w.dispatcher.BroadcastMessage(w.pIDs, tssMsg)
