@@ -306,7 +306,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 
 	msgCache := w.preExecutionCache.PopAllMessages(w.workId)
 	if len(msgCache) > 0 {
-		log.Info(w.workId, "Cache size =", len(msgCache))
+		log.Info(w.workId, " Cache size =", len(msgCache))
 	}
 
 	for _, msg := range msgCache {
@@ -437,6 +437,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	// this update mesasge is for signing round, we have to catch this message.
 	if jobType == wTypes.EcdsaPresign && w.jobType == wTypes.EcdsaSigning &&
 		len(tssMsg.UpdateMessages) > 0 && tssMsg.UpdateMessages[0].Round == "SignRound1Message" {
+		log.Verbose("We are in presign phase, add signing message to cache: ", tssMsg.UpdateMessages[0].Round)
 		w.preExecutionCache.AddMessage(tssMsg)
 	}
 
@@ -447,6 +448,10 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	w.jobsLock.RLock()
 	jobs := w.jobs
 	w.jobsLock.RUnlock()
+
+	if len(tssMsg.UpdateMessages) > 0 {
+		log.Verbose("Processing messge at round: ", tssMsg.UpdateMessages[0].Round)
+	}
 
 	for i := range jobs {
 		fromString := tssMsg.From
