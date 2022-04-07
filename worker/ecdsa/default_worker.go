@@ -550,8 +550,10 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 
 	// Broadcast ack msg to everyone
 	ackMsg := common.NewAckKeygenDoneMessage(w.myPid.Id, "", w.workId)
-	log.Debug("sending ack keygen done")
-	go w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
+
+	// Broadcast message in sync mode here
+	// because we want to make sure everyone receives this message before terminate worker
+	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
 
 loop:
 	// Waiting for all others parties ack
@@ -576,7 +578,7 @@ loop:
 			ackedParties = len(w.ackDoneParties)
 			w.ackLock.RUnlock()
 
-			log.Debug("ackedParties = ", ackedParties, " w.allParties - 1 = ", len(w.allParties)-1)
+			// Check if enough ack message
 			if ackedParties == len(w.allParties)-1 {
 				break loop
 			}
