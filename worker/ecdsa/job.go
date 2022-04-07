@@ -165,7 +165,7 @@ func (job *Job) startListening() {
 	endTime := time.Now().Add(job.timeOut)
 
 	// TODO: Add timeout and missing messages.
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	oldRound := job.party.Round()
 	for {
 		select {

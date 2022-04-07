@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/sisu-network/dheart/core"
@@ -119,14 +118,5 @@ func main() {
 	select {
 	case result := <-outCh:
 		log.Info("Result ", result)
-	}
-
-	// Keep program run more 10 seconds
-	ticker := time.NewTicker(10 * time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			os.Exit(0)
-		}
 	}
 }

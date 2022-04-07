@@ -29,6 +29,7 @@ import (
 var (
 	LeaderWaitTime              = 10 * time.Second
 	PreExecutionRequestWaitTime = 5 * time.Second
+	AckWaitTime                 = 50 * time.Second
 )
 
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
@@ -103,6 +104,10 @@ type DefaultWorker struct {
 	presignOutputs  []*presign.LocalPresignData
 	signingOutputs  []*libCommon.SignatureData
 	finalOutputLock *sync.RWMutex
+
+	ackDoneCh      chan *common.TssMessage
+	ackDoneParties map[string]struct{}
+	ackLock        *sync.RWMutex
 
 	blameMgr *blame.Manager
 
@@ -202,6 +207,9 @@ func baseWorker(
 		jobTimeout:        timeOut,
 		maxJob:            maxJob,
 		monitor:           NewDefaultWorkerMonitor(),
+		ackDoneCh:         make(chan *common.TssMessage, len(allParties)),
+		ackLock:           &sync.RWMutex{},
+		ackDoneParties:    make(map[string]struct{}),
 	}
 }
 
@@ -428,10 +436,13 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 			// make sure we only send message to this channel once.
 			w.preExecMsgCh <- tssMsg.PreExecOutputMessage
 		}
-	case common.TssMessage_ASK_MESSAGE:
+	case common.TssMessage_ASK_MESSAGE_REQUEST:
 		if err := w.onAskRequest(tssMsg); err != nil {
 			return fmt.Errorf("error when processing ask message %w", err)
 		}
+	case common.TssMessage_ACK_DONE:
+		w.ackDoneCh <- tssMsg
+		log.Debug("Receive ack done")
 
 	default:
 		// Don't call callback here because this can be from bad actor/corrupted.
@@ -537,6 +548,44 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 	}
 	w.finalOutputLock.RUnlock()
 
+	// Broadcast ack msg to everyone
+	ackMsg := common.NewAckKeygenDoneMessage(w.myPid.Id, "", w.workId)
+	log.Debug("sending ack keygen done")
+	go w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
+
+loop:
+	// Waiting for all others parties ack
+	for {
+		select {
+		case msg := <-w.ackDoneCh:
+			if msg.AckDoneMessage.AckType != commonTypes.AckDoneMessage_KEYGEN {
+				continue
+			}
+
+			if _, ok := w.pIDsMap[msg.From]; !ok {
+				continue
+			}
+
+			// Use map to avoid duplicated ack message from a single party
+			w.ackLock.Lock()
+			w.ackDoneParties[msg.From] = struct{}{}
+			w.ackLock.Unlock()
+
+			var ackedParties int
+			w.ackLock.RLock()
+			ackedParties = len(w.ackDoneParties)
+			w.ackLock.RUnlock()
+
+			log.Debug("ackedParties = ", ackedParties, " w.allParties - 1 = ", len(w.allParties)-1)
+			if ackedParties == len(w.allParties)-1 {
+				break loop
+			}
+		case <-time.After(AckWaitTime):
+			log.Error("waiting for keygen ack from others parties is timeout")
+			break loop
+		}
+	}
+
 	if count == w.batchSize {
 		log.Verbose(w.GetWorkId(), " Done!")
 		w.callback.OnWorkKeygenFinished(w.request, w.keygenOutputs)
@@ -601,10 +650,10 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 }
 
 func (w *DefaultWorker) onAskRequest(tssMsg *commonTypes.TssMessage) error {
-	log.Info("askMsg = ", tssMsg.AskMessage.MsgKey, " from = ", tssMsg.From)
-	msg, ok := w.monitor.GetMessage(tssMsg.AskMessage.GetMsgKey())
+	log.Info("askMsg = ", tssMsg.AskRequestMessage.MsgKey, " from = ", tssMsg.From)
+	msg, ok := w.monitor.GetMessage(tssMsg.AskRequestMessage.GetMsgKey())
 	if !ok {
-		log.Warnf("cannot find message type %s from %s", tssMsg.AskMessage.MsgKey, tssMsg.From)
+		log.Warnf("cannot find message type %s from %s", tssMsg.AskRequestMessage.MsgKey, tssMsg.From)
 		return nil
 	}
 

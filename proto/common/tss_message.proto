@@ -27,6 +27,9 @@ message TssMessage {
 
     // When a party missed broadcast/unicast TSS messages, they ask them from peers
     ASK_MESSAGE_REQUEST = 4;
+
+    // When a party finished any phase, broadcast this message to everyone to acknowledge
+    ACK_DONE = 5;
   }
 
   Type type = 1;
@@ -39,6 +42,7 @@ message TssMessage {
   AvailabilityResponseMessage availabilityResponseMessage = 6;
   PreExecOutputMessage preExecOutputMessage = 7;
   AskRequestMessage askRequestMessage = 8;
+  AckDoneMessage ackDoneMessage = 9;
 }
 
 message UpdateMessage {
@@ -73,4 +77,12 @@ message PreExecOutputMessage {
 // If a party missed a TSS message then ask the peers
 message AskRequestMessage {
   string msgKey = 1;
+}
+
+message AckDoneMessage {
+  enum ACK_TYPE {
+    KEYGEN = 0;
+  }
+
+  ACK_TYPE ackType = 1;
 }

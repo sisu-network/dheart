@@ -207,8 +207,7 @@ func (engine *DefaultEngine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) e
 		}
 	} else {
 		if tssMsg.Type == common.TssMessage_AVAILABILITY_REQUEST {
-			// TODO: Check if we still have some available workers, create a worker and respond to the
-			// leader.
+			// TODO: Check if we still have some available workers, create a worker and respond to the leader.
 		} else {
 			// This could be the case when a worker has not started yet. Save it to the cache.
 			engine.preworkCache.AddMessage(tssMsg)

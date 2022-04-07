@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/ecdsa"
+	thelper "github.com/sisu-network/dheart/test/e2e/helper"
 
 	"crypto/elliptic"
 	"database/sql"
@@ -120,7 +121,7 @@ func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan
 	var result *htypes.KeygenResult
 	select {
 	case result = <-outCh:
-	case <-time.After(time.Second * 20):
+	case <-time.After(time.Second * 100):
 		panic("Keygen timeout")
 	}
 
@@ -136,13 +137,18 @@ func verifySignature(pubkey *ecdsa.PublicKey, msg string, R, S *big.Int) {
 
 func main() {
 	var index, n int
+	var isSlow bool
 	flag.IntVar(&index, "index", 0, "listening port")
+	flag.BoolVar(&isSlow, "is-slow", false, "Use it when testing message caching mechanism")
 	flag.Parse()
 
 	n = 2
 
 	config, privateKey := p2p.GetMockSecp256k1Config(n, index)
 	cm := p2p.NewConnectionManager(config)
+	if isSlow {
+		cm = thelper.NewSlowConnectionManager(config)
+	}
 	err := cm.Start(privateKey, "secp256k1")
 	if err != nil {
 		panic(err)
@@ -182,9 +188,9 @@ func main() {
 
 	// Keygen
 	keygenResult := doKeygen(pids, index, engine, keygenCh)
-	log.Info("Doing keysign now!")
 
 	// Keysign
+	log.Info("Doing keysign now!")
 	workId := "keysign"
 	messages := []string{"First message", "second message"}
 	chains := []string{"eth", "eth"}
@@ -203,7 +209,7 @@ func main() {
 	var result *htypes.KeysignResult
 	select {
 	case result = <-keysignch:
-	case <-time.After(time.Second * 20):
+	case <-time.After(time.Second * 100):
 		panic("Keygen timeout")
 	}
 

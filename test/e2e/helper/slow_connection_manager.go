@@ -2,7 +2,6 @@ package helper
 
 import (
 	"encoding/json"
-	"github.com/sisu-network/lib/log"
 	"math/rand"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/sisu-network/dheart/p2p"
 	p2pTypes "github.com/sisu-network/dheart/p2p/types"
 	"github.com/sisu-network/dheart/types/common"
+	"github.com/sisu-network/lib/log"
 )
 
 type SlowConnectionManager struct {
@@ -32,8 +32,8 @@ func (scm *SlowConnectionManager) WriteToStream(pID peer.ID, protocolId protocol
 	}
 
 	rd := rand.New(rand.NewSource(time.Now().UnixNano()))
-	if rd.Intn(100)%2 == 0 {
-		log.Debug("Drop broadcast message")
+	if rd.Intn(11)%5 == 0 {
+		log.Debug("Drop broadcast message with type ", signedMsg.TssMessage.Type)
 		return nil
 	}
 

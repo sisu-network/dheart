@@ -71,11 +71,19 @@ func NewPreExecOutputMessage(from, to, workId string, success bool, presignIds [
 }
 
 func NewRequestMessage(from, to, workId, msgKey string) *TssMessage {
-	msg := baseMessage(TssMessage_ASK_MESSAGE, from, to, workId)
-	msg.AskMessage = &AskMessage{
+	msg := baseMessage(TssMessage_ASK_MESSAGE_REQUEST, from, to, workId)
+	msg.AskRequestMessage = &AskRequestMessage{
 		MsgKey: msgKey,
 	}
 
+	return msg
+}
+
+func NewAckKeygenDoneMessage(from, to, workId string) *TssMessage {
+	msg := baseMessage(TssMessage_ACK_DONE, from, to, workId)
+	msg.AckDoneMessage = &AckDoneMessage{
+		AckType: AckDoneMessage_KEYGEN,
+	}
 	return msg
 }
 
