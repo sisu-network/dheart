@@ -372,7 +372,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 
 		atomic.StoreUint32(&w.curRound, message.NextRound(w.jobType, w.curRound))
 
-		log.Verbose("Sending message ", msg.Type(), " to ", dest)
+		log.Verbose(w.workId, " sending message ", msg.Type(), " to ", dest)
 
 		if dest == nil {
 			// broadcast
@@ -452,7 +452,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	w.jobsLock.RUnlock()
 
 	if len(tssMsg.UpdateMessages) > 0 {
-		log.Verbose("Processing messge at round: ", tssMsg.UpdateMessages[0].Round)
+		log.Verbose(w.workId, " processing messge at round: ", tssMsg.UpdateMessages[0].Round)
 	}
 
 	for i := range jobs {
