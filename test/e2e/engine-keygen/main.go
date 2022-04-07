@@ -1,62 +1,20 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"math/big"
-	"math/rand"
 	"os"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/p2p"
-	p2pTypes "github.com/sisu-network/dheart/p2p/types"
+	thelper "github.com/sisu-network/dheart/test/e2e/helper"
 	htypes "github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 )
-
-type SlowConnectionManager struct {
-	cm p2p.ConnectionManager
-}
-
-func (scm *SlowConnectionManager) Start(privKeyBytes []byte, keyType string) error {
-	return scm.cm.Start(privKeyBytes, keyType)
-}
-
-func (scm *SlowConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error {
-	signedMsg := &common.SignedMessage{}
-	if err := json.Unmarshal(msg, signedMsg); err != nil {
-		panic(err)
-	}
-
-	if signedMsg.TssMessage.Type != common.TssMessage_UPDATE_MESSAGES {
-		return scm.cm.WriteToStream(pID, protocolId, msg)
-	}
-
-	rd := rand.New(rand.NewSource(time.Now().UnixNano()))
-	if rd.Intn(100)%2 == 0 {
-		log.Debug("Drop broadcast message")
-		return nil
-	}
-
-	return scm.cm.WriteToStream(pID, protocolId, msg)
-}
-
-func (scm *SlowConnectionManager) AddListener(protocol protocol.ID, listener p2p.P2PDataListener) {
-	scm.cm.AddListener(protocol, listener)
-}
-
-func NewSlowConnectionManager(config p2pTypes.ConnectionsConfig) p2p.ConnectionManager {
-	return &SlowConnectionManager{
-		cm: p2p.NewConnectionManager(config),
-	}
-}
 
 type EngineCallback struct {
 	keygenDataCh  chan *htypes.KeygenResult
@@ -115,7 +73,7 @@ func main() {
 	config, privateKey := p2p.GetMockSecp256k1Config(n, index)
 	cm := p2p.NewConnectionManager(config)
 	if isSlowNode {
-		cm = NewSlowConnectionManager(config)
+		cm = thelper.NewSlowConnectionManager(config)
 	}
 	err := cm.Start(privateKey, "secp256k1")
 
