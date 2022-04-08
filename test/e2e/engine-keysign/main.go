@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/ecdsa"
-	thelper "github.com/sisu-network/dheart/test/e2e/helper"
 
 	"crypto/elliptic"
 	"database/sql"
@@ -11,6 +10,7 @@ import (
 	"math/big"
 	"time"
 
+	thelper "github.com/sisu-network/dheart/test/e2e/helper"
 	libchain "github.com/sisu-network/lib/chain"
 
 	"github.com/sisu-network/dheart/core"

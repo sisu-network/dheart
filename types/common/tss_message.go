@@ -2,8 +2,8 @@ package common
 
 import (
 	"encoding/json"
-	"github.com/sisu-network/lib/log"
 
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
 )
 

@@ -1,9 +1,9 @@
 package helper
 
 import (
+	"crypto/rand"
 	"encoding/json"
-	"math/rand"
-	"time"
+	"math/big"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
@@ -31,8 +31,8 @@ func (scm *SlowConnectionManager) WriteToStream(pID peer.ID, protocolId protocol
 		return scm.cm.WriteToStream(pID, protocolId, msg)
 	}
 
-	rd := rand.New(rand.NewSource(time.Now().UnixNano()))
-	if rd.Intn(100)%2 == 0 {
+	rd, _ := rand.Int(rand.Reader, big.NewInt(100))
+	if rd.Int64()%2 == 0 {
 		log.Debug("Drop broadcast message with type ", signedMsg.TssMessage.Type)
 		return nil
 	}

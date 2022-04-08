@@ -30,7 +30,7 @@ import (
 var (
 	LeaderWaitTime              = 10 * time.Second
 	PreExecutionRequestWaitTime = 5 * time.Second
-	AckWaitTime                 = 100 * time.Second
+	AckWaitTime                 = 50 * time.Second
 )
 
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
@@ -489,7 +489,6 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 
 		updateMessage := tssMsg.UpdateMessages[i]
 		msg, err := tss.ParseWireMessage(updateMessage.Data, from, tssMsg.IsBroadcast())
-		log.Debug("msg.Type() = ", msg.Type())
 		if err != nil {
 			return fmt.Errorf("error when parsing wire message %w", err)
 		}
