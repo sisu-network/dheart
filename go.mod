@@ -20,7 +20,7 @@ require (
 	github.com/logdna/logdna-go v1.0.2
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/sisu-network/lib v0.0.1-alpha13
-	github.com/sisu-network/tss-lib v0.1.1
+	github.com/sisu-network/tss-lib v0.1.2
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tendermint/tendermint v0.34.13 // indirect
@@ -31,5 +31,3 @@ require (
 replace google.golang.org/grpc => google.golang.org/grpc v1.33.2
 
 replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
-
-replace github.com/sisu-network/tss-lib => /Users/sonltcoder/go/src/github.com/sisu-network/tss-lib
