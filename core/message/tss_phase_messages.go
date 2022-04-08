@@ -2,7 +2,6 @@ package message
 
 import (
 	"errors"
-
 	wTypes "github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -11,8 +10,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type Round int
+
 const (
-	Keygen1 = iota + 1
+	Keygen1 Round = iota + 1
 	Keygen2
 	Keygen3
 	Presign1
@@ -22,7 +23,7 @@ const (
 	Sign1
 )
 
-func GetMsgRound(content tss.MessageContent) (uint32, error) {
+func GetMsgRound(content tss.MessageContent) (Round, error) {
 	switch content.(type) {
 	case *keygen.KGRound1Message:
 		return Keygen1, nil
@@ -53,7 +54,7 @@ func GetMsgRound(content tss.MessageContent) (uint32, error) {
 	}
 }
 
-func NextRound(jobType wTypes.WorkType, curRound uint32) uint32 {
+func NextRound(jobType wTypes.WorkType, curRound Round) Round {
 	switch jobType {
 	case wTypes.EcdsaKeygen:
 		switch curRound {
@@ -79,7 +80,7 @@ func NextRound(jobType wTypes.WorkType, curRound uint32) uint32 {
 
 // GetAllMessageTypesByRound gets all messages for a Dheart round
 // Use ConvertTSSRoundToDheartRound to convert from tss to Dheart round first
-func GetAllMessageTypesByRound(round uint32) []string {
+func GetAllMessageTypesByRound(round Round) []string {
 	switch round {
 	case Keygen1:
 		return []string{
@@ -120,17 +121,17 @@ func GetAllMessageTypesByRound(round uint32) []string {
 	}
 }
 
-func ConvertTSSRoundToDheartRound(tssRound uint32, roundType wTypes.WorkType) uint32 {
+func ConvertTSSRoundToDheartRound(tssRound int, roundType wTypes.WorkType) Round {
 	switch roundType {
 	case wTypes.EcdsaKeygen:
-		return tssRound
-	case wTypes.EddsaPresign:
+		return Round(tssRound)
+	case wTypes.EcdsaPresign:
 		// 3 is number of keygen rounds
-		return tssRound + 3
+		return Round(tssRound + 3)
 	case wTypes.EcdsaSigning:
 		// 7 is number of keygen + presign rounds
-		return tssRound + 7
+		return Round(tssRound + 7)
 	default:
-		return 0
+		return Round(0)
 	}
 }

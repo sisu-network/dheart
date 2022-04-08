@@ -132,7 +132,7 @@ func NewKeygenWorker(
 	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
 	w.keygenOutputs = make([]*keygen.LocalPartySaveData, request.BatchSize)
-	w.curRound = message.Keygen1
+	w.curRound = uint32(message.Keygen1)
 
 	return w
 }
@@ -151,7 +151,7 @@ func NewPresignWorker(
 	w.jobType = wTypes.EcdsaPresign
 	w.presignInput = request.PresignInput
 	w.presignOutputs = make([]*presign.LocalPresignData, request.BatchSize)
-	w.curRound = message.Presign1
+	w.curRound = uint32(message.Presign1)
 
 	return w
 }
@@ -171,7 +171,7 @@ func NewSigningWorker(
 	w.jobType = wTypes.EcdsaSigning
 	w.signingOutputs = make([]*libCommon.SignatureData, request.BatchSize)
 	w.signingMessages = request.Messages
-	w.curRound = message.Sign1
+	w.curRound = uint32(message.Sign1)
 
 	return w
 }
@@ -279,12 +279,12 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 				// we have to do presign first.
 				w.presignInput = w.request.PresignInput
 				w.presignOutputs = make([]*presign.LocalPresignData, w.batchSize)
-				w.curRound = message.Presign1
+				w.curRound = uint32(message.Presign1)
 				nextJobType = wTypes.EcdsaPresign
 
 				jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
 			} else {
-				w.curRound = message.Sign1
+				w.curRound = uint32(message.Sign1)
 				nextJobType = wTypes.EcdsaSigning
 				jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessages[i], w.signingInput[i], w, w.jobTimeout)
 			}
@@ -385,7 +385,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 			return
 		}
 
-		atomic.StoreUint32(&w.curRound, message.NextRound(w.jobType, w.curRound))
+		atomic.StoreUint32(&w.curRound, uint32(message.NextRound(w.jobType, message.Round(w.curRound))))
 
 		if dest == nil {
 			// broadcast
@@ -508,11 +508,11 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 			if err != nil {
 				log.Error("error when getting round %w", err)
 				// If we cannot get msg round, blame the sender
-				w.blameMgr.AddCulpritByRound(w.workId, w.curRound, []*tss.PartyID{msgs[id].GetFrom()})
+				w.blameMgr.AddCulpritByRound(w.workId, uint32(w.curRound), []*tss.PartyID{msgs[id].GetFrom()})
 				return
 			}
 
-			w.blameMgr.AddSender(w.workId, round, tssMsg.From)
+			w.blameMgr.AddSender(w.workId, uint32(round), tssMsg.From)
 
 			// If this is a signing worker (with presign step) and this message is a signing message
 			// while we are waiting for the last presign message, add the signing message to cache.
@@ -521,7 +521,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 				// Message can be from bad actor/corrupted. Save the culprits, and ignore.
 				log.Error("cannot process message error", err)
 				if round > 0 {
-					w.blameMgr.AddCulpritByRound(w.workId, round, err.Culprits())
+					w.blameMgr.AddCulpritByRound(w.workId, uint32(round), err.Culprits())
 				} else {
 					w.blameMgr.AddCulpritByRound(w.workId, atomic.LoadUint32(&w.curRound), err.Culprits())
 				}

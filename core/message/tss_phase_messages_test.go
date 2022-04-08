@@ -23,8 +23,12 @@ func TestGetAllMessageTypesByRound(t *testing.T) {
 func TestConvertTSSRoundToDheartRound(t *testing.T) {
 	t.Parallel()
 
-	require.Equal(t, 1, ConvertTSSRoundToDheartRound(1, wTypes.EcdsaKeygen))
-	require.Equal(t, 2, ConvertTSSRoundToDheartRound(2, wTypes.EcdsaKeygen))
-	require.Equal(t, 3, ConvertTSSRoundToDheartRound(3, wTypes.EcdsaKeygen))
-	require.Equal(t, 3, ConvertTSSRoundToDheartRound(3, wTypes.EcdsaKeygen))
+	require.Equal(t, Keygen1, ConvertTSSRoundToDheartRound(1, wTypes.EcdsaKeygen))
+	require.Equal(t, Keygen2, ConvertTSSRoundToDheartRound(2, wTypes.EcdsaKeygen))
+	require.Equal(t, Keygen3, ConvertTSSRoundToDheartRound(3, wTypes.EcdsaKeygen))
+	require.Equal(t, Presign1, ConvertTSSRoundToDheartRound(1, wTypes.EcdsaPresign))
+	require.Equal(t, Presign2, ConvertTSSRoundToDheartRound(2, wTypes.EcdsaPresign))
+	require.Equal(t, Presign3, ConvertTSSRoundToDheartRound(3, wTypes.EcdsaPresign))
+	require.Equal(t, Presign4, ConvertTSSRoundToDheartRound(4, wTypes.EcdsaPresign))
+	require.Equal(t, Sign1, ConvertTSSRoundToDheartRound(1, wTypes.EcdsaSigning))
 }

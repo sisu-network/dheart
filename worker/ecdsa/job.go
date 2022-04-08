@@ -187,7 +187,7 @@ func (job *Job) startListening() {
 			for _, p := range waitingForParties {
 				log.Debug("Waiting for parties ", p.GetId())
 			}
-			msgTypes := message.GetAllMessageTypesByRound(message.ConvertTSSRoundToDheartRound(uint32(currentRound), job.jobType))
+			msgTypes := message.GetAllMessageTypesByRound(message.ConvertTSSRoundToDheartRound(currentRound, job.jobType))
 
 			// TODO: check duplicated request messages
 			for _, msgType := range msgTypes {
