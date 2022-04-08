@@ -83,6 +83,7 @@ message AckDoneMessage {
   enum ACK_TYPE {
     KEYGEN = 0;
     PRESIGN = 1;
+    SIGNING = 2;
   }
 
   ACK_TYPE ackType = 1;

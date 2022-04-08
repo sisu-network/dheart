@@ -95,6 +95,14 @@ func NewAckPresignDoneMessage(from, to, workId string) *TssMessage {
 	return msg
 }
 
+func NewAckSigningDoneMessage(from, to, workId string) *TssMessage {
+	msg := baseMessage(TssMessage_ACK_DONE, from, to, workId)
+	msg.AckDoneMessage = &AckDoneMessage{
+		AckType: AckDoneMessage_SIGNING,
+	}
+	return msg
+}
+
 func baseMessage(typez TssMessage_Type, from, to, workId string) *TssMessage {
 	return &TssMessage{
 		Type:   typez,

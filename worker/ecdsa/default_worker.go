@@ -689,6 +689,48 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 	}
 	w.finalOutputLock.RUnlock()
 
+	// Broadcast ack msg to everyone
+	ackMsg := common.NewAckSigningDoneMessage(w.myPid.Id, "", w.workId)
+
+	// Broadcast message in sync mode here
+	// because we want to make sure everyone receives this message before terminate worker
+	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
+
+loop:
+	// Waiting for all others parties ack
+	for {
+		select {
+		case msg := <-w.ackDoneCh:
+			log.Debug("Receive ack signing done")
+			if msg.AckDoneMessage.AckType != commonTypes.AckDoneMessage_SIGNING {
+				continue
+			}
+
+			if _, ok := w.pIDsMap[msg.From]; !ok {
+				continue
+			}
+
+			// Use map to avoid duplicated ack message from a single party
+			w.ackLock.Lock()
+			w.ackDoneParties[msg.From] = struct{}{}
+			w.ackLock.Unlock()
+
+			var ackedParties int
+			w.ackLock.RLock()
+			ackedParties = len(w.ackDoneParties)
+			w.ackLock.RUnlock()
+
+			// Check if enough ack message
+			if ackedParties >= utils.GetThreshold(len(w.allParties)) {
+				log.Debug("Received enough signing ack")
+				break loop
+			}
+		case <-time.After(AckWaitTime):
+			log.Error("waiting for signing ack from others parties is timeout")
+			break loop
+		}
+	}
+
 	if count == w.batchSize {
 		log.Verbose(w.GetWorkId(), " Signing Done!")
 		w.callback.OnWorkSigningFinished(w.request, w.signingOutputs)
