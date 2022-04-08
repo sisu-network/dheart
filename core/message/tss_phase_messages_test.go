@@ -32,3 +32,20 @@ func TestConvertTSSRoundToDheartRound(t *testing.T) {
 	require.Equal(t, Presign4, ConvertTSSRoundToDheartRound(4, wTypes.EcdsaPresign))
 	require.Equal(t, Sign1, ConvertTSSRoundToDheartRound(1, wTypes.EcdsaSigning))
 }
+
+func TestIsBroadcastMessage(t *testing.T) {
+	t.Parallel()
+
+	require.True(t, IsBroadcastMessage("KGRound1Message"))
+	require.True(t, IsBroadcastMessage("KGRound2Message2"))
+	require.True(t, IsBroadcastMessage("KGRound3Message"))
+	require.True(t, IsBroadcastMessage("PresignRound1Message2"))
+	require.True(t, IsBroadcastMessage("PresignRound3Message"))
+	require.True(t, IsBroadcastMessage("PresignRound4Message"))
+
+	require.False(t, IsBroadcastMessage("KGRound2Message1"))
+	require.False(t, IsBroadcastMessage("PresignRound1Message1"))
+	require.False(t, IsBroadcastMessage("PresignRound2Message"))
+	require.False(t, IsBroadcastMessage("PresignRound2Message"))
+	require.False(t, IsBroadcastMessage("SignRound1Message"))
+}

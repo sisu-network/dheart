@@ -2,6 +2,7 @@ package message
 
 import (
 	"errors"
+
 	wTypes "github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -133,5 +134,21 @@ func ConvertTSSRoundToDheartRound(tssRound int, roundType wTypes.WorkType) Round
 		return Round(tssRound + 7)
 	default:
 		return Round(0)
+	}
+}
+
+// IsBroadcastMessage return true if it's broadcast message
+func IsBroadcastMessage(msgType string) bool {
+	switch msgType {
+	case string(proto.MessageName(&keygen.KGRound1Message{})),
+		string(proto.MessageName(&keygen.KGRound2Message2{})),
+		string(proto.MessageName(&keygen.KGRound3Message{})),
+		string(proto.MessageName(&presign.PresignRound1Message2{})),
+		string(proto.MessageName(&presign.PresignRound3Message{})),
+		string(proto.MessageName(&presign.PresignRound4Message{})):
+
+		return true
+	default:
+		return false
 	}
 }

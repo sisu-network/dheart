@@ -189,11 +189,13 @@ func (job *Job) startListening() {
 			}
 			msgTypes := message.GetAllMessageTypesByRound(message.ConvertTSSRoundToDheartRound(currentRound, job.jobType))
 
-			// TODO: check duplicated request messages
 			for _, msgType := range msgTypes {
 				for _, p := range waitingForParties {
-					broadcastMsgKey := GetCacheMsgKey(msgType, p.GetId(), "")
-					go job.callback.OnRequestTSSMessageFromPeers(job, broadcastMsgKey, []*tss.PartyID{p})
+					if message.IsBroadcastMessage(msgType) {
+						broadcastMsgKey := GetCacheMsgKey(msgType, p.GetId(), "")
+						go job.callback.OnRequestTSSMessageFromPeers(job, broadcastMsgKey, []*tss.PartyID{p})
+						continue
+					}
 
 					p2pMsgKey := GetCacheMsgKey(msgType, p.GetId(), job.party.PartyID().GetId())
 					go job.callback.OnRequestTSSMessageFromPeers(job, p2pMsgKey, []*tss.PartyID{p})
