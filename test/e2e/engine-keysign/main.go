@@ -192,7 +192,7 @@ func main() {
 	// Keysign
 	log.Info("Doing keysign now!")
 	workId := "keysign"
-	messages := []string{"First message", "second message"}
+	messages := []string{"First message"}
 	chains := []string{"eth", "eth"}
 
 	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
@@ -210,7 +210,7 @@ func main() {
 	select {
 	case result = <-keysignch:
 	case <-time.After(time.Second * 100):
-		panic("Keygen timeout")
+		panic("Signing timeout")
 	}
 
 	for i, msg := range messages {

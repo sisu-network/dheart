@@ -11,6 +11,7 @@ import (
 	"github.com/sisu-network/dheart/blame"
 	"github.com/sisu-network/dheart/core/message"
 	"github.com/sisu-network/dheart/db"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/interfaces"
@@ -29,7 +30,7 @@ import (
 var (
 	LeaderWaitTime              = 10 * time.Second
 	PreExecutionRequestWaitTime = 5 * time.Second
-	AckWaitTime                 = 50 * time.Second
+	AckWaitTime                 = 100 * time.Second
 )
 
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
@@ -609,6 +610,49 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 		}
 	}
 	w.finalOutputLock.RUnlock()
+
+	// Broadcast ack msg to everyone
+	ackMsg := common.NewAckPresignDoneMessage(w.myPid.Id, "", w.workId)
+
+	// Broadcast message in sync mode here
+	// because we want to make sure everyone receives this message before terminate worker
+	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
+
+loop:
+	// Waiting for all others parties ack
+	for {
+		select {
+		case msg := <-w.ackDoneCh:
+			log.Debug("Receive ack presign done")
+			if msg.AckDoneMessage.AckType != commonTypes.AckDoneMessage_PRESIGN {
+				continue
+			}
+
+			if _, ok := w.pIDsMap[msg.From]; !ok {
+				continue
+			}
+
+			// Use map to avoid duplicated ack message from a single party
+			w.ackLock.Lock()
+			w.ackDoneParties[msg.From] = struct{}{}
+			w.ackLock.Unlock()
+
+			var ackedParties int
+			w.ackLock.RLock()
+			ackedParties = len(w.ackDoneParties)
+			w.ackLock.RUnlock()
+
+			// Check if enough ack message
+			log.Debug("threshold ", utils.GetThreshold(len(w.allParties)))
+			if ackedParties >= utils.GetThreshold(len(w.allParties)) {
+				log.Debug("Received enough presign ack")
+				break loop
+			}
+		case <-time.After(AckWaitTime):
+			log.Error("waiting for presign ack from others parties is timeout")
+			break loop
+		}
+	}
 
 	if count == w.batchSize {
 		log.Verbose(w.GetWorkId(), " Presign Done!")

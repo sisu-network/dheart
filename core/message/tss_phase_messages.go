@@ -77,6 +77,8 @@ func NextRound(jobType wTypes.WorkType, curRound uint32) uint32 {
 	return curRound
 }
 
+// GetAllMessageTypesByRound gets all messages for a Dheart round
+// Use ConvertTSSRoundToDheartRound to convert from tss to Dheart round first
 func GetAllMessageTypesByRound(round uint32) []string {
 	switch round {
 	case Keygen1:
@@ -115,5 +117,20 @@ func GetAllMessageTypesByRound(round uint32) []string {
 		}
 	default:
 		return []string{}
+	}
+}
+
+func ConvertTSSRoundToDheartRound(tssRound uint32, roundType wTypes.WorkType) uint32 {
+	switch roundType {
+	case wTypes.EcdsaKeygen:
+		return tssRound
+	case wTypes.EddsaPresign:
+		// 3 is number of keygen rounds
+		return tssRound + 3
+	case wTypes.EcdsaSigning:
+		// 7 is number of keygen + presign rounds
+		return tssRound + 7
+	default:
+		return 0
 	}
 }

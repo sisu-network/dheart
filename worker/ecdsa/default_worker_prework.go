@@ -60,7 +60,6 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 		// Only send request message to parties that has not sent a message to us.
 		if w.availableParties.getParty(p.Id) == nil {
 			tssMsg := common.NewAvailabilityRequestMessage(w.myPid.Id, p.Id, w.request.WorkId)
-			log.Info("asking member")
 			go w.dispatcher.UnicastMessage(p, tssMsg)
 		}
 	}

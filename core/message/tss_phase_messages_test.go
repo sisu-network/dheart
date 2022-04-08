@@ -3,6 +3,7 @@ package message
 import (
 	"testing"
 
+	wTypes "github.com/sisu-network/dheart/worker/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,4 +18,13 @@ func TestGetAllMessageTypesByRound(t *testing.T) {
 	require.Equal(t, []string{"PresignRound3Message"}, GetAllMessageTypesByRound(Presign3))
 	require.Equal(t, []string{"PresignRound4Message"}, GetAllMessageTypesByRound(Presign4))
 	require.Equal(t, []string{"SignRound1Message"}, GetAllMessageTypesByRound(Sign1))
+}
+
+func TestConvertTSSRoundToDheartRound(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, 1, ConvertTSSRoundToDheartRound(1, wTypes.EcdsaKeygen))
+	require.Equal(t, 2, ConvertTSSRoundToDheartRound(2, wTypes.EcdsaKeygen))
+	require.Equal(t, 3, ConvertTSSRoundToDheartRound(3, wTypes.EcdsaKeygen))
+	require.Equal(t, 3, ConvertTSSRoundToDheartRound(3, wTypes.EcdsaKeygen))
 }

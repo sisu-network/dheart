@@ -82,6 +82,7 @@ message AskRequestMessage {
 message AckDoneMessage {
   enum ACK_TYPE {
     KEYGEN = 0;
+    PRESIGN = 1;
   }
 
   ACK_TYPE ackType = 1;
