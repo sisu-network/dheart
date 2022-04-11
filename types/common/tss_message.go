@@ -2,7 +2,6 @@ package common
 
 import (
 	"encoding/json"
-	"github.com/sisu-network/lib/log"
 
 	"github.com/sisu-network/tss-lib/tss"
 )
@@ -51,7 +50,6 @@ func NewAvailabilityResponseMessage(from, to, workId string, answer Availability
 }
 
 func NewPreExecOutputMessage(from, to, workId string, success bool, presignIds []string, pids []*tss.PartyID) *TssMessage {
-	log.Debug("presignIds = ", presignIds)
 	msg := baseMessage(TssMessage_PRE_EXEC_OUTPUT, from, to, workId)
 
 	// get all pid strings

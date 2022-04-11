@@ -3,9 +3,9 @@ package ecdsa
 import (
 	"errors"
 	"fmt"
-	"github.com/sisu-network/dheart/db"
 	"time"
 
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
@@ -67,7 +67,6 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 
 	// Waits for all members to respond.
 	presignIds, selectedPids, err := w.waitForMemberResponse()
-	log.Debug("aaaaaaaaaaaaa ", presignIds)
 	if err != nil {
 		var culprits []*tss.PartyID
 		// Blame nodes that do not send messages
