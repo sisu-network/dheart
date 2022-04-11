@@ -60,7 +60,7 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 		// Only send request message to parties that has not sent a message to us.
 		if w.availableParties.getParty(p.Id) == nil {
 			tssMsg := common.NewAvailabilityRequestMessage(w.myPid.Id, p.Id, w.request.WorkId)
-			go w.dispatcher.UnicastMessage(p, tssMsg)
+			w.dispatcher.UnicastMessage(p, tssMsg)
 		}
 	}
 
@@ -176,7 +176,7 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selectedPids []*tss.PartyID) {
 	if !success { // Failure case
 		msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, false, presignIds, w.pIDs)
-		go w.dispatcher.BroadcastMessage(w.pIDs, msg)
+		w.dispatcher.BroadcastMessage(w.pIDs, msg)
 		return
 	}
 
@@ -187,7 +187,7 @@ func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selec
 
 	// Broadcast success to everyone
 	msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, true, presignIds, w.pIDs)
-	go w.dispatcher.BroadcastMessage(w.allParties, msg)
+	w.dispatcher.BroadcastMessage(w.allParties, msg)
 
 	workType := w.jobType
 	if w.request.IsSigning() {
@@ -222,7 +222,7 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 
 	// Send a message to the leader.
 	tssMsg := common.NewAvailabilityResponseMessage(w.myPid.Id, leader.Id, w.workId, common.AvailabilityResponseMessage_YES, w.maxJob)
-	go w.dispatcher.UnicastMessage(leader, tssMsg)
+	w.dispatcher.UnicastMessage(leader, tssMsg)
 
 	// Waits for response from the leader.
 	select {
@@ -246,7 +246,7 @@ func (w *DefaultWorker) onPreExecutionRequest(tssMsg *commonTypes.TssMessage) er
 		responseMsg := common.NewAvailabilityResponseMessage(w.myPid.Id, tssMsg.From, w.workId, common.AvailabilityResponseMessage_YES, w.maxJob)
 		responseMsg.AvailabilityResponseMessage.MaxJob = int32(w.maxJob)
 
-		go w.dispatcher.UnicastMessage(sender, responseMsg)
+		w.dispatcher.UnicastMessage(sender, responseMsg)
 	} else {
 		return fmt.Errorf("cannot find party with id %s", tssMsg.From)
 	}

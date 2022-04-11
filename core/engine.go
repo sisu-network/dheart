@@ -380,7 +380,9 @@ func (engine *DefaultEngine) sendData(data []byte, pIDs []*tss.PartyID) {
 
 	// Write to stream
 	for _, peerId := range peerIds {
-		engine.cm.WriteToStream(peerId, p2p.TSSProtocolID, data)
+		go func(peerId peer.ID) {
+			engine.cm.WriteToStream(peerId, p2p.TSSProtocolID, data)
+		}(peerId)
 	}
 }
 

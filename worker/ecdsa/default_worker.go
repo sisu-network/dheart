@@ -389,9 +389,9 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 
 		if dest == nil {
 			// broadcast
-			go w.dispatcher.BroadcastMessage(w.pIDs, tssMsg)
+			w.dispatcher.BroadcastMessage(w.pIDs, tssMsg)
 		} else {
-			go w.dispatcher.UnicastMessage(dest[0], tssMsg)
+			w.dispatcher.UnicastMessage(dest[0], tssMsg)
 		}
 	}
 }
@@ -401,7 +401,7 @@ func (w *DefaultWorker) OnRequestTSSMessageFromPeers(_ *Job, msgKey string, pIDs
 	log.Verbose("Asking tss messages from peers. msg key = ", msgKey)
 	msg := common.NewRequestMessage(w.myPid.Id, "", w.workId, msgKey)
 	for _, pid := range pIDs {
-		go w.dispatcher.UnicastMessage(pid, msg)
+		w.dispatcher.UnicastMessage(pid, msg)
 	}
 }
 
@@ -551,10 +551,7 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 	// Broadcast ack msg to everyone
 	ackMsg := common.NewAckKeygenDoneMessage(w.myPid.Id, "", w.workId)
 
-	// Broadcast message in sync mode here
-	// because we want to make sure everyone receives this message before terminate worker
 	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
-
 	w.waitingForAckMessage(commonTypes.AckDoneMessage_KEYGEN, len(w.allParties)-1)
 
 	if count == w.batchSize {
@@ -582,10 +579,7 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 	// Broadcast ack msg to everyone
 	ackMsg := common.NewAckPresignDoneMessage(w.myPid.Id, "", w.workId)
 
-	// Broadcast message in sync mode here
-	// because we want to make sure everyone receives this message before terminate worker
 	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
-
 	w.waitingForAckMessage(commonTypes.AckDoneMessage_PRESIGN, utils.GetThreshold(len(w.allParties))-1)
 
 	if count == w.batchSize {
@@ -626,10 +620,7 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 	// Broadcast ack msg to everyone
 	ackMsg := common.NewAckSigningDoneMessage(w.myPid.Id, "", w.workId)
 
-	// Broadcast message in sync mode here
-	// because we want to make sure everyone receives this message before terminate worker
 	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
-
 	w.waitingForAckMessage(commonTypes.AckDoneMessage_SIGNING, utils.GetThreshold(len(w.allParties))-1)
 
 	if count == w.batchSize {
@@ -700,7 +691,7 @@ func (w *DefaultWorker) onAskRequest(tssMsg *commonTypes.TssMessage) error {
 
 	log.Debug("Found asked msg, responding ...", responseMsg.Type, " isBroadcast = ", responseMsg.IsBroadcast())
 	log.Debug("Dest: ", w.pIDsMap[tssMsg.From].GetId())
-	go w.dispatcher.UnicastMessage(w.pIDsMap[tssMsg.From], responseMsg)
+	w.dispatcher.UnicastMessage(w.pIDsMap[tssMsg.From], responseMsg)
 	return nil
 }
 
