@@ -398,7 +398,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 
 // OnRequestTSSMessageFromPeers ask the peers to find missed message
 func (w *DefaultWorker) OnRequestTSSMessageFromPeers(_ *Job, msgKey string, pIDs []*tss.PartyID) {
-	log.Info("Asking tss messages from peers...")
+	log.Verbose("Asking tss messages from peers. msg key = ", msgKey)
 	msg := common.NewRequestMessage(w.myPid.Id, "", w.workId, msgKey)
 	for _, pid := range pIDs {
 		go w.dispatcher.UnicastMessage(pid, msg)
@@ -679,7 +679,12 @@ func (w *DefaultWorker) onAskRequest(tssMsg *commonTypes.TssMessage) error {
 	log.Info("askMsg = ", tssMsg.AskRequestMessage.MsgKey, " from = ", tssMsg.From)
 	msg, ok := w.monitor.GetMessage(tssMsg.AskRequestMessage.GetMsgKey())
 	if !ok {
-		log.Warnf("cannot find message type %s from %s", tssMsg.AskRequestMessage.MsgKey, tssMsg.From)
+		log.Warnf("Cannot find message type %s from %s", tssMsg.AskRequestMessage.MsgKey, tssMsg.From)
+		return nil
+	}
+
+	if !msg.IsBroadcast() && msg.GetTo()[0].GetId() != tssMsg.GetFrom() {
+		log.Warnf("Request missed msg from bad actor, ignore it")
 		return nil
 	}
 
