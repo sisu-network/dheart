@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
@@ -79,26 +80,10 @@ func NewRequestMessage(from, to, workId, msgKey string) *TssMessage {
 	return msg
 }
 
-func NewAckKeygenDoneMessage(from, to, workId string) *TssMessage {
-	msg := baseMessage(TssMessage_ACK_DONE, from, to, workId)
+func NewAckMessage(from, workId string, ackType AckDoneMessage_ACK_TYPE) *TssMessage {
+	msg := baseMessage(TssMessage_ACK_DONE, from, "", workId)
 	msg.AckDoneMessage = &AckDoneMessage{
-		AckType: AckDoneMessage_KEYGEN,
-	}
-	return msg
-}
-
-func NewAckPresignDoneMessage(from, to, workId string) *TssMessage {
-	msg := baseMessage(TssMessage_ACK_DONE, from, to, workId)
-	msg.AckDoneMessage = &AckDoneMessage{
-		AckType: AckDoneMessage_PRESIGN,
-	}
-	return msg
-}
-
-func NewAckSigningDoneMessage(from, to, workId string) *TssMessage {
-	msg := baseMessage(TssMessage_ACK_DONE, from, to, workId)
-	msg.AckDoneMessage = &AckDoneMessage{
-		AckType: AckDoneMessage_SIGNING,
+		AckType: ackType,
 	}
 	return msg
 }
@@ -114,4 +99,12 @@ func baseMessage(typez TssMessage_Type, from, to, workId string) *TssMessage {
 
 func (msg *TssMessage) IsBroadcast() bool {
 	return msg.To == ""
+}
+
+func (msg *TssMessage) GetMessageKey() string {
+	return GetMessageKey(msg.WorkId, msg.From, msg.To, msg.Type.String())
+}
+
+func GetMessageKey(workdId, from, to, msgType string) string {
+	return fmt.Sprintf("%s__%s__%s__%s", workdId, from, to, msgType)
 }
