@@ -3,6 +3,7 @@ package ecdsa
 import (
 	"errors"
 	"fmt"
+	"github.com/sisu-network/dheart/db"
 	"time"
 
 	"github.com/sisu-network/dheart/types/common"
@@ -66,6 +67,7 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 
 	// Waits for all members to respond.
 	presignIds, selectedPids, err := w.waitForMemberResponse()
+	log.Debug("aaaaaaaaaaaaa ", presignIds)
 	if err != nil {
 		var culprits []*tss.PartyID
 		// Blame nodes that do not send messages
@@ -263,7 +265,21 @@ func (w *DefaultWorker) onPreExecutionResponse(tssMsg *commonTypes.TssMessage) e
 // We either start execution or finish this work.
 func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 	if msg.Success {
-		// TODO: Check validity of the presign ids. Make sure it is never used.
+		if len(msg.PresignIds) > 0 {
+			statuses, err := w.db.LoadPresignStatus(msg.PresignIds)
+			if err != nil {
+				log.Error("error when loading presign data, presign ids =  ", msg.PresignIds)
+				return
+			}
+
+			for i, status := range statuses {
+				if status == db.PresignStatusUsed {
+					log.Warn("presign id was used. Id = ", msg.PresignIds[i])
+					return
+				}
+			}
+
+		}
 
 		// Check if we are in the list of participants or not
 		join := false
