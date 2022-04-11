@@ -409,7 +409,7 @@ func (d *SqlDatabase) LoadPresignStatus(presignIds []string) ([]string, error) {
 	results := make([]string, 0)
 	for rows.Next() {
 		var status string
-		if err := rows.Scan(status); err != nil {
+		if err := rows.Scan(&status); err != nil {
 			log.Error("Cannot load status", err)
 			return nil, err
 		}
