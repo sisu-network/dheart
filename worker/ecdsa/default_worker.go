@@ -555,38 +555,7 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 	// because we want to make sure everyone receives this message before terminate worker
 	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
 
-loop:
-	// Waiting for all others parties ack
-	for {
-		select {
-		case msg := <-w.ackDoneCh:
-			if msg.AckDoneMessage.AckType != commonTypes.AckDoneMessage_KEYGEN {
-				continue
-			}
-
-			if _, ok := w.pIDsMap[msg.From]; !ok {
-				continue
-			}
-
-			// Use map to avoid duplicated ack message from a single party
-			w.ackLock.Lock()
-			w.ackDoneParties[msg.From] = struct{}{}
-			w.ackLock.Unlock()
-
-			var ackedParties int
-			w.ackLock.RLock()
-			ackedParties = len(w.ackDoneParties)
-			w.ackLock.RUnlock()
-
-			// Check if enough ack message
-			if ackedParties == len(w.allParties)-1 {
-				break loop
-			}
-		case <-time.After(AckWaitTime):
-			log.Error("waiting for keygen ack from others parties is timeout")
-			break loop
-		}
-	}
+	w.waitingForAckMessage(commonTypes.AckDoneMessage_KEYGEN, len(w.allParties)-1)
 
 	if count == w.batchSize {
 		log.Verbose(w.GetWorkId(), " Done!")
@@ -617,41 +586,7 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 	// because we want to make sure everyone receives this message before terminate worker
 	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
 
-loop:
-	// Waiting for all others parties ack
-	for {
-		select {
-		case msg := <-w.ackDoneCh:
-			log.Debug("Receive ack presign done")
-			if msg.AckDoneMessage.AckType != commonTypes.AckDoneMessage_PRESIGN {
-				continue
-			}
-
-			if _, ok := w.pIDsMap[msg.From]; !ok {
-				continue
-			}
-
-			// Use map to avoid duplicated ack message from a single party
-			w.ackLock.Lock()
-			w.ackDoneParties[msg.From] = struct{}{}
-			w.ackLock.Unlock()
-
-			var ackedParties int
-			w.ackLock.RLock()
-			ackedParties = len(w.ackDoneParties)
-			w.ackLock.RUnlock()
-
-			// Check if enough ack message
-			log.Debug("threshold ", utils.GetThreshold(len(w.allParties)))
-			if ackedParties >= utils.GetThreshold(len(w.allParties)) {
-				log.Debug("Received enough presign ack")
-				break loop
-			}
-		case <-time.After(AckWaitTime):
-			log.Error("waiting for presign ack from others parties is timeout")
-			break loop
-		}
-	}
+	w.waitingForAckMessage(commonTypes.AckDoneMessage_PRESIGN, utils.GetThreshold(len(w.allParties))-1)
 
 	if count == w.batchSize {
 		log.Verbose(w.GetWorkId(), " Presign Done!")
@@ -695,13 +630,22 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 	// because we want to make sure everyone receives this message before terminate worker
 	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
 
+	w.waitingForAckMessage(commonTypes.AckDoneMessage_SIGNING, utils.GetThreshold(len(w.allParties))-1)
+
+	if count == w.batchSize {
+		log.Verbose(w.GetWorkId(), " Signing Done!")
+		w.callback.OnWorkSigningFinished(w.request, w.signingOutputs)
+	}
+}
+
+func (w *DefaultWorker) waitingForAckMessage(msgType commonTypes.AckDoneMessage_ACK_TYPE, thresholdAck int) {
 loop:
 	// Waiting for all others parties ack
 	for {
 		select {
 		case msg := <-w.ackDoneCh:
-			log.Debug("Receive ack signing done")
-			if msg.AckDoneMessage.AckType != commonTypes.AckDoneMessage_SIGNING {
+			log.Debug("Receive ack message")
+			if msg.AckDoneMessage.AckType != msgType {
 				continue
 			}
 
@@ -720,19 +664,14 @@ loop:
 			w.ackLock.RUnlock()
 
 			// Check if enough ack message
-			if ackedParties >= utils.GetThreshold(len(w.allParties)) {
-				log.Debug("Received enough signing ack")
+			if ackedParties >= thresholdAck {
+				log.Debug("Received enough ack msg")
 				break loop
 			}
 		case <-time.After(AckWaitTime):
-			log.Error("waiting for signing ack from others parties is timeout")
+			log.Error("Waiting for signing ack from others parties is timeout")
 			break loop
 		}
-	}
-
-	if count == w.batchSize {
-		log.Verbose(w.GetWorkId(), " Signing Done!")
-		w.callback.OnWorkSigningFinished(w.request, w.signingOutputs)
 	}
 }
 

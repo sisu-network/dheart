@@ -18,6 +18,8 @@ import (
 	wTypes "github.com/sisu-network/dheart/worker/types"
 )
 
+const MaxWaitRound = 10 * time.Second
+
 type JobCallback interface {
 	// Called when there is a tss message output.
 	OnJobMessage(job *Job, msg tss.Message)
@@ -165,7 +167,7 @@ func (job *Job) startListening() {
 	endTime := time.Now().Add(job.timeOut)
 
 	// TODO: Add timeout and missing messages.
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(MaxWaitRound)
 	oldRound := job.party.Round()
 	for {
 		select {
@@ -182,7 +184,7 @@ func (job *Job) startListening() {
 				continue
 			}
 
-			log.Debug("after 10 secs but the round number has not changed")
+			log.Debug("After MaxWaitRound but the round number has not changed")
 			waitingForParties := job.party.WaitingFor()
 			for _, p := range waitingForParties {
 				log.Debug("Waiting for parties ", p.GetId())
