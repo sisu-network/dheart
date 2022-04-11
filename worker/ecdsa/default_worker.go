@@ -549,7 +549,7 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 	w.finalOutputLock.RUnlock()
 
 	// Broadcast ack msg to everyone
-	ackMsg := common.NewAckKeygenDoneMessage(w.myPid.Id, "", w.workId)
+	ackMsg := common.NewAckMessage(w.myPid.Id, w.workId, common.AckDoneMessage_KEYGEN)
 
 	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
 	w.waitingForAckMessage(commonTypes.AckDoneMessage_KEYGEN, len(w.allParties)-1)
@@ -577,7 +577,7 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 	w.finalOutputLock.RUnlock()
 
 	// Broadcast ack msg to everyone
-	ackMsg := common.NewAckPresignDoneMessage(w.myPid.Id, "", w.workId)
+	ackMsg := common.NewAckMessage(w.myPid.Id, w.workId, common.AckDoneMessage_PRESIGN)
 
 	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
 	w.waitingForAckMessage(commonTypes.AckDoneMessage_PRESIGN, utils.GetThreshold(len(w.allParties))-1)
@@ -618,7 +618,7 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 	w.finalOutputLock.RUnlock()
 
 	// Broadcast ack msg to everyone
-	ackMsg := common.NewAckSigningDoneMessage(w.myPid.Id, "", w.workId)
+	ackMsg := common.NewAckMessage(w.myPid.Id, w.workId, common.AckDoneMessage_SIGNING)
 
 	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
 	w.waitingForAckMessage(commonTypes.AckDoneMessage_SIGNING, utils.GetThreshold(len(w.allParties))-1)

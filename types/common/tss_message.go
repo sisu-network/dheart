@@ -79,26 +79,10 @@ func NewRequestMessage(from, to, workId, msgKey string) *TssMessage {
 	return msg
 }
 
-func NewAckKeygenDoneMessage(from, to, workId string) *TssMessage {
-	msg := baseMessage(TssMessage_ACK_DONE, from, to, workId)
+func NewAckMessage(from, workId string, ackType AckDoneMessage_ACK_TYPE) *TssMessage {
+	msg := baseMessage(TssMessage_ACK_DONE, from, "", workId)
 	msg.AckDoneMessage = &AckDoneMessage{
-		AckType: AckDoneMessage_KEYGEN,
-	}
-	return msg
-}
-
-func NewAckPresignDoneMessage(from, to, workId string) *TssMessage {
-	msg := baseMessage(TssMessage_ACK_DONE, from, to, workId)
-	msg.AckDoneMessage = &AckDoneMessage{
-		AckType: AckDoneMessage_PRESIGN,
-	}
-	return msg
-}
-
-func NewAckSigningDoneMessage(from, to, workId string) *TssMessage {
-	msg := baseMessage(TssMessage_ACK_DONE, from, to, workId)
-	msg.AckDoneMessage = &AckDoneMessage{
-		AckType: AckDoneMessage_SIGNING,
+		AckType: ackType,
 	}
 	return msg
 }
