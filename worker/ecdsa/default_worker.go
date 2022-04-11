@@ -684,7 +684,7 @@ func (w *DefaultWorker) onAskRequest(tssMsg *commonTypes.TssMessage) error {
 	}
 
 	if !msg.IsBroadcast() && msg.GetTo()[0].GetId() != tssMsg.GetFrom() {
-		log.Warnf("Request missed msg from bad actor, ignore it")
+		log.Warnf("Request from bad actor = %s, ignore it", tssMsg.GetFrom())
 		return nil
 	}
 
