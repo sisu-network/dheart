@@ -416,6 +416,7 @@ func (engine *DefaultEngine) getSignedMessageBytes(tssMessage *common.TssMessage
 	}
 
 	signedMessage := &common.SignedMessage{
+		From:       engine.myPid.Id,
 		TssMessage: tssMessage,
 		Signature:  signature,
 	}
