@@ -452,7 +452,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	w.jobsLock.RUnlock()
 
 	if len(tssMsg.UpdateMessages) > 0 {
-		log.Verbose(w.workId, " processing messge at round: ", tssMsg.UpdateMessages[0].Round)
+		log.Verbose(w.workId, " processing message at round: ", tssMsg.UpdateMessages[0].Round)
 	}
 
 	for i := range jobs {

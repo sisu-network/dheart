@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
@@ -92,16 +93,9 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 	}
 
 	// Wait for everyone to reply or timeout.
-	end := time.Now().Add(PreExecutionRequestWaitTime)
 	for {
-		now := time.Now()
-		if now.After(end) {
-			break
-		}
-
-		timeDiff := end.Sub(now)
 		select {
-		case <-time.After(timeDiff):
+		case <-time.After(PreExecutionRequestWaitTime):
 			// Time out, this returns failure except for 1 case:
 			//
 			// If this is a signing task and we have enough online (>= threshold + 1) but cannot find
@@ -140,11 +134,9 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 			return presignIds, selectedPids, nil
 		}
 	}
-
-	return nil, nil, errors.New("cannot find enough members for this work")
 }
 
-// checkEnoughParticipants is a function called by the leader in the election to see if we have
+// checkEnoughParticipants is a function called by the leader in the selection to see if we have
 // enough nodes to participate and find a common presign set.
 func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyID) {
 	if w.availableParties.getLength() < w.request.GetMinPartyCount() {
@@ -263,7 +255,21 @@ func (w *DefaultWorker) onPreExecutionResponse(tssMsg *commonTypes.TssMessage) e
 // We either start execution or finish this work.
 func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 	if msg.Success {
-		// TODO: Check validity of the presign ids. Make sure it is never used.
+		if len(msg.PresignIds) > 0 {
+			statuses, err := w.db.LoadPresignStatus(msg.PresignIds)
+			if err != nil {
+				log.Error("error when loading presign data, presign ids =  ", msg.PresignIds)
+				return
+			}
+
+			for i, status := range statuses {
+				if status == db.PresignStatusUsed {
+					log.Warn("presign id was used. Id = ", msg.PresignIds[i])
+					w.callback.OnWorkFailed(w.request)
+					return
+				}
+			}
+		}
 
 		// Check if we are in the list of participants or not
 		join := false
