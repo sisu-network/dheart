@@ -18,7 +18,6 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	p2ptypes "github.com/sisu-network/dheart/p2p/types"
-	"github.com/sisu-network/dheart/tools"
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
@@ -87,7 +86,7 @@ type DefaultEngine struct {
 	// Cache all message before a worker starts
 	preworkCache *worker.MessageCache
 	// Cache messages during and after worker's execution.
-	workCache tools.CircularQueue
+	workCache *worker.WorkMessageCache
 
 	callback EngineCallback
 	cm       p2p.ConnectionManager
@@ -119,7 +118,7 @@ func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback 
 		nodeLock:        &sync.RWMutex{},
 		presignsManager: NewAvailPresignManager(db),
 		config:          config,
-		workCache:       tools.NewCircularQueue(MaxOutMsgCacheSize),
+		workCache:       worker.NewWorkMessageCache(worker.MaxMessagePerNode),
 	}
 }
 

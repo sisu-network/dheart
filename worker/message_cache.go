@@ -17,7 +17,6 @@ type CacheValue struct {
 // A cache that stores all messages sent to this node even before a worker starts or before a worker
 // start execution and helps prevent message loss. The cache has a limit of number of messages PER
 // VALIDATOR since we want to avoid bad actors spamming our node with fake tss work.
-// TODO: Use CircularQueue for this cache.
 type MessageCache struct {
 	cache     map[string]*CacheValue
 	cacheLock *sync.RWMutex
