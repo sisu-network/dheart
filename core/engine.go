@@ -344,14 +344,14 @@ func (engine *DefaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *c
 		return
 	}
 
-	// Add this to the cache.
-	engine.workCache.Add(tssMessage.GetMessageKey(), tssMessage)
-
-	bz, err := engine.getSignedMessageBytes(tssMessage)
+	signedMsg, bz, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
 		log.Error("Cannot get signed message", err)
 		return
 	}
+
+	// Add this to the cache.
+	engine.workCache.Add(tssMessage.GetMessageKey(), signedMsg)
 
 	engine.sendData(bz, pIDs)
 }
@@ -362,14 +362,14 @@ func (engine *DefaultEngine) UnicastMessage(dest *tss.PartyID, tssMessage *commo
 		return
 	}
 
-	// Add this to the cache.
-	engine.workCache.Add(tssMessage.GetMessageKey(), tssMessage)
-
-	bz, err := engine.getSignedMessageBytes(tssMessage)
+	signedMsg, bz, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
 		log.Error("Cannot get signed message", err)
 		return
 	}
+
+	// Add this to the cache.
+	engine.workCache.Add(tssMessage.GetMessageKey(), signedMsg)
 
 	engine.sendData(bz, []*tss.PartyID{dest})
 }
@@ -405,15 +405,15 @@ func (engine *DefaultEngine) sendData(data []byte, pIDs []*tss.PartyID) {
 }
 
 // getSignedMessageBytes signs a tss message and returns serialized bytes of the signed message.
-func (engine *DefaultEngine) getSignedMessageBytes(tssMessage *common.TssMessage) ([]byte, error) {
+func (engine *DefaultEngine) getSignedMessageBytes(tssMessage *common.TssMessage) (*common.SignedMessage, []byte, error) {
 	serialized, err := json.Marshal(tssMessage)
 	if err != nil {
-		return nil, fmt.Errorf("error when marshalling message %w", err)
+		return nil, nil, fmt.Errorf("error when marshalling message %w", err)
 	}
 
 	signature, err := engine.signer.Sign(serialized)
 	if err != nil {
-		return nil, fmt.Errorf("error when signing %w", err)
+		return nil, nil, fmt.Errorf("error when signing %w", err)
 	}
 
 	signedMessage := &common.SignedMessage{
@@ -423,10 +423,10 @@ func (engine *DefaultEngine) getSignedMessageBytes(tssMessage *common.TssMessage
 
 	bz, err := json.Marshal(signedMessage)
 	if err != nil {
-		return nil, fmt.Errorf("error when marshalling message %w", err)
+		return nil, nil, fmt.Errorf("error when marshalling message %w", err)
 	}
 
-	return bz, nil
+	return signedMessage, bz, nil
 }
 
 // OnNetworkMessage implements P2PDataListener interface.
