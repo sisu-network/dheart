@@ -18,6 +18,7 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	p2ptypes "github.com/sisu-network/dheart/p2p/types"
+	"github.com/sisu-network/dheart/tools"
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
@@ -90,6 +91,8 @@ type DefaultEngine struct {
 
 	nodes    map[string]*Node
 	nodeLock *sync.RWMutex
+
+	outMsgCache tools.CircularQueue
 
 	// TODO: Remove used presigns after getting a match to avoid using duplicated presigns.
 	presignsManager *AvailPresignManager

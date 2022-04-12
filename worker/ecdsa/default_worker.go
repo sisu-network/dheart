@@ -619,7 +619,6 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 
 	// Broadcast ack msg to everyone
 	ackMsg := common.NewAckMessage(w.myPid.Id, w.workId, common.AckDoneMessage_SIGNING)
-
 	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
 	w.waitingForAckMessage(commonTypes.AckDoneMessage_SIGNING, utils.GetThreshold(len(w.allParties))-1)
 
