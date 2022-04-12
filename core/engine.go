@@ -31,9 +31,10 @@ import (
 )
 
 const (
-	MaxWorker    = 2
-	BatchSize    = 4
-	MaxBatchSize = 4
+	MaxWorker          = 2
+	BatchSize          = 4
+	MaxBatchSize       = 4
+	MaxOutMsgCacheSize = 100
 )
 
 var defaultJobTimeout = 10 * time.Minute
@@ -82,8 +83,11 @@ type DefaultEngine struct {
 	workers      map[string]worker.Worker
 	requestQueue *requestQueue
 
-	workLock     *sync.RWMutex
+	workLock *sync.RWMutex
+	// Cache all message before a worker starts
 	preworkCache *worker.MessageCache
+	// Cache messages during and after worker's execution.
+	workCache tools.CircularQueue
 
 	callback EngineCallback
 	cm       p2p.ConnectionManager
@@ -91,8 +95,6 @@ type DefaultEngine struct {
 
 	nodes    map[string]*Node
 	nodeLock *sync.RWMutex
-
-	outMsgCache tools.CircularQueue
 
 	// TODO: Remove used presigns after getting a match to avoid using duplicated presigns.
 	presignsManager *AvailPresignManager
@@ -117,6 +119,7 @@ func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback 
 		nodeLock:        &sync.RWMutex{},
 		presignsManager: NewAvailPresignManager(db),
 		config:          config,
+		workCache:       tools.NewCircularQueue(MaxOutMsgCacheSize),
 	}
 }
 
@@ -204,16 +207,22 @@ func (engine *DefaultEngine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) e
 	worker := engine.getWorker(tssMsg.WorkId)
 	engine.workLock.RUnlock()
 
-	if worker != nil {
-		if err := worker.ProcessNewMessage(tssMsg); err != nil {
-			return fmt.Errorf("error when worker processing new message %w", err)
-		}
-	} else {
-		if tssMsg.Type == common.TssMessage_AVAILABILITY_REQUEST {
-			// TODO: Check if we still have some available workers, create a worker and respond to the leader.
+	switch tssMsg.Type {
+	case common.TssMessage_ASK_MESSAGE_REQUEST:
+		// TODO: Handle message request here.
+
+	default:
+		if worker != nil {
+			if err := worker.ProcessNewMessage(tssMsg); err != nil {
+				return fmt.Errorf("error when worker processing new message %w", err)
+			}
 		} else {
-			// This could be the case when a worker has not started yet. Save it to the cache.
-			engine.preworkCache.AddMessage(tssMsg)
+			if tssMsg.Type == common.TssMessage_AVAILABILITY_REQUEST {
+				// TODO: Check if we still have some available workers, create a worker and respond to the leader.
+			} else {
+				// This could be the case when a worker has not started yet. Save it to the cache.
+				engine.preworkCache.AddMessage(tssMsg)
+			}
 		}
 	}
 
@@ -335,6 +344,9 @@ func (engine *DefaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *c
 		return
 	}
 
+	// Add this to the cache.
+	engine.workCache.Add(tssMessage.GetMessageKey(), tssMessage)
+
 	bz, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
 		log.Error("Cannot get signed message", err)
@@ -349,6 +361,9 @@ func (engine *DefaultEngine) UnicastMessage(dest *tss.PartyID, tssMessage *commo
 	if tssMessage.To == engine.myPid.Id {
 		return
 	}
+
+	// Add this to the cache.
+	engine.workCache.Add(tssMessage.GetMessageKey(), tssMessage)
 
 	bz, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
@@ -433,6 +448,8 @@ func (engine *DefaultEngine) OnNetworkMessage(message *p2ptypes.P2PMessage) {
 		log.Verbose("Tss message is nil")
 		return
 	}
+
+	// TODO: Check message signature here.
 
 	if err := engine.ProcessNewMessage(tssMessage); err != nil {
 		log.Error("Error when process new message", err)

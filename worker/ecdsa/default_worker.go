@@ -420,6 +420,8 @@ func (w *DefaultWorker) getCompletedJobCount(list []tss.Message) int {
 func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
 	switch tssMsg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
+		// TODO: Do message validation here. Make sure that the round type is correct.
+
 		if err := w.processUpdateMessages(tssMsg); err != nil {
 			return fmt.Errorf("error when processing update message %w", err)
 		}

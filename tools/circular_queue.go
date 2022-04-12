@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -23,9 +22,9 @@ type defaultCircularQueue struct {
 	lock *sync.RWMutex
 }
 
-func NewCircularQueue(size int) (CircularQueue, error) {
+func NewCircularQueue(size int) CircularQueue {
 	if size <= 0 {
-		return nil, fmt.Errorf("Invalid queue size: %d", size)
+		return nil
 	}
 
 	return &defaultCircularQueue{
@@ -34,7 +33,7 @@ func NewCircularQueue(size int) (CircularQueue, error) {
 		size:  int64(size),
 		queue: make([]*wrappedItem, size),
 		lock:  &sync.RWMutex{},
-	}, nil
+	}
 }
 
 func (q *defaultCircularQueue) Add(key string, T any) {

@@ -8,10 +8,7 @@ import (
 )
 
 func TestCircularQueue(t *testing.T) {
-	q, err := NewCircularQueue(5)
-	if err != nil {
-		t.Error(err)
-	}
+	q := NewCircularQueue(5)
 
 	for i := 1; i <= 5; i++ {
 		q.Add(fmt.Sprintf("%d", i), i)

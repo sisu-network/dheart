@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
@@ -98,4 +99,12 @@ func baseMessage(typez TssMessage_Type, from, to, workId string) *TssMessage {
 
 func (msg *TssMessage) IsBroadcast() bool {
 	return msg.To == ""
+}
+
+func (msg *TssMessage) GetMessageKey() string {
+	return GetMessageKey(msg.WorkId, msg.From, msg.To, msg.Type.String())
+}
+
+func GetMessageKey(workdId, from, to, msgType string) string {
+	return fmt.Sprintf("%s__%s__%s__%s", workdId, from, to, msgType)
 }
