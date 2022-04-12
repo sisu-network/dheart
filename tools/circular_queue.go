@@ -18,6 +18,7 @@ type defaultCircularQueue struct {
 	head, tail int64
 	size       int64
 	queue      []*wrappedItem
+	m          map[string]*wrappedItem // map for quicker look up
 
 	lock *sync.RWMutex
 }
@@ -32,6 +33,7 @@ func NewCircularQueue(size int) CircularQueue {
 		tail:  0,
 		size:  int64(size),
 		queue: make([]*wrappedItem, size),
+		m:     make(map[string]*wrappedItem),
 		lock:  &sync.RWMutex{},
 	}
 }
@@ -40,28 +42,29 @@ func (q *defaultCircularQueue) Add(key string, T any) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	q.queue[q.tail%q.size] = &wrappedItem{
+	// Remove old item from the map. The item in the queue will be overwritten.
+	if q.tail-q.head >= q.size {
+		delete(q.m, q.queue[q.head%q.size].key)
+		q.head++
+	}
+
+	entry := &wrappedItem{
 		key:  key,
 		item: T,
 	}
+	q.queue[q.tail%q.size] = entry
 	q.tail++
-
-	if q.tail-q.head > q.size {
-		q.head++
-	}
+	q.m[key] = entry
 }
 
 func (q *defaultCircularQueue) Get(key string) (T any) {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 
-	// for simplicity, just use a for loop to run through the queue
-	for i := q.tail - 1; i >= q.head; i-- {
-		index := i % q.size
-		if q.queue[index].key == key {
-			return q.queue[index].item
-		}
+	entry := q.m[key]
+	if entry == nil {
+		return nil
 	}
 
-	return nil
+	return entry.item
 }
