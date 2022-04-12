@@ -3,6 +3,7 @@ package ecdsa
 import (
 	"crypto/elliptic"
 	"fmt"
+	"github.com/sisu-network/dheart/types/common"
 	"math/big"
 	"time"
 
@@ -42,6 +43,7 @@ type JobCallback interface {
 }
 
 type Job struct {
+	workId  string
 	jobType wTypes.WorkType
 	index   int
 
@@ -58,6 +60,7 @@ type Job struct {
 }
 
 func NewKeygenJob(
+	workId string,
 	index int,
 	pIDs tss.SortedPartyIDs,
 	params *tss.Parameters,
@@ -72,6 +75,7 @@ func NewKeygenJob(
 	party := keygen.NewLocalParty(params, outCh, endCh, *localPreparams).(*keygen.LocalParty)
 
 	return &Job{
+		workId:      workId,
 		index:       index,
 		jobType:     wTypes.EcdsaKeygen,
 		party:       party,
@@ -84,6 +88,7 @@ func NewKeygenJob(
 }
 
 func NewPresignJob(
+	workId string,
 	index int,
 	pIDs tss.SortedPartyIDs,
 	params *tss.Parameters,
@@ -97,6 +102,7 @@ func NewPresignJob(
 	party := presign.NewLocalParty(pIDs, params, *savedData, outCh, endCh)
 
 	return &Job{
+		workId:       workId,
 		index:        index,
 		jobType:      wTypes.EcdsaPresign,
 		party:        party,
@@ -108,6 +114,7 @@ func NewPresignJob(
 }
 
 func NewSigningJob(
+	workId string,
 	index int,
 	pIDs tss.SortedPartyIDs,
 	params *tss.Parameters,
@@ -123,6 +130,7 @@ func NewSigningJob(
 	party := signing.NewLocalParty(msgInt, params, signingInput, outCh, endCh)
 
 	return &Job{
+		workId:       workId,
 		index:        index,
 		jobType:      wTypes.EcdsaSigning,
 		party:        party,
@@ -192,15 +200,15 @@ func (job *Job) startListening() {
 			msgTypes := message.GetAllMessageTypesByRound(message.ConvertTSSRoundToDheartRound(currentRound, job.jobType))
 
 			for _, msgType := range msgTypes {
-				for _, p := range waitingForParties {
+				for _, otherParty := range waitingForParties {
 					if message.IsBroadcastMessage(msgType) {
-						broadcastMsgKey := GetCacheMsgKey(msgType, p.GetId(), "")
-						go job.callback.OnRequestTSSMessageFromPeers(job, broadcastMsgKey, []*tss.PartyID{p})
+						broadcastMsgKey := common.GetMessageKey(job.workId, otherParty.GetId(), "", msgType)
+						go job.callback.OnRequestTSSMessageFromPeers(job, broadcastMsgKey, []*tss.PartyID{otherParty})
 						continue
 					}
 
-					p2pMsgKey := GetCacheMsgKey(msgType, p.GetId(), job.party.PartyID().GetId())
-					go job.callback.OnRequestTSSMessageFromPeers(job, p2pMsgKey, []*tss.PartyID{p})
+					p2pMsgKey := common.GetMessageKey(job.workId, otherParty.GetId(), job.party.PartyID().GetId(), msgType)
+					go job.callback.OnRequestTSSMessageFromPeers(job, p2pMsgKey, []*tss.PartyID{otherParty})
 				}
 			}
 		case <-time.After(endTime.Sub(time.Now())):

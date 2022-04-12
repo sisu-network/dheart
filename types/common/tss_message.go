@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
@@ -80,14 +81,6 @@ func NewRequestMessage(from, to, workId, msgKey string) *TssMessage {
 	return msg
 }
 
-func NewAckMessage(from, workId string, ackType AckDoneMessage_ACK_TYPE) *TssMessage {
-	msg := baseMessage(TssMessage_ACK_DONE, from, "", workId)
-	msg.AckDoneMessage = &AckDoneMessage{
-		AckType: ackType,
-	}
-	return msg
-}
-
 func baseMessage(typez TssMessage_Type, from, to, workId string) *TssMessage {
 	return &TssMessage{
 		Type:   typez,
@@ -101,10 +94,38 @@ func (msg *TssMessage) IsBroadcast() bool {
 	return msg.To == ""
 }
 
-func (msg *TssMessage) GetMessageKey() string {
-	return GetMessageKey(msg.WorkId, msg.From, msg.To, msg.Type.String())
+func (msg *TssMessage) GetMessageKey(pID *tss.PartyID) (string, error) {
+	if len(msg.UpdateMessages) == 0 {
+		err := fmt.Errorf("empty update messages")
+		log.Error(err)
+		return "", err
+	}
+
+	firstMsg := msg.UpdateMessages[0]
+	parsedMsg, err := tss.ParseWireMessage(firstMsg.Data, pID, msg.IsBroadcast())
+	if err != nil {
+		log.Error("error when parse wire message", err)
+		return "", err
+	}
+
+	return GetMessageKey(msg.WorkId, msg.From, msg.To, parsedMsg.Type()), nil
 }
 
-func GetMessageKey(workdId, from, to, msgType string) string {
-	return fmt.Sprintf("%s__%s__%s__%s", workdId, from, to, msgType)
+func GetMessageKey(workdId, from, to, tssMsgType string) string {
+	return fmt.Sprintf("%s__%s__%s__%s", workdId, from, to, tssMsgType)
+}
+
+// ExtractMessageKey returns workId, from, to, tssMsgType
+func ExtractMessageKey(msgKey string) ([]string, error) {
+	if len(msgKey) == 0 {
+		return nil, nil
+	}
+	keys := strings.Split(msgKey, "__")
+	if len(keys) < 4 {
+		err := fmt.Errorf("not enough keys. msgKey = %s", msgKey)
+		log.Error(err)
+		return nil, err
+	}
+
+	return keys, nil
 }

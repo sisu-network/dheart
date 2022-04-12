@@ -11,7 +11,6 @@ import (
 	"github.com/sisu-network/dheart/blame"
 	"github.com/sisu-network/dheart/core/message"
 	"github.com/sisu-network/dheart/db"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/interfaces"
@@ -115,8 +114,6 @@ type DefaultWorker struct {
 	curRound uint32
 
 	jobTimeout time.Duration
-
-	monitor Monitor
 }
 
 func NewKeygenWorker(
@@ -207,7 +204,6 @@ func baseWorker(
 		blameMgr:          blame.NewManager(),
 		jobTimeout:        timeOut,
 		maxJob:            maxJob,
-		monitor:           NewDefaultWorkerMonitor(),
 		ackDoneCh:         make(chan *common.TssMessage, len(allParties)),
 		ackLock:           &sync.RWMutex{},
 		ackDoneParties:    make(map[string]struct{}),
@@ -266,12 +262,12 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 	for i := range jobs {
 		switch w.jobType {
 		case wTypes.EcdsaKeygen:
-			jobs[i] = NewKeygenJob(i, w.pIDs, params, w.keygenInput, w, w.jobTimeout)
+			jobs[i] = NewKeygenJob(w.workId, i, w.pIDs, params, w.keygenInput, w, w.jobTimeout)
 			nextJobType = wTypes.EcdsaKeygen
 
 		case wTypes.EcdsaPresign:
 			w.presignInput = w.request.PresignInput
-			jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
+			jobs[i] = NewPresignJob(w.workId, i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
 			nextJobType = wTypes.EcdsaPresign
 
 		case wTypes.EcdsaSigning:
@@ -282,11 +278,11 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 				w.curRound = uint32(message.Presign1)
 				nextJobType = wTypes.EcdsaPresign
 
-				jobs[i] = NewPresignJob(i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
+				jobs[i] = NewPresignJob(w.workId, i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
 			} else {
 				w.curRound = uint32(message.Sign1)
 				nextJobType = wTypes.EcdsaSigning
-				jobs[i] = NewSigningJob(i, w.pIDs, params, w.signingMessages[i], w.signingInput[i], w, w.jobTimeout)
+				jobs[i] = NewSigningJob(w.workId, i, w.pIDs, params, w.signingMessages[i], w.signingInput[i], w, w.jobTimeout)
 			}
 
 		default:
@@ -368,9 +364,6 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 	count := w.getCompletedJobCount(list)
 	w.jobOutputLock.Unlock()
 
-	cacheMsgKey := GetCacheMsgKeyForTSSMsg(msg)
-	w.monitor.StoreMessage(cacheMsgKey, msg)
-
 	if count == w.batchSize {
 		// We have completed all jobs for current round. Send the list to the dispatcher. Move the worker to next round.
 		dest := msg.GetTo()
@@ -439,13 +432,6 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 			// make sure we only send message to this channel once.
 			w.preExecMsgCh <- tssMsg.PreExecOutputMessage
 		}
-	case common.TssMessage_ASK_MESSAGE_REQUEST:
-		if err := w.onAskRequest(tssMsg); err != nil {
-			return fmt.Errorf("error when processing ask message %w", err)
-		}
-	case common.TssMessage_ACK_DONE:
-		w.ackDoneCh <- tssMsg
-		log.Debug("Receive ack done")
 
 	default:
 		// Don't call callback here because this can be from bad actor/corrupted.
@@ -550,12 +536,6 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 	}
 	w.finalOutputLock.RUnlock()
 
-	// Broadcast ack msg to everyone
-	ackMsg := common.NewAckMessage(w.myPid.Id, w.workId, common.AckDoneMessage_KEYGEN)
-
-	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
-	w.waitingForAckMessage(commonTypes.AckDoneMessage_KEYGEN, len(w.allParties)-1)
-
 	if count == w.batchSize {
 		log.Verbose(w.GetWorkId(), " Done!")
 		w.callback.OnWorkKeygenFinished(w.request, w.keygenOutputs)
@@ -577,12 +557,6 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 		}
 	}
 	w.finalOutputLock.RUnlock()
-
-	// Broadcast ack msg to everyone
-	ackMsg := common.NewAckMessage(w.myPid.Id, w.workId, common.AckDoneMessage_PRESIGN)
-
-	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
-	w.waitingForAckMessage(commonTypes.AckDoneMessage_PRESIGN, utils.GetThreshold(len(w.allParties))-1)
 
 	if count == w.batchSize {
 		log.Verbose(w.GetWorkId(), " Presign Done!")
@@ -619,81 +593,14 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 	}
 	w.finalOutputLock.RUnlock()
 
-	// Broadcast ack msg to everyone
-	ackMsg := common.NewAckMessage(w.myPid.Id, w.workId, common.AckDoneMessage_SIGNING)
-	w.dispatcher.BroadcastMessage(w.allParties, ackMsg)
-	w.waitingForAckMessage(commonTypes.AckDoneMessage_SIGNING, utils.GetThreshold(len(w.allParties))-1)
-
 	if count == w.batchSize {
 		log.Verbose(w.GetWorkId(), " Signing Done!")
 		w.callback.OnWorkSigningFinished(w.request, w.signingOutputs)
 	}
 }
 
-func (w *DefaultWorker) waitingForAckMessage(msgType commonTypes.AckDoneMessage_ACK_TYPE, thresholdAck int) {
-loop:
-	// Waiting for all others parties ack
-	for {
-		select {
-		case msg := <-w.ackDoneCh:
-			log.Debug("Receive ack message")
-			if msg.AckDoneMessage.AckType != msgType {
-				continue
-			}
-
-			if _, ok := w.pIDsMap[msg.From]; !ok {
-				continue
-			}
-
-			// Use map to avoid duplicated ack message from a single party
-			w.ackLock.Lock()
-			w.ackDoneParties[msg.From] = struct{}{}
-			w.ackLock.Unlock()
-
-			var ackedParties int
-			w.ackLock.RLock()
-			ackedParties = len(w.ackDoneParties)
-			w.ackLock.RUnlock()
-
-			// Check if enough ack message
-			if ackedParties >= thresholdAck {
-				log.Debug("Received enough ack msg")
-				break loop
-			}
-		case <-time.After(AckWaitTime):
-			log.Error("Waiting for signing ack from others parties is timeout")
-			break loop
-		}
-	}
-}
-
-func (w *DefaultWorker) onAskRequest(tssMsg *commonTypes.TssMessage) error {
-	log.Info("askMsg = ", tssMsg.AskRequestMessage.MsgKey, " from = ", tssMsg.From)
-	msg, ok := w.monitor.GetMessage(tssMsg.AskRequestMessage.GetMsgKey())
-	if !ok {
-		log.Warnf("Cannot find message type %s from %s", tssMsg.AskRequestMessage.MsgKey, tssMsg.From)
-		return nil
-	}
-
-	if !msg.IsBroadcast() && msg.GetTo()[0].GetId() != tssMsg.GetFrom() {
-		log.Warnf("Request from bad actor = %s, ignore it", tssMsg.GetFrom())
-		return nil
-	}
-
-	to := ""
-	if dest := msg.GetTo(); len(dest) > 0 {
-		to = dest[0].Id
-	}
-	responseMsg, err := commonTypes.NewTssMessage(w.myPid.Id, to, w.workId, []tss.Message{msg}, msg.Type())
-	if err != nil {
-		log.Critical("error when build tss message", err)
-		return err
-	}
-
-	log.Debug("Found asked msg, responding ...", responseMsg.Type, " isBroadcast = ", responseMsg.IsBroadcast())
-	log.Debug("Dest: ", w.pIDsMap[tssMsg.From].GetId())
-	w.dispatcher.UnicastMessage(w.pIDsMap[tssMsg.From], responseMsg)
-	return nil
+func (w *DefaultWorker) GetPartyMap() map[string]*tss.PartyID {
+	return w.pIDsMap
 }
 
 // Implements GetPartyId() of Worker interface.

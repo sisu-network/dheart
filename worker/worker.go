@@ -22,6 +22,8 @@ type Worker interface {
 	// GetCulprits ...
 	GetCulprits() []*tss.PartyID
 
+	GetPartyMap() map[string]*tss.PartyID
+
 	// Stop stops the worker and cleans all the resources
 	Stop()
 }

@@ -202,13 +202,18 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 
 // ProcessNewMessage processes new incoming tss message from network.
 func (engine *DefaultEngine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
+	if tssMsg == nil {
+		return nil
+	}
+
 	engine.workLock.RLock()
 	worker := engine.getWorker(tssMsg.WorkId)
 	engine.workLock.RUnlock()
-
 	switch tssMsg.Type {
 	case common.TssMessage_ASK_MESSAGE_REQUEST:
-		// TODO: Handle message request here.
+		if err := engine.OnAskMessage(tssMsg); err != nil {
+			return err
+		}
 
 	default:
 		if worker != nil {
@@ -298,6 +303,35 @@ func (engine *DefaultEngine) OnWorkSigningFinished(request *types.WorkRequest, d
 	engine.startNextWork()
 }
 
+func (engine *DefaultEngine) OnAskMessage(tssMsg *commonTypes.TssMessage) error {
+	msgKey := tssMsg.AskRequestMessage.MsgKey
+	keys, err := commonTypes.ExtractMessageKey(msgKey)
+	if err != nil {
+		return err
+	}
+
+	originalFrom := keys[1]
+	cacheMsg := engine.workCache.Get(originalFrom, msgKey)
+	if cacheMsg == nil {
+		log.Warn("Can not find msg with key = ", msgKey)
+		return nil
+	}
+
+	if m := cacheMsg.TssMessage; !m.IsBroadcast() && m.GetTo() != tssMsg.GetFrom() {
+		log.Warnf("Request from bad actor = %s, ignore it", tssMsg.GetFrom())
+		return nil
+	}
+
+	bz, err := json.Marshal(cacheMsg)
+	if err != nil {
+		log.Error("error when marshal cache msg")
+		return err
+	}
+	pIds := engine.getWorker(tssMsg.WorkId).GetPartyMap()
+	engine.sendData(bz, []*tss.PartyID{pIds[tssMsg.From]})
+	return nil
+}
+
 // finishWorker removes a worker from the current worker pool.
 func (engine *DefaultEngine) finishWorker(workId string) {
 	engine.workLock.Lock()
@@ -350,7 +384,7 @@ func (engine *DefaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *c
 	}
 
 	// Add this to the cache.
-	engine.workCache.Add(tssMessage.GetMessageKey(), signedMsg)
+	engine.cacheWorkMsg(signedMsg, tssMessage)
 
 	engine.sendData(bz, pIDs)
 }
@@ -368,9 +402,23 @@ func (engine *DefaultEngine) UnicastMessage(dest *tss.PartyID, tssMessage *commo
 	}
 
 	// Add this to the cache.
-	engine.workCache.Add(tssMessage.GetMessageKey(), signedMsg)
+	engine.cacheWorkMsg(signedMsg, tssMessage)
 
 	engine.sendData(bz, []*tss.PartyID{dest})
+}
+
+func (engine *DefaultEngine) cacheWorkMsg(signedMsg *common.SignedMessage, tssMsg *common.TssMessage) {
+	if tssMsg.Type != commonTypes.TssMessage_UPDATE_MESSAGES {
+		return
+	}
+
+	msgKey, err := tssMsg.GetMessageKey(engine.myPid)
+	if err != nil {
+		return
+	}
+
+	engine.workCache.Add(msgKey, signedMsg)
+	log.Debug("Added msg key = ", msgKey, " from = ", signedMsg.From)
 }
 
 // sendData sends data to the network.
@@ -449,6 +497,7 @@ func (engine *DefaultEngine) OnNetworkMessage(message *p2ptypes.P2PMessage) {
 
 	// TODO: Check message signature here.
 
+	engine.cacheWorkMsg(signedMessage, tssMessage)
 	if err := engine.ProcessNewMessage(tssMessage); err != nil {
 		log.Error("Error when process new message", err)
 	}
