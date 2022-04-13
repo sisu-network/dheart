@@ -192,7 +192,7 @@ func main() {
 	// Keysign
 	log.Info("Doing keysign now!")
 	workId := "keysign"
-	messages := []string{"First message"}
+	messages := []string{"First message", "Second message"}
 	chains := []string{"eth", "eth"}
 
 	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
