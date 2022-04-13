@@ -105,10 +105,6 @@ type DefaultWorker struct {
 	signingOutputs  []*libCommon.SignatureData
 	finalOutputLock *sync.RWMutex
 
-	ackDoneCh      chan *common.TssMessage
-	ackDoneParties map[string]struct{}
-	ackLock        *sync.RWMutex
-
 	blameMgr *blame.Manager
 
 	curRound uint32
@@ -204,9 +200,6 @@ func baseWorker(
 		blameMgr:          blame.NewManager(),
 		jobTimeout:        timeOut,
 		maxJob:            maxJob,
-		ackDoneCh:         make(chan *common.TssMessage, len(allParties)),
-		ackLock:           &sync.RWMutex{},
-		ackDoneParties:    make(map[string]struct{}),
 	}
 }
 

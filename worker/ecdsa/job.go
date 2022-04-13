@@ -3,11 +3,11 @@ package ecdsa
 import (
 	"crypto/elliptic"
 	"fmt"
-	"github.com/sisu-network/dheart/types/common"
 	"math/big"
 	"time"
 
 	"github.com/sisu-network/dheart/core/message"
+	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
