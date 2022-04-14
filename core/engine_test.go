@@ -174,6 +174,11 @@ func runEngines(engines []Engine, workId string, outCh chan *p2pDataWrapper, err
 					if err := engine.ProcessNewMessage(signedMessage.TssMessage); err != nil {
 						panic(err)
 					}
+
+					// Sends duplicated messages
+					if err := engine.ProcessNewMessage(signedMessage.TssMessage); err != nil {
+						panic(err)
+					}
 					break
 				}
 			}
