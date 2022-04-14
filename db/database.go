@@ -389,7 +389,7 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 
 func (d *SqlDatabase) UpdatePresignStatus(presignIds []string) error {
 	presignString := getQueryQuestionMark(1, len(presignIds))
-	query := fmt.Sprintf(
+	query := fmt.Sprintf( //nolint
 		"UPDATE presign SET status = ? WHERE presign_id IN %s",
 		presignString,
 	)

@@ -141,4 +141,4 @@ replace google.golang.org/grpc => google.golang.org/grpc v1.33.2
 
 replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
-replace github.com/sisu-network/tss-lib => /Users/sonltcoder/go/src/github.com/sisu-network/tss-lib
+replace github.com/sisu-network/tss-lib => ../tss-lib
