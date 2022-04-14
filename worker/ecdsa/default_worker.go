@@ -29,7 +29,6 @@ import (
 var (
 	LeaderWaitTime              = 10 * time.Second
 	PreExecutionRequestWaitTime = 5 * time.Second
-	AckWaitTime                 = 50 * time.Second
 )
 
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
@@ -420,6 +419,7 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 			return fmt.Errorf("error when processing execution response %w", err)
 		}
 	case common.TssMessage_PRE_EXEC_OUTPUT:
+		log.Debug("Received pre exec output")
 		if len(w.pIDs) == 0 {
 			// This output of workParticipantCh is called only once. We do checking for pids length to
 			// make sure we only send message to this channel once.

@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -82,6 +83,114 @@ func TestEngineDelayStart(t *testing.T) {
 	runEngines(engines, workId, outCh, errCh, done, 0)
 }
 
+func TestEngineSendDuplicateMessage(t *testing.T) {
+	t.Parallel()
+
+	nbEngines := 4
+	privKeys, nodes, pIDs, savedData := getEngineTestData(nbEngines)
+
+	workId := "presign0"
+	pidString := ""
+	presignIds := make([]string, nbEngines)
+	pidStrings := make([]string, nbEngines)
+
+	doneCh := make(chan struct{}, nbEngines)
+	allEnginesDone := make(chan struct{}, nbEngines)
+
+	for i := range presignIds {
+		presignIds[i] = fmt.Sprintf("%s-%d", workId, i)
+		pidString = pidString + pIDs[i].Id
+		if i < nbEngines-1 {
+			pidString = pidString + ","
+		}
+	}
+	for i := range presignIds {
+		pidStrings[i] = pidString
+	}
+	engines := make([]Engine, nbEngines)
+	outCh := make(chan *p2pDataWrapper)
+	errCh := make(chan error, nbEngines)
+
+	// Init engines
+	failCb := func(request *types.WorkRequest, culprits []*tss.PartyID) {
+		errCh <- errors.New("fail work")
+	}
+	doneCb := func(result *htypes.PresignResult) {
+		doneCh <- struct{}{}
+	}
+
+	go func() {
+		// Waiting for all engines done presign work
+		for i := 0; i < nbEngines; i++ {
+			<-doneCh
+		}
+
+		allEnginesDone <- struct{}{}
+	}()
+
+	for i := 0; i < nbEngines; i++ {
+		config := NewDefaultEngineConfig()
+		config.PresignJobTimeout = time.Second
+
+		engines[i] = NewEngine(
+			nodes[i],
+			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
+			getMokDbForAvailManager(presignIds, pidStrings),
+			&helper.MockEngineCallback{
+				OnWorkPresignFinishedFunc: doneCb,
+				OnWorkFailedFunc:          failCb,
+			},
+			privKeys[i],
+			config,
+		)
+		engines[i].AddNodes(nodes)
+	}
+	for i := 0; i < nbEngines; i++ {
+		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), nbEngines-1, savedData[i], true, 1)
+		go func(en Engine, rq *types.WorkRequest, delay time.Duration) {
+			time.Sleep(delay)
+			require.NoError(t, en.AddRequest(rq))
+		}(engines[i], request, time.Millisecond*time.Duration(i*350))
+	}
+
+	// Simulate send duplicate messages
+	for {
+		select {
+		case err := <-errCh:
+			t.Log(err)
+			t.Fail()
+		case <-allEnginesDone:
+			return
+		case <-time.After(time.Second * 60):
+			t.Log("Testing timeout")
+			t.Fail()
+
+		case p2pMsgWrapper := <-outCh:
+			for _, engine := range engines {
+				defaultEngine := engine.(*DefaultEngine)
+				if defaultEngine.myNode.PeerId.String() != p2pMsgWrapper.To {
+					continue
+				}
+
+				signedMessage := &common.SignedMessage{}
+				if err := json.Unmarshal(p2pMsgWrapper.msg.Data, signedMessage); err != nil {
+					log.Error(err)
+					t.Fail()
+				}
+
+				// For each single tss message, duplicate it
+				for i := 0; i < 2; i++ {
+					if err := engine.ProcessNewMessage(signedMessage.TssMessage); err != nil {
+						log.Error(err)
+						t.Fail()
+					}
+				}
+				break
+			}
+		}
+	}
+}
+
 func TestEngineJobTimeout(t *testing.T) {
 	log.Verbose("Running test with tss works starting at different time.")
 	n := 4
@@ -140,7 +249,7 @@ func TestEngineJobTimeout(t *testing.T) {
 		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
 
 		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
-			// Deplay starting each engine to simulate that different workers can start at different times.
+			// Delay starting each engine to simulate that different workers can start at different times.
 			time.Sleep(delay)
 			engine.AddRequest(request)
 		}(engines[i], request, time.Millisecond*time.Duration(i*350))
@@ -171,11 +280,6 @@ func runEngines(engines []Engine, workId string, outCh chan *p2pDataWrapper, err
 					}
 
 					time.Sleep(delay)
-					if err := engine.ProcessNewMessage(signedMessage.TssMessage); err != nil {
-						panic(err)
-					}
-
-					// Sends duplicated messages
 					if err := engine.ProcessNewMessage(signedMessage.TssMessage); err != nil {
 						panic(err)
 					}
