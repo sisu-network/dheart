@@ -6,8 +6,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/sisu-network/dheart/core/message"
-	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
@@ -174,43 +172,43 @@ func (job *Job) startListening() {
 
 	endTime := time.Now().Add(job.timeOut)
 
-	// TODO: Add timeout and missing messages.
-	ticker := time.NewTicker(MaxWaitRound)
-	oldRound := job.party.Round()
+	// // TODO: Add timeout and missing messages.
+	// ticker := time.NewTicker(MaxWaitRound)
+	// oldRound := job.party.Round()
 	for {
 		select {
-		case <-ticker.C:
-			// Every 10 seconds, check if job round is changed?
-			// If not, potentially we missed some messages from peers
-			// In this case, send request to ask broadcast/unicast message from peers and re-process this round
+		// case <-ticker.C:
+		// 	// Every 10 seconds, check if job round is changed?
+		// 	// If not, potentially we missed some messages from peers
+		// 	// In this case, send request to ask broadcast/unicast message from peers and re-process this round
 
-			// Check round number has changed or not
-			currentRound := job.party.Round()
-			if currentRound != oldRound {
-				// Re-assign old round
-				oldRound = currentRound
-				continue
-			}
+		// 	// Check round number has changed or not
+		// 	currentRound := job.party.Round()
+		// 	if currentRound != oldRound {
+		// 		// Re-assign old round
+		// 		oldRound = currentRound
+		// 		continue
+		// 	}
 
-			log.Debug("After MaxWaitRound but the round number has not changed")
-			waitingForParties := job.party.WaitingFor()
-			for _, p := range waitingForParties {
-				log.Debug("Waiting for parties ", p.GetId())
-			}
-			msgTypes := message.GetAllMessageTypesByRound(message.ConvertTSSRoundToDheartRound(currentRound, job.jobType))
+		// 	log.Debug("After MaxWaitRound but the round number has not changed")
+		// 	waitingForParties := job.party.WaitingFor()
+		// 	for _, p := range waitingForParties {
+		// 		log.Debug("Waiting for parties ", p.GetId())
+		// 	}
+		// 	msgTypes := message.GetAllMessageTypesByRound(message.ConvertTSSRoundToDheartRound(currentRound, job.jobType))
 
-			for _, msgType := range msgTypes {
-				for _, otherParty := range waitingForParties {
-					if message.IsBroadcastMessage(msgType) {
-						broadcastMsgKey := common.GetMessageKey(job.workId, otherParty.GetId(), "", msgType)
-						go job.callback.OnRequestTSSMessageFromPeers(job, broadcastMsgKey, []*tss.PartyID{otherParty})
-						continue
-					}
+		// 	for _, msgType := range msgTypes {
+		// 		for _, otherParty := range waitingForParties {
+		// 			if message.IsBroadcastMessage(msgType) {
+		// 				broadcastMsgKey := common.GetMessageKey(job.workId, otherParty.GetId(), "", msgType)
+		// 				go job.callback.OnRequestTSSMessageFromPeers(job, broadcastMsgKey, []*tss.PartyID{otherParty})
+		// 				continue
+		// 			}
 
-					p2pMsgKey := common.GetMessageKey(job.workId, otherParty.GetId(), job.party.PartyID().GetId(), msgType)
-					go job.callback.OnRequestTSSMessageFromPeers(job, p2pMsgKey, []*tss.PartyID{otherParty})
-				}
-			}
+		// 			p2pMsgKey := common.GetMessageKey(job.workId, otherParty.GetId(), job.party.PartyID().GetId(), msgType)
+		// 			go job.callback.OnRequestTSSMessageFromPeers(job, p2pMsgKey, []*tss.PartyID{otherParty})
+		// 		}
+		// 	}
 		case <-time.After(endTime.Sub(time.Now())):
 			job.callback.OnJobTimeout()
 			return

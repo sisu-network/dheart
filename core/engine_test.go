@@ -145,6 +145,7 @@ func TestEngineSendDuplicateMessage(t *testing.T) {
 		)
 		engines[i].AddNodes(nodes)
 	}
+
 	for i := 0; i < nbEngines; i++ {
 		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), nbEngines-1, savedData[i], true, 1)
 		go func(en Engine, rq *types.WorkRequest, delay time.Duration) {
@@ -260,6 +261,20 @@ func TestEngineJobTimeout(t *testing.T) {
 }
 
 func runEngines(engines []Engine, workId string, outCh chan *p2pDataWrapper, errCh chan error, done chan bool, delay time.Duration) {
+	runEnginesWithDroppedMessages(engines, workId, outCh, errCh, done, delay, nil)
+}
+
+func getDropMsgPair(from, to string) string {
+	return fmt.Sprintf("%s__%s", from, to)
+}
+
+// Run an engine with possible message drop. The message drop is defined in the drop map. Each
+// message from -> to with a specific type will be dropped once and removed from the map after
+// it is dropped.
+func runEnginesWithDroppedMessages(engines []Engine, workId string, outCh chan *p2pDataWrapper,
+	errCh chan error, done chan bool, delay time.Duration, drop map[string]map[string]bool) {
+	lock := &sync.RWMutex{}
+
 	// Run all engines
 	for {
 		select {
@@ -279,6 +294,29 @@ func runEngines(engines []Engine, workId string, outCh chan *p2pDataWrapper, err
 						panic(err)
 					}
 
+					// Check if the message should be dropped
+					if drop != nil && signedMessage.TssMessage.Type == common.TssMessage_UPDATE_MESSAGES {
+						msg := signedMessage.TssMessage
+
+						shouldDrop := false
+						lock.RLock()
+						pair := getDropMsgPair(msg.From, defaultEngine.myPid.Id)
+						dropMsgs := drop[pair]
+						if dropMsgs != nil && dropMsgs[msg.UpdateMessages[0].Round] {
+							// This message needs to be drop
+							shouldDrop = true
+						}
+						lock.RUnlock()
+
+						if shouldDrop {
+							lock.Lock()
+							dropMsgs[msg.UpdateMessages[0].Round] = false
+							lock.Unlock()
+
+							break
+						}
+					}
+
 					time.Sleep(delay)
 					if err := engine.ProcessNewMessage(signedMessage.TssMessage); err != nil {
 						panic(err)
@@ -288,4 +326,80 @@ func runEngines(engines []Engine, workId string, outCh chan *p2pDataWrapper, err
 			}
 		}
 	}
+}
+
+func TestEngine_MissingMessages(t *testing.T) {
+	n := 4
+
+	privKeys, nodes, pIDs, savedData := getEngineTestData(n)
+
+	errCh := make(chan error)
+	outCh := make(chan *p2pDataWrapper, n*10)
+	engines := make([]Engine, n)
+	workId := "presign0"
+	done := make(chan bool)
+	finishedWorkerCount := 0
+	outputLock := &sync.Mutex{}
+	pidString := ""
+	presignIds := make([]string, n)
+	pidStrings := make([]string, n)
+	for i := range presignIds {
+		presignIds[i] = fmt.Sprintf("%s-%d", workId, i)
+		pidString = pidString + pIDs[i].Id
+		if i < n-1 {
+			pidString = pidString + ","
+		}
+	}
+	for i := range presignIds {
+		pidStrings[i] = pidString
+	}
+
+	for i := 0; i < n; i++ {
+		cb := func(result *htypes.PresignResult) {
+			outputLock.Lock()
+			defer outputLock.Unlock()
+
+			finishedWorkerCount += 1
+			if finishedWorkerCount == n {
+				done <- true
+			}
+		}
+
+		engines[i] = NewEngine(
+			nodes[i],
+			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
+			getMokDbForAvailManager(presignIds, pidStrings),
+			&helper.MockEngineCallback{
+				OnWorkPresignFinishedFunc: cb,
+			},
+			privKeys[i],
+			NewDefaultEngineConfig(),
+		)
+		engines[i].AddNodes(nodes)
+	}
+
+	// Start all engines
+	for i := 0; i < n; i++ {
+		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
+
+		go func(engine Engine, request *types.WorkRequest) {
+			engine.AddRequest(request)
+		}(engines[i], request)
+	}
+
+	drop := make(map[string]map[string]bool)
+	drop[getDropMsgPair(nodes[0].PartyId.Id, nodes[2].PartyId.Id)] = map[string]bool{
+		"PresignRound2Message": true, // Unicast message
+	}
+
+	drop[getDropMsgPair(nodes[0].PartyId.Id, nodes[3].PartyId.Id)] = map[string]bool{
+		"PresignRound3Message": true, // Broadcast message
+	}
+
+	drop[getDropMsgPair(nodes[1].PartyId.Id, nodes[2].PartyId.Id)] = map[string]bool{
+		"PresignRound4Message": true, // Broadcast message
+	}
+
+	// Run all engines
+	runEnginesWithDroppedMessages(engines, workId, outCh, errCh, done, 0, drop)
 }

@@ -5,13 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/sisu-network/dheart/blame"
 	"github.com/sisu-network/dheart/core/message"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/worker"
+	"github.com/sisu-network/dheart/worker/components"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/interfaces"
 	"github.com/sisu-network/dheart/worker/types"
@@ -84,10 +86,13 @@ type DefaultWorker struct {
 	curJobType atomic.Value
 
 	isExecutionStarted atomic.Value
+	isStopped          atomic.Value
 	keygenInput        *keygen.LocalPreParams
 	presignInput       *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
 	signingInput       []*presign.LocalPresignData
 	signingMessages    []string
+
+	messageMonitor components.MessageMonitor
 
 	// A map between of rounds and list of messages that have been produced. The size of the list
 	// is the same as batchSize.
@@ -284,6 +289,8 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 		}
 	}
 
+	w.startMessageMonitor(nextJobType)
+
 	log.Info("nextJobType = ", nextJobType)
 
 	for _, job := range jobs {
@@ -370,7 +377,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 			return
 		}
 
-		atomic.StoreUint32(&w.curRound, uint32(message.NextRound(w.jobType, message.Round(w.curRound))))
+		// atomic.StoreUint32(&w.curRound, uint32(message.NextRound(w.jobType, message.Round(w.curRound))))
 
 		if dest == nil {
 			// broadcast
@@ -378,15 +385,6 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 		} else {
 			w.dispatcher.UnicastMessage(dest[0], tssMsg)
 		}
-	}
-}
-
-// OnRequestTSSMessageFromPeers ask the peers to find missed message
-func (w *DefaultWorker) OnRequestTSSMessageFromPeers(_ *Job, msgKey string, pIDs []*tss.PartyID) {
-	log.Verbose("Asking tss messages from peers. msg key = ", msgKey)
-	msg := common.NewRequestMessage(w.myPid.Id, "", w.workId, msgKey)
-	for _, pid := range pIDs {
-		w.dispatcher.UnicastMessage(pid, msg)
 	}
 }
 
@@ -406,7 +404,6 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 	switch tssMsg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
 		// TODO: Do message validation here. Make sure that the round type is correct.
-
 		if err := w.processUpdateMessages(tssMsg); err != nil {
 			return fmt.Errorf("error when processing update message %w", err)
 		}
@@ -451,6 +448,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	if jobType == wTypes.EcdsaPresign && w.jobType == wTypes.EcdsaSigning &&
 		len(tssMsg.UpdateMessages) > 0 && tssMsg.UpdateMessages[0].Round == "SignRound1Message" {
 		w.preExecutionCache.AddMessage(tssMsg)
+		return nil
 	}
 
 	// Do all message validation first before processing.
@@ -461,13 +459,13 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	jobs := w.jobs
 	w.jobsLock.RUnlock()
 
-	for i := range jobs {
-		fromString := tssMsg.From
-		from := helper.GetPidFromString(fromString, w.pIDs)
-		if from == nil {
-			return errors.New("sender is nil")
-		}
+	fromString := tssMsg.From
+	from := helper.GetPidFromString(fromString, w.pIDs)
+	if from == nil {
+		return errors.New("sender is nil")
+	}
 
+	for i := range jobs {
 		updateMessage := tssMsg.UpdateMessages[i]
 		msg, err := tss.ParseWireMessage(updateMessage.Data, from, tssMsg.IsBroadcast())
 		if err != nil {
@@ -481,6 +479,8 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 
 		msgs[i] = msg
 	}
+
+	w.messageMonitor.NewMessageReceived(msgs[0], from)
 
 	for i, j := range jobs {
 		go func(id int, job *Job) {
@@ -503,7 +503,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 				if round > 0 {
 					w.blameMgr.AddCulpritByRound(w.workId, uint32(round), err.Culprits())
 				} else {
-					w.blameMgr.AddCulpritByRound(w.workId, atomic.LoadUint32(&w.curRound), err.Culprits())
+					// w.blameMgr.AddCulpritByRound(w.workId, atomic.LoadUint32(&w.curRound), err.Culprits())
 				}
 			}
 		}(i, j)
@@ -532,6 +532,7 @@ func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySav
 	if count == w.batchSize {
 		log.Verbose(w.GetWorkId(), " Done!")
 		w.callback.OnWorkKeygenFinished(w.request, w.keygenOutputs)
+		w.finished()
 	}
 }
 
@@ -562,12 +563,14 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 		} else {
 			// This is purely presign request. Make a callback after finish
 			w.callback.OnWorkPresignFinished(w.request, w.pIDs, w.presignOutputs)
+			w.finished()
 		}
 	}
 }
 
 func (w *DefaultWorker) OnJobTimeout() {
 	w.callback.OnWorkFailed(w.request)
+	w.finished()
 }
 
 // Implements OnJobSignFinished of JobCallback.
@@ -589,6 +592,40 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 	if count == w.batchSize {
 		log.Verbose(w.GetWorkId(), " Signing Done!")
 		w.callback.OnWorkSigningFinished(w.request, w.signingOutputs)
+		w.finished()
+	}
+}
+
+func (w *DefaultWorker) finished() {
+	w.messageMonitor.Stop()
+}
+
+// Overrides MessageMonitorCallback
+func (w *DefaultWorker) OnMissingMesssageDetected(m map[string][]string) {
+	// We have found missing messages
+	for pid, msgTypes := range m {
+		for _, msgType := range msgTypes {
+			if message.IsBroadcastMessage(msgType) {
+				msgKey := common.GetMessageKey(w.workId, pid, "", msgType)
+				msg := common.NewRequestMessage(w.myPid.Id, "", w.workId, msgKey)
+
+				w.dispatcher.BroadcastMessage(w.pIDs, msg)
+			} else {
+				msgKey := common.GetMessageKey(w.workId, pid, w.myPid.Id, msgType)
+				msg := common.NewRequestMessage(w.myPid.Id, pid, w.workId, msgKey)
+
+				w.dispatcher.UnicastMessage(w.pIDsMap[pid], msg)
+			}
+		}
+	}
+}
+
+// OnRequestTSSMessageFromPeers ask the peers to find missed message
+func (w *DefaultWorker) OnRequestTSSMessageFromPeers(_ *Job, msgKey string, pIDs []*tss.PartyID) {
+	log.Verbose("Asking tss messages from peers. msg key = ", msgKey)
+	msg := common.NewRequestMessage(w.myPid.Id, "", w.workId, msgKey)
+	for _, pid := range pIDs {
+		w.dispatcher.UnicastMessage(pid, msg)
 	}
 }
 
@@ -612,7 +649,8 @@ func (w *DefaultWorker) GetCulprits() []*tss.PartyID {
 		return culprits
 	}
 
-	return w.blameMgr.GetRoundCulprits(w.workId, atomic.LoadUint32(&w.curRound), w.pIDsMap)
+	// return w.blameMgr.GetRoundCulprits(w.workId, atomic.LoadUint32(&w.curRound), w.pIDsMap)
+	return make([]*tss.PartyID, 0)
 }
 
 func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {
@@ -623,4 +661,13 @@ func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {
 	}
 
 	return nil
+}
+
+func (w *DefaultWorker) startMessageMonitor(jobType wTypes.WorkType) {
+	if w.messageMonitor != nil {
+		w.messageMonitor.Stop()
+	}
+
+	w.messageMonitor = components.NewMessageMonitor(jobType, w, w.pIDsMap)
+	go w.messageMonitor.Start()
 }

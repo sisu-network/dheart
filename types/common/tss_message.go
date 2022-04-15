@@ -94,21 +94,14 @@ func (msg *TssMessage) IsBroadcast() bool {
 	return msg.To == ""
 }
 
-func (msg *TssMessage) GetMessageKey(pID *tss.PartyID) (string, error) {
+func (msg *TssMessage) GetMessageKey() (string, error) {
 	if len(msg.UpdateMessages) == 0 {
 		err := fmt.Errorf("empty update messages")
 		log.Error(err)
 		return "", err
 	}
 
-	firstMsg := msg.UpdateMessages[0]
-	parsedMsg, err := tss.ParseWireMessage(firstMsg.Data, pID, msg.IsBroadcast())
-	if err != nil {
-		log.Error("error when parse wire message", err)
-		return "", err
-	}
-
-	return GetMessageKey(msg.WorkId, msg.From, msg.To, parsedMsg.Type()), nil
+	return GetMessageKey(msg.WorkId, msg.From, msg.To, msg.UpdateMessages[0].Round), nil
 }
 
 func GetMessageKey(workdId, from, to, tssMsgType string) string {

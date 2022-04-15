@@ -311,24 +311,29 @@ func (engine *DefaultEngine) OnAskMessage(tssMsg *commonTypes.TssMessage) error 
 	}
 
 	originalFrom := keys[1]
-	cacheMsg := engine.workCache.Get(originalFrom, msgKey)
-	if cacheMsg == nil {
-		log.Warn("Can not find msg with key = ", msgKey)
+	signedMsg := engine.workCache.Get(originalFrom, msgKey)
+	if signedMsg == nil {
 		return nil
 	}
 
-	if m := cacheMsg.TssMessage; !m.IsBroadcast() && m.GetTo() != tssMsg.GetFrom() {
+	if m := signedMsg.TssMessage; !m.IsBroadcast() && m.GetTo() != tssMsg.GetFrom() {
 		log.Warnf("Request from bad actor = %s, ignore it", tssMsg.GetFrom())
 		return nil
 	}
 
-	bz, err := json.Marshal(cacheMsg)
-	if err != nil {
-		log.Error("error when marshal cache msg")
-		return err
+	var dest *tss.PartyID
+	for _, node := range engine.nodes {
+		if node.PartyId.Id == tssMsg.From {
+			dest = node.PartyId
+		}
 	}
-	pIds := engine.getWorker(tssMsg.WorkId).GetPartyMap()
-	engine.sendData(bz, []*tss.PartyID{pIds[tssMsg.From]})
+
+	if dest != nil {
+		log.Verbose("Replying message: ", msgKey, " dest = ", dest)
+		engine.sendSignMessaged(signedMsg, []*tss.PartyID{dest})
+	} else {
+		log.Error("OnAskMessage: cannot find party id for ", signedMsg.TssMessage.To)
+	}
 	return nil
 }
 
@@ -377,16 +382,16 @@ func (engine *DefaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *c
 		return
 	}
 
-	signedMsg, bz, err := engine.getSignedMessageBytes(tssMessage)
+	signedMsg, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
 		log.Error("Cannot get signed message", err)
 		return
 	}
 
 	// Add this to the cache.
-	engine.cacheWorkMsg(signedMsg, tssMessage)
+	engine.cacheWorkMsg(signedMsg)
 
-	engine.sendData(bz, pIDs)
+	engine.sendSignMessaged(signedMsg, pIDs)
 }
 
 // Send a message to a single destination.
@@ -395,34 +400,40 @@ func (engine *DefaultEngine) UnicastMessage(dest *tss.PartyID, tssMessage *commo
 		return
 	}
 
-	signedMsg, bz, err := engine.getSignedMessageBytes(tssMessage)
+	signedMsg, err := engine.getSignedMessageBytes(tssMessage)
 	if err != nil {
 		log.Error("Cannot get signed message", err)
 		return
 	}
 
 	// Add this to the cache.
-	engine.cacheWorkMsg(signedMsg, tssMessage)
+	engine.cacheWorkMsg(signedMsg)
 
-	engine.sendData(bz, []*tss.PartyID{dest})
+	engine.sendSignMessaged(signedMsg, []*tss.PartyID{dest})
 }
 
-func (engine *DefaultEngine) cacheWorkMsg(signedMsg *common.SignedMessage, tssMsg *common.TssMessage) {
+func (engine *DefaultEngine) cacheWorkMsg(signedMsg *common.SignedMessage) {
+	tssMsg := signedMsg.TssMessage
 	if tssMsg.Type != commonTypes.TssMessage_UPDATE_MESSAGES {
 		return
 	}
 
-	msgKey, err := tssMsg.GetMessageKey(engine.myPid)
+	msgKey, err := tssMsg.GetMessageKey()
 	if err != nil {
 		return
 	}
 
 	engine.workCache.Add(msgKey, signedMsg)
-	log.Debug("Added msg key = ", msgKey, " from = ", signedMsg.From)
 }
 
-// sendData sends data to the network.
-func (engine *DefaultEngine) sendData(data []byte, pIDs []*tss.PartyID) {
+// sendSignMessaged sends data to the network.
+func (engine *DefaultEngine) sendSignMessaged(signedMessage *common.SignedMessage, pIDs []*tss.PartyID) {
+	bz, err := json.Marshal(signedMessage)
+	if err != nil {
+		log.Errorf("error when marshalling message %w", err)
+		return
+	}
+
 	// Converts pids => peerIds
 	peerIds := make([]peer.ID, 0, len(pIDs))
 	engine.nodeLock.RLock()
@@ -445,20 +456,20 @@ func (engine *DefaultEngine) sendData(data []byte, pIDs []*tss.PartyID) {
 
 	// Write to stream
 	for _, peerId := range peerIds {
-		engine.cm.WriteToStream(peerId, p2p.TSSProtocolID, data)
+		engine.cm.WriteToStream(peerId, p2p.TSSProtocolID, bz)
 	}
 }
 
 // getSignedMessageBytes signs a tss message and returns serialized bytes of the signed message.
-func (engine *DefaultEngine) getSignedMessageBytes(tssMessage *common.TssMessage) (*common.SignedMessage, []byte, error) {
+func (engine *DefaultEngine) getSignedMessageBytes(tssMessage *common.TssMessage) (*common.SignedMessage, error) {
 	serialized, err := json.Marshal(tssMessage)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error when marshalling message %w", err)
+		return nil, fmt.Errorf("error when marshalling message %w", err)
 	}
 
 	signature, err := engine.signer.Sign(serialized)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error when signing %w", err)
+		return nil, fmt.Errorf("error when signing %w", err)
 	}
 
 	signedMessage := &common.SignedMessage{
@@ -467,12 +478,7 @@ func (engine *DefaultEngine) getSignedMessageBytes(tssMessage *common.TssMessage
 		Signature:  signature,
 	}
 
-	bz, err := json.Marshal(signedMessage)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error when marshalling message %w", err)
-	}
-
-	return signedMessage, bz, nil
+	return signedMessage, nil
 }
 
 // OnNetworkMessage implements P2PDataListener interface.
@@ -496,8 +502,10 @@ func (engine *DefaultEngine) OnNetworkMessage(message *p2ptypes.P2PMessage) {
 	}
 
 	// TODO: Check message signature here.
+	if tssMessage.Type == common.TssMessage_UPDATE_MESSAGES && len(tssMessage.UpdateMessages) > 0 && tssMessage.IsBroadcast() {
+		engine.cacheWorkMsg(signedMessage)
+	}
 
-	engine.cacheWorkMsg(signedMessage, tssMessage)
 	if err := engine.ProcessNewMessage(tssMessage); err != nil {
 		log.Error("Error when process new message", err)
 	}
