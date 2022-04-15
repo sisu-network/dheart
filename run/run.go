@@ -74,7 +74,7 @@ func SetupApiServer() {
 }
 
 func setupLogger(key string, options logger.Options) {
-	logDNA := log.NewDNALogger(key, options)
+	logDNA := log.NewDNALogger(key, options, false)
 	log.SetLogger(logDNA)
 }
 
