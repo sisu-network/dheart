@@ -53,6 +53,11 @@ type WorkerCallback interface {
 	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData)
 }
 
+type WorkerConfig struct {
+	JobTimeout            time.Duration
+	MonitorMessageTimeout time.Duration
+}
+
 // Implements worker.Worker interface
 type DefaultWorker struct {
 	batchSize  int
@@ -113,7 +118,15 @@ type DefaultWorker struct {
 
 	curRound uint32
 
+	cfg        WorkerConfig
 	jobTimeout time.Duration
+}
+
+func DefaultWorkerConfig() WorkerConfig {
+	return WorkerConfig{
+		JobTimeout:            time.Minute * 10,
+		MonitorMessageTimeout: time.Second * 15,
+	}
 }
 
 func NewKeygenWorker(
@@ -122,9 +135,9 @@ func NewKeygenWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
-	jobTimeout time.Duration,
+	cfg WorkerConfig,
 ) worker.Worker {
-	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, 1)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, 1)
 
 	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
@@ -140,10 +153,10 @@ func NewPresignWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
-	jobTimeout time.Duration,
+	cfg WorkerConfig,
 	maxJob int,
 ) worker.Worker {
-	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, maxJob)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, maxJob)
 
 	w.jobType = wTypes.EcdsaPresign
 	w.presignInput = request.PresignInput
@@ -159,11 +172,11 @@ func NewSigningWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
-	jobTimeout time.Duration,
+	cfg WorkerConfig,
 	maxJob int,
 ) worker.Worker {
 	// TODO: The request.Pids
-	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, jobTimeout, maxJob)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, maxJob)
 
 	w.jobType = wTypes.EcdsaSigning
 	w.signingOutputs = make([]*libCommon.SignatureData, request.BatchSize)
@@ -180,7 +193,7 @@ func baseWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
-	timeOut time.Duration,
+	cfg WorkerConfig,
 	maxJob int,
 ) *DefaultWorker {
 	return &DefaultWorker{
@@ -202,7 +215,8 @@ func baseWorker(
 		availableParties:  NewAvailableParties(),
 		preExecutionCache: worker.NewMessageCache(),
 		blameMgr:          blame.NewManager(),
-		jobTimeout:        timeOut,
+		jobTimeout:        cfg.JobTimeout,
+		cfg:               cfg,
 		maxJob:            maxJob,
 	}
 }
@@ -668,6 +682,6 @@ func (w *DefaultWorker) startMessageMonitor(jobType wTypes.WorkType) {
 		w.messageMonitor.Stop()
 	}
 
-	w.messageMonitor = components.NewMessageMonitor(jobType, w, w.pIDsMap)
+	w.messageMonitor = components.NewMessageMonitor(w.myPid, jobType, w, w.pIDsMap, w.cfg.MonitorMessageTimeout)
 	go w.messageMonitor.Start()
 }

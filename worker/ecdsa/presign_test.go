@@ -70,7 +70,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 					}
 				},
 			},
-			10*time.Minute,
+			DefaultWorkerConfig(),
 			1,
 		)
 
@@ -124,7 +124,7 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 					}
 				},
 			},
-			10*time.Minute,
+			DefaultWorkerConfig(),
 			1,
 		)
 
@@ -161,6 +161,9 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 			batchSize,
 		)
 
+		cfg := DefaultWorkerConfig()
+		cfg.JobTimeout = time.Second
+
 		worker := NewPresignWorker(
 			request,
 			pIDs[i],
@@ -173,7 +176,7 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 					}
 				},
 			},
-			time.Second,
+			cfg,
 			1,
 		)
 
@@ -242,7 +245,7 @@ func TestPresign_Threshold(t *testing.T) {
 					}
 				},
 			},
-			10*time.Minute,
+			DefaultWorkerConfig(),
 			1,
 		)
 

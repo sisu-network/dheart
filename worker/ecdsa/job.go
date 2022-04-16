@@ -169,12 +169,8 @@ func (job *Job) Stop() {
 
 func (job *Job) startListening() {
 	outCh := job.outCh
-
 	endTime := time.Now().Add(job.timeOut)
 
-	// // TODO: Add timeout and missing messages.
-	// ticker := time.NewTicker(MaxWaitRound)
-	// oldRound := job.party.Round()
 	for {
 		select {
 		// case <-ticker.C:

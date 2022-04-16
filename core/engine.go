@@ -39,9 +39,10 @@ const (
 var defaultJobTimeout = 10 * time.Minute
 
 type EngineConfig struct {
-	PresignJobTimeout time.Duration
-	KeygenJobTimeout  time.Duration
-	SigningJobTimeout time.Duration
+	PresignJobTimeout     time.Duration
+	KeygenJobTimeout      time.Duration
+	SigningJobTimeout     time.Duration
+	MonitorMessageTimeout time.Duration
 }
 
 // go:generate mockgen -source core/engine.go -destination=test/mock/core/engine.go -package=mock
@@ -124,9 +125,10 @@ func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback 
 
 func NewDefaultEngineConfig() EngineConfig {
 	return EngineConfig{
-		KeygenJobTimeout:  defaultJobTimeout,
-		SigningJobTimeout: defaultJobTimeout,
-		PresignJobTimeout: defaultJobTimeout,
+		KeygenJobTimeout:      defaultJobTimeout,
+		SigningJobTimeout:     defaultJobTimeout,
+		PresignJobTimeout:     defaultJobTimeout,
+		MonitorMessageTimeout: time.Second * 15,
 	}
 }
 
@@ -177,15 +179,24 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 	switch request.WorkType {
 	case types.EcdsaKeygen:
 		w = ecdsa.NewKeygenWorker(request, workPartyId, engine, engine.db, engine,
-			engine.config.KeygenJobTimeout)
+			ecdsa.WorkerConfig{
+				JobTimeout:            engine.config.KeygenJobTimeout,
+				MonitorMessageTimeout: engine.config.MonitorMessageTimeout,
+			})
 
 	case types.EcdsaPresign:
 		w = ecdsa.NewPresignWorker(request, workPartyId, engine, engine.db, engine,
-			engine.config.PresignJobTimeout, MaxBatchSize)
+			ecdsa.WorkerConfig{
+				JobTimeout:            engine.config.PresignJobTimeout,
+				MonitorMessageTimeout: engine.config.MonitorMessageTimeout,
+			}, MaxBatchSize)
 
 	case types.EcdsaSigning:
 		w = ecdsa.NewSigningWorker(request, workPartyId, engine, engine.db, engine,
-			engine.config.SigningJobTimeout, MaxBatchSize)
+			ecdsa.WorkerConfig{
+				JobTimeout:            engine.config.SigningJobTimeout,
+				MonitorMessageTimeout: engine.config.MonitorMessageTimeout,
+			}, MaxBatchSize)
 	}
 
 	engine.workLock.Lock()
@@ -329,7 +340,7 @@ func (engine *DefaultEngine) OnAskMessage(tssMsg *commonTypes.TssMessage) error 
 	}
 
 	if dest != nil {
-		log.Verbose("Replying message: ", msgKey, " dest = ", dest)
+		log.Verbose("Replying request message: ", msgKey, " dest = ", dest)
 		engine.sendSignMessaged(signedMsg, []*tss.PartyID{dest})
 	} else {
 		log.Error("OnAskMessage: cannot find party id for ", signedMsg.TssMessage.To)

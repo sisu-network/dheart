@@ -67,7 +67,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 					}
 				},
 			},
-			10*time.Minute,
+			DefaultWorkerConfig(),
 		)
 	}
 
@@ -122,6 +122,9 @@ func TestKeygenTimeout(t *testing.T) {
 			N:           totalParticipants,
 		}
 
+		cfg := DefaultWorkerConfig()
+		cfg.JobTimeout = time.Second
+
 		workers[i] = NewKeygenWorker(
 			request,
 			pIDs[i],
@@ -138,7 +141,7 @@ func TestKeygenTimeout(t *testing.T) {
 					}
 				},
 			},
-			time.Second,
+			cfg,
 		)
 	}
 

@@ -122,7 +122,7 @@ func TestSigningEndToEnd(t *testing.T) {
 					return wrapper.Outputs[workerIndex]
 				},
 			},
-			10*time.Minute,
+			DefaultWorkerConfig(),
 			1,
 		)
 
@@ -194,7 +194,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 					return nil
 				},
 			},
-			10*time.Minute,
+			DefaultWorkerConfig(),
 			1,
 		)
 
@@ -245,7 +245,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 					}
 				},
 			},
-			10*time.Minute,
+			DefaultWorkerConfig(),
 			1,
 		)
 
@@ -284,6 +284,8 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 		)
 
 		workerIndex := i
+		cfg := DefaultWorkerConfig()
+		cfg.JobTimeout = time.Second
 
 		worker := NewSigningWorker(
 			request,
@@ -305,7 +307,7 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 					return wrapper.Outputs[workerIndex]
 				},
 			},
-			time.Second,
+			cfg,
 			1,
 		)
 
@@ -451,7 +453,7 @@ func doTestThreshold(t *testing.T) {
 					}
 				},
 			},
-			10*time.Minute,
+			DefaultWorkerConfig(),
 			1,
 		)
 

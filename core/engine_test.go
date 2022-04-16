@@ -304,6 +304,7 @@ func runEnginesWithDroppedMessages(engines []Engine, workId string, outCh chan *
 						dropMsgs := drop[pair]
 						if dropMsgs != nil && dropMsgs[msg.UpdateMessages[0].Round] {
 							// This message needs to be drop
+							log.Info("Droping message: ", pair, msg.UpdateMessages[0].Round)
 							shouldDrop = true
 						}
 						lock.RUnlock()
@@ -365,6 +366,9 @@ func TestEngine_MissingMessages(t *testing.T) {
 			}
 		}
 
+		config := NewDefaultEngineConfig()
+		config.MonitorMessageTimeout = time.Duration(time.Second * 1)
+
 		engines[i] = NewEngine(
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
@@ -373,7 +377,7 @@ func TestEngine_MissingMessages(t *testing.T) {
 				OnWorkPresignFinishedFunc: cb,
 			},
 			privKeys[i],
-			NewDefaultEngineConfig(),
+			config,
 		)
 		engines[i].AddNodes(nodes)
 	}
@@ -388,16 +392,26 @@ func TestEngine_MissingMessages(t *testing.T) {
 	}
 
 	drop := make(map[string]map[string]bool)
-	drop[getDropMsgPair(nodes[0].PartyId.Id, nodes[2].PartyId.Id)] = map[string]bool{
-		"PresignRound2Message": true, // Unicast message
+	drop[getDropMsgPair(nodes[0].PartyId.Id, nodes[3].PartyId.Id)] = map[string]bool{
+		"PresignRound2Message": true,
+		"PresignRound3Message": true,
+		"PresignRound4Message": true,
 	}
 
-	drop[getDropMsgPair(nodes[0].PartyId.Id, nodes[3].PartyId.Id)] = map[string]bool{
-		"PresignRound3Message": true, // Broadcast message
+	drop[getDropMsgPair(nodes[1].PartyId.Id, nodes[3].PartyId.Id)] = map[string]bool{
+		"PresignRound2Message": true,
+		"PresignRound3Message": true,
+		"PresignRound4Message": true,
+	}
+
+	drop[getDropMsgPair(nodes[2].PartyId.Id, nodes[3].PartyId.Id)] = map[string]bool{
+		"PresignRound2Message": true,
+		"PresignRound3Message": true,
+		"PresignRound4Message": true,
 	}
 
 	drop[getDropMsgPair(nodes[1].PartyId.Id, nodes[2].PartyId.Id)] = map[string]bool{
-		"PresignRound4Message": true, // Broadcast message
+		"PresignRound4Message": true,
 	}
 
 	// Run all engines
