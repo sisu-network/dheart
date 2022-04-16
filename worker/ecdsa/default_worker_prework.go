@@ -183,18 +183,16 @@ func (w *DefaultWorker) checkEnoughParticipants() (bool, []string, []*tss.PartyI
 // Finalize work as a leader and start execution.
 func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selectedPids []*tss.PartyID) {
 	if !success { // Failure case
-		msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, false, presignIds, w.pIDs)
-		go w.dispatcher.BroadcastMessage(w.pIDs, msg)
+		msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, false, presignIds, w.getPids())
+		go w.dispatcher.BroadcastMessage(w.getPids(), msg)
 		return
 	}
 
 	// Get list of parties
-	// pIDs := w.availableParties.getPartyList(w.request.GetMinPartyCount())
-	w.pIDs = tss.SortPartyIDs(selectedPids)
-	w.pIDsMap = pidsToMap(w.pIDs)
+	w.setPids(tss.SortPartyIDs(selectedPids))
 
 	// Broadcast success to everyone
-	msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, true, presignIds, w.pIDs)
+	msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, true, presignIds, w.getPids())
 	log.Info("Leader: Broadcasting PreExecOutput to everyone...")
 	go w.dispatcher.BroadcastMessage(w.allParties, msg)
 
@@ -287,8 +285,7 @@ func (w *DefaultWorker) memberFinalized(msg *common.PreExecOutputMessage) {
 			pIDs = append(pIDs, helper.GetPidFromString(participant, w.allParties))
 		}
 
-		w.pIDs = tss.SortPartyIDs(pIDs)
-		w.pIDsMap = pidsToMap(w.pIDs)
+		w.setPids(tss.SortPartyIDs(pIDs))
 
 		if join {
 			workType := w.jobType

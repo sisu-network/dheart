@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"testing"
 	"time"
@@ -114,6 +115,7 @@ func TestEngineSendDuplicateMessage(t *testing.T) {
 
 	// Init engines
 	failCb := func(request *types.WorkRequest, culprits []*tss.PartyID) {
+		debug.PrintStack()
 		errCh <- errors.New("fail work")
 	}
 	doneCb := func(result *htypes.PresignResult) {

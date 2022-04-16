@@ -534,7 +534,7 @@ func (engine *DefaultEngine) OnWorkFailed(request *types.WorkRequest) {
 		return
 	}
 	culprits := worker.GetCulprits()
-	go engine.callback.OnWorkFailed(request, culprits)
+	engine.callback.OnWorkFailed(request, culprits)
 
 	engine.startNextWork()
 }

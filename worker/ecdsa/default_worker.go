@@ -57,6 +57,7 @@ type DefaultWorker struct {
 	allParties []*tss.PartyID
 	pIDs       tss.SortedPartyIDs
 	pIDsMap    map[string]*tss.PartyID
+	pidsLock   *sync.RWMutex
 	jobType    wTypes.WorkType
 	callback   WorkerCallback
 	workId     string
@@ -188,6 +189,7 @@ func baseWorker(
 		batchSize:          request.BatchSize,
 		db:                 db,
 		myPid:              myPid,
+		pidsLock:           &sync.RWMutex{},
 		allParties:         allParties,
 		dispatcher:         dispatcher,
 		callback:           callback,
@@ -217,8 +219,7 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 	if w.request.IsKeygen() {
 		// For keygen, we skip the leader selection part since all parties need to be involved in the
 		// signing process.
-		w.pIDs = w.request.AllParties
-		w.pIDsMap = pidsToMap(w.pIDs)
+		w.setPids(w.request.AllParties)
 		go func() {
 			if err := w.executeWork(w.jobType); err != nil {
 				log.Error("Error when executing work", err)
@@ -232,6 +233,27 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 	return nil
 }
 
+func (w *DefaultWorker) setPids(pids []*tss.PartyID) {
+	w.pidsLock.Lock()
+	w.pIDs = pids
+	w.pIDsMap = pidsToMap(pids)
+	w.pidsLock.Unlock()
+}
+
+func (w *DefaultWorker) getPids() []*tss.PartyID {
+	w.pidsLock.RLock()
+	defer w.pidsLock.RUnlock()
+
+	return w.pIDs
+}
+
+func (w *DefaultWorker) getPidFromId(id string) *tss.PartyID {
+	w.pidsLock.RLock()
+	defer w.pidsLock.RUnlock()
+
+	return w.pIDsMap[id]
+}
+
 // TODO: handle error when this executeWork fails.
 // Start actual execution of the work.
 func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
@@ -242,7 +264,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 	}
 
 	log.Info("Executing work type ", wTypes.WorkTypeStrings[workType])
-	p2pCtx := tss.NewPeerContext(w.pIDs)
+	p2pCtx := tss.NewPeerContext(w.getPids())
 
 	// Assign the correct index for our pid.
 	for _, p := range w.pIDs {
@@ -251,7 +273,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 		}
 	}
 
-	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.request.Threshold)
+	params := tss.NewParameters(p2pCtx, w.myPid, len(w.getPids()), w.request.Threshold)
 
 	jobs := make([]*Job, w.batchSize)
 	log.Info("batchSize = ", w.batchSize)
@@ -260,13 +282,13 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 	for i := range jobs {
 		switch w.jobType {
 		case wTypes.EcdsaKeygen:
-			jobs[i] = NewKeygenJob(w.workId, i, w.pIDs, params, w.keygenInput, w, w.jobTimeout)
+			jobs[i] = NewKeygenJob(w.workId, i, w.getPids(), params, w.keygenInput, w, w.jobTimeout)
 			nextJobType = wTypes.EcdsaKeygen
 			w.startMessageMonitor(nextJobType)
 
 		case wTypes.EcdsaPresign:
 			w.presignInput = w.request.PresignInput
-			jobs[i] = NewPresignJob(w.workId, i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
+			jobs[i] = NewPresignJob(w.workId, i, w.getPids(), params, w.presignInput, w, w.jobTimeout)
 			nextJobType = wTypes.EcdsaPresign
 			w.startMessageMonitor(nextJobType)
 
@@ -278,11 +300,11 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 				w.curRound = uint32(message.Presign1)
 				nextJobType = wTypes.EcdsaPresign
 
-				jobs[i] = NewPresignJob(w.workId, i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
+				jobs[i] = NewPresignJob(w.workId, i, w.getPids(), params, w.presignInput, w, w.jobTimeout)
 			} else {
 				w.curRound = uint32(message.Sign1)
 				nextJobType = wTypes.EcdsaSigning
-				jobs[i] = NewSigningJob(w.workId, i, w.pIDs, params, w.signingMessages[i], w.signingInput[i], w, w.jobTimeout)
+				jobs[i] = NewSigningJob(w.workId, i, w.getPids(), params, w.signingMessages[i], w.signingInput[i], w, w.jobTimeout)
 				w.startMessageMonitor(nextJobType)
 			}
 
@@ -385,7 +407,7 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 
 		if dest == nil {
 			// broadcast
-			w.dispatcher.BroadcastMessage(w.pIDs, tssMsg)
+			w.dispatcher.BroadcastMessage(w.getPids(), tssMsg)
 		} else {
 			w.dispatcher.UnicastMessage(dest[0], tssMsg)
 		}
@@ -421,7 +443,7 @@ func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error 
 		}
 	case common.TssMessage_PRE_EXEC_OUTPUT:
 		log.Debug("Received pre exec output")
-		if len(w.pIDs) == 0 {
+		if len(w.getPids()) == 0 {
 			// This output of workParticipantCh is called only once. We do checking for pids length to
 			// make sure we only send message to this channel once.
 			w.preExecMsgCh <- tssMsg.PreExecOutputMessage
@@ -465,7 +487,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	w.jobsLock.RUnlock()
 
 	fromString := tssMsg.From
-	from := helper.GetPidFromString(fromString, w.pIDs)
+	from := helper.GetPidFromString(fromString, w.getPids())
 	if from == nil {
 		return errors.New("sender is nil")
 	}
@@ -573,7 +595,7 @@ func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresig
 			w.executeWork(types.EcdsaSigning)
 		} else {
 			// This is purely presign request. Make a callback after finish
-			w.callback.OnWorkPresignFinished(w.request, w.pIDs, w.presignOutputs)
+			w.callback.OnWorkPresignFinished(w.request, w.getPids(), w.presignOutputs)
 			w.finished()
 		}
 	}
@@ -622,18 +644,21 @@ func (w *DefaultWorker) OnMissingMesssageDetected(m map[string][]string) {
 				msgKey := common.GetMessageKey(w.workId, pid, "", msgType)
 				msg := common.NewRequestMessage(w.myPid.Id, "", w.workId, msgKey)
 
-				w.dispatcher.BroadcastMessage(w.pIDs, msg)
+				w.dispatcher.BroadcastMessage(w.getPids(), msg)
 			} else {
 				msgKey := common.GetMessageKey(w.workId, pid, w.myPid.Id, msgType)
 				msg := common.NewRequestMessage(w.myPid.Id, pid, w.workId, msgKey)
 
-				w.dispatcher.UnicastMessage(w.pIDsMap[pid], msg)
+				w.dispatcher.UnicastMessage(w.getPidFromId(pid), msg)
 			}
 		}
 	}
 }
 
 func (w *DefaultWorker) GetPartyMap() map[string]*tss.PartyID {
+	w.pidsLock.RLock()
+	defer w.pidsLock.RUnlock()
+
 	return w.pIDsMap
 }
 
@@ -677,7 +702,7 @@ func (w *DefaultWorker) startMessageMonitor(jobType wTypes.WorkType) {
 	}
 
 	w.messageMonitorLock.Lock()
-	w.messageMonitor = components.NewMessageMonitor(w.myPid, jobType, w, w.pIDsMap, w.cfg.MonitorMessageTimeout)
+	w.messageMonitor = components.NewMessageMonitor(w.myPid, jobType, w, w.GetPartyMap(), w.cfg.MonitorMessageTimeout)
 	w.messageMonitorLock.Unlock()
 
 	go w.messageMonitor.Start()
