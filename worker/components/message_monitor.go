@@ -43,7 +43,7 @@ func NewMessageMonitor(mypid *tss.PartyID, jobType wTypes.WorkType, callback Mes
 	pIDsMap map[string]*tss.PartyID, timeout time.Duration) MessageMonitor {
 	allMessages := message.GetMessagesByWorkType(jobType)
 	receivedMessages := make(map[string][]bool)
-	for pid, _ := range pIDsMap {
+	for pid := range pIDsMap {
 		receivedMessages[pid] = make([]bool, len(allMessages))
 	}
 

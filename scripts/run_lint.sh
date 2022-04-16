@@ -13,7 +13,7 @@ if [ ! -z ${CI} ]; then
  # install into ./bin/
  # because different project might need different golang version,
  # and thus, need to use different linter version
- curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.41.0
+ curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.45.2
  GOLANGCI_LINT="./bin/golangci-lint"
  fi
 fi
