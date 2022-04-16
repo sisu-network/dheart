@@ -381,6 +381,8 @@ func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
 
 		// atomic.StoreUint32(&w.curRound, uint32(message.NextRound(w.jobType, message.Round(w.curRound))))
 
+		log.Verbose(w.workId, " sending message ", msg.Type(), " to ", dest)
+
 		if dest == nil {
 			// broadcast
 			w.dispatcher.BroadcastMessage(w.pIDs, tssMsg)
@@ -449,6 +451,7 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 	// this update mesasge is for signing round, we have to catch this message.
 	if jobType == wTypes.EcdsaPresign && w.jobType == wTypes.EcdsaSigning &&
 		len(tssMsg.UpdateMessages) > 0 && tssMsg.UpdateMessages[0].Round == "SignRound1Message" {
+		log.Verbose("We are in presign phase, add signing message to cache: ", tssMsg.UpdateMessages[0].Round)
 		w.preExecutionCache.AddMessage(tssMsg)
 		return nil
 	}

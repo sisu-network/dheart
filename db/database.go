@@ -45,6 +45,7 @@ type Database interface {
 	GetAvailablePresignShortForm() ([]string, []string, error) // Returns presignIds, pids, error
 
 	LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error)
+	LoadPresignStatus(presignIds []string) ([]string, error)
 	UpdatePresignStatus(presignIds []string) error
 
 	SavePeers([]*p2ptypes.Peer) error
@@ -384,6 +385,38 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 		results = append(results, &data)
 	}
 
+	return results, nil
+}
+
+func (d *SqlDatabase) LoadPresignStatus(presignIds []string) ([]string, error) {
+	questions := getQueryQuestionMark(1, len(presignIds))
+
+	query := "SELECT status FROM presign WHERE presign_id IN " + questions + " ORDER BY created_time DESC"
+
+	// Execute the query
+	interfaceArr := make([]interface{}, len(presignIds))
+	for i, s := range presignIds {
+		interfaceArr[i] = s
+	}
+
+	rows, err := d.db.Query(query, interfaceArr...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// 2. Scan every rows and save it to loaded array
+	results := make([]string, 0)
+	for rows.Next() {
+		var status string
+		if err := rows.Scan(&status); err != nil {
+			log.Error("Cannot load status", err)
+			return nil, err
+		}
+		results = append(results, status)
+	}
+
+	log.Debug("load presign status result = ", results)
 	return results, nil
 }
 

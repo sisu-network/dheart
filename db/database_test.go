@@ -169,6 +169,34 @@ func TestSqlDatabase_LoadPresign(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestSqlDatabase_LoadPresignStatus(t *testing.T) {
+	t.Parallel()
+
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	sqlDatabase := SqlDatabase{
+		db: db,
+	}
+
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	rows := sqlmock.NewRows([]string{"status"}).AddRow("used").AddRow("not_used")
+	presignIDs := []string{"presign0", "presign1"}
+
+	mock.ExpectQuery("SELECT status FROM presign WHERE presign_id IN \\(\\?, \\?\\) ORDER BY created_time DESC").
+		WithArgs(presignIDs[0], presignIDs[1]).
+		WillReturnRows(rows).
+		WillReturnError(nil)
+
+	got, err := sqlDatabase.LoadPresignStatus(presignIDs)
+	assert.NoError(t, err)
+	assert.EqualValues(t, []string{"used", "not_used"}, got)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestSqlDatabase_SavePreparams(t *testing.T) {
 	t.Parallel()
 
