@@ -32,10 +32,6 @@ type JobCallback interface {
 	// Called when this signing job finishes.
 	OnJobSignFinished(job *Job, data *libCommon.SignatureData)
 
-	// OnRequestTSSMessageFromPeers potentially missed message to process current round
-	// we need to request message for this round from peers
-	OnRequestTSSMessageFromPeers(job *Job, msgKey string, pIDs []*tss.PartyID)
-
 	// OnJobTimeout on job timeout
 	OnJobTimeout()
 }
@@ -173,38 +169,6 @@ func (job *Job) startListening() {
 
 	for {
 		select {
-		// case <-ticker.C:
-		// 	// Every 10 seconds, check if job round is changed?
-		// 	// If not, potentially we missed some messages from peers
-		// 	// In this case, send request to ask broadcast/unicast message from peers and re-process this round
-
-		// 	// Check round number has changed or not
-		// 	currentRound := job.party.Round()
-		// 	if currentRound != oldRound {
-		// 		// Re-assign old round
-		// 		oldRound = currentRound
-		// 		continue
-		// 	}
-
-		// 	log.Debug("After MaxWaitRound but the round number has not changed")
-		// 	waitingForParties := job.party.WaitingFor()
-		// 	for _, p := range waitingForParties {
-		// 		log.Debug("Waiting for parties ", p.GetId())
-		// 	}
-		// 	msgTypes := message.GetAllMessageTypesByRound(message.ConvertTSSRoundToDheartRound(currentRound, job.jobType))
-
-		// 	for _, msgType := range msgTypes {
-		// 		for _, otherParty := range waitingForParties {
-		// 			if message.IsBroadcastMessage(msgType) {
-		// 				broadcastMsgKey := common.GetMessageKey(job.workId, otherParty.GetId(), "", msgType)
-		// 				go job.callback.OnRequestTSSMessageFromPeers(job, broadcastMsgKey, []*tss.PartyID{otherParty})
-		// 				continue
-		// 			}
-
-		// 			p2pMsgKey := common.GetMessageKey(job.workId, otherParty.GetId(), job.party.PartyID().GetId(), msgType)
-		// 			go job.callback.OnRequestTSSMessageFromPeers(job, p2pMsgKey, []*tss.PartyID{otherParty})
-		// 		}
-		// 	}
 		case <-time.After(endTime.Sub(time.Now())):
 			job.callback.OnJobTimeout()
 			return

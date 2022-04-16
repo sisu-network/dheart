@@ -67,15 +67,6 @@ func (w *DefaultWorker) doPreExecutionAsLeader() {
 	// Waits for all members to respond.
 	presignIds, selectedPids, err := w.waitForMemberResponse()
 	if err != nil {
-		var culprits []*tss.PartyID
-		// Blame nodes that do not send messages
-		for _, party := range w.allParties {
-			if ok := w.availableParties.hasPartyId(party.Id); !ok {
-				culprits = append(culprits, party)
-			}
-		}
-		w.blameMgr.AddPreExecutionCulprit(append(culprits, w.myPid))
-
 		log.Error("Leader: error while waiting for member response, err = ", err)
 		w.leaderFinalized(false, nil, nil)
 		w.callback.OnWorkFailed(w.request)
@@ -92,7 +83,7 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 	}
 
 	// Wait for everyone to reply or timeout.
-	end := time.Now().Add(PreExecutionRequestWaitTime)
+	end := time.Now().Add(w.cfg.PreworkWaitTimeout)
 	for {
 		now := time.Now()
 		if now.After(end) {
@@ -100,22 +91,14 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 		}
 
 		timeDiff := end.Sub(now)
+		hashNewAvailableMember := false
 		select {
 		case <-time.After(timeDiff):
-			// Time out, this returns failure except for 1 case:
-			//
-			// If this is a signing task and we have enough online (>= threshold + 1) but cannot find
-			// the presigns set to do the signing, we have to do the presign first before doing signing
-			if w.request.IsSigning() {
-				// We have to do presign + signing ƒrom online nodes since we cannot find appropriate presign data.
-				parties := w.availableParties.getPartyList(w.request.Threshold + 1)
-				if len(parties) >= w.request.Threshold+1 {
-					return nil, parties, nil
-				}
-			}
-			return nil, nil, errors.New("timeout waiting for member response")
+			log.Info("LEADER: timeout")
+			return w.leaderWaitFinalized()
 
 		case tssMsg := <-w.memberResponseCh:
+			log.Info("LEADER: There is a member response, from: ", tssMsg.From)
 			// Check if this member is one of the parties we know
 			var party *tss.PartyID
 			for _, p := range w.allParties {
@@ -131,17 +114,42 @@ func (w *DefaultWorker) waitForMemberResponse() ([]string, []*tss.PartyID, error
 				continue
 			}
 
-			if tssMsg.AvailabilityResponseMessage.MaxJob > 0 {
-				w.availableParties.add(party, int(tssMsg.AvailabilityResponseMessage.MaxJob))
+			if tssMsg.AvailabilityResponseMessage.Answer == commonTypes.AvailabilityResponseMessage_YES {
+				w.availableParties.add(party, 1)
+				hashNewAvailableMember = true
 			}
 		}
 
-		if ok, presignIds, selectedPids := w.checkEnoughParticipants(); ok {
-			return presignIds, selectedPids, nil
+		if hashNewAvailableMember {
+			if ok, presignIds, selectedPids := w.checkEnoughParticipants(); ok {
+				log.Info("Leader: presign ids found")
+				return presignIds, selectedPids, nil
+			} else if w.availableParties.getLength() == len(w.allParties) {
+				log.Info("All responses have been received")
+				return w.leaderWaitFinalized()
+			}
 		}
 	}
 
 	return nil, nil, errors.New("cannot find enough members for this work")
+}
+
+// leaderWaitFinalized is called when the leader's waiting for members timeouted or it cannot find
+// enough members for the tasks or it cannot find a presign id set for the group of available
+// members.
+func (w *DefaultWorker) leaderWaitFinalized() ([]string, []*tss.PartyID, error) {
+	// Time out, this returns failure except for 1 case:
+	//
+	// If this is a signing task and we have enough online (>= threshold + 1) but cannot find
+	// the presigns set to do the signing, we have to do the presign first before doing signing
+	if w.request.IsSigning() {
+		// We have to do presign + signing ƒrom online nodes since we cannot find appropriate presign data.
+		parties := w.availableParties.getPartyList(w.request.Threshold + 1)
+		if len(parties) >= w.request.Threshold+1 {
+			return nil, parties, nil
+		}
+	}
+	return nil, nil, errors.New("Leader fails to find enough participants for the task")
 }
 
 // checkEnoughParticipants is a function called by the leader in the election to see if we have
@@ -187,6 +195,7 @@ func (w *DefaultWorker) leaderFinalized(success bool, presignIds []string, selec
 
 	// Broadcast success to everyone
 	msg := common.NewPreExecOutputMessage(w.myPid.Id, "", w.workId, true, presignIds, w.pIDs)
+	log.Info("Leader: Broadcasting PreExecOutput to everyone...")
 	go w.dispatcher.BroadcastMessage(w.allParties, msg)
 
 	workType := w.jobType
@@ -226,12 +235,13 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 
 	// Waits for response from the leader.
 	select {
-	case <-time.After(LeaderWaitTime):
+	case <-time.After(w.cfg.PreworkWaitTimeout):
 		// TODO: Report as failure here.
 		log.Error("member: leader wait timed out.")
 		// Blame leader
 		w.blameMgr.AddPreExecutionCulprit([]*tss.PartyID{leader})
 		w.callback.OnWorkFailed(w.request)
+		w.finished()
 
 	case msg := <-w.preExecMsgCh:
 		w.memberFinalized(msg)
@@ -255,6 +265,8 @@ func (w *DefaultWorker) onPreExecutionRequest(tssMsg *commonTypes.TssMessage) er
 }
 
 func (w *DefaultWorker) onPreExecutionResponse(tssMsg *commonTypes.TssMessage) error {
+	// TODO: Check if we have finished seleciton process. Otherwise, this could create a blocking
+	// operation.
 	w.memberResponseCh <- tssMsg
 	return nil
 }

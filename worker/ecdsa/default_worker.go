@@ -10,6 +10,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/sisu-network/dheart/blame"
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/core/message"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/worker"
@@ -26,11 +27,6 @@ import (
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	wTypes "github.com/sisu-network/dheart/worker/types"
-)
-
-var (
-	LeaderWaitTime              = 10 * time.Second
-	PreExecutionRequestWaitTime = 5 * time.Second
 )
 
 // A callback for the caller to receive updates from this worker. We use callback instead of Go
@@ -51,11 +47,6 @@ type WorkerCallback interface {
 	OnWorkPresignFinished(request *types.WorkRequest, selectedPids []*tss.PartyID, data []*presign.LocalPresignData)
 
 	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData)
-}
-
-type WorkerConfig struct {
-	JobTimeout            time.Duration
-	MonitorMessageTimeout time.Duration
 }
 
 // Implements worker.Worker interface
@@ -97,7 +88,8 @@ type DefaultWorker struct {
 	signingInput       []*presign.LocalPresignData
 	signingMessages    []string
 
-	messageMonitor components.MessageMonitor
+	messageMonitor     components.MessageMonitor
+	messageMonitorLock *sync.RWMutex
 
 	// A map between of rounds and list of messages that have been produced. The size of the list
 	// is the same as batchSize.
@@ -118,15 +110,8 @@ type DefaultWorker struct {
 
 	curRound uint32
 
-	cfg        WorkerConfig
+	cfg        config.TimeoutConfig
 	jobTimeout time.Duration
-}
-
-func DefaultWorkerConfig() WorkerConfig {
-	return WorkerConfig{
-		JobTimeout:            time.Minute * 10,
-		MonitorMessageTimeout: time.Second * 15,
-	}
 }
 
 func NewKeygenWorker(
@@ -135,9 +120,9 @@ func NewKeygenWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
-	cfg WorkerConfig,
+	cfg config.TimeoutConfig,
 ) worker.Worker {
-	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, 1)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, cfg.KeygenJobTimeout, 1)
 
 	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
@@ -153,10 +138,10 @@ func NewPresignWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
-	cfg WorkerConfig,
+	cfg config.TimeoutConfig,
 	maxJob int,
 ) worker.Worker {
-	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, maxJob)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, cfg.PresignJobTimeout, maxJob)
 
 	w.jobType = wTypes.EcdsaPresign
 	w.presignInput = request.PresignInput
@@ -172,11 +157,11 @@ func NewSigningWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
-	cfg WorkerConfig,
+	cfg config.TimeoutConfig,
 	maxJob int,
 ) worker.Worker {
 	// TODO: The request.Pids
-	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, maxJob)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, cfg.SigningJobTimeout, maxJob)
 
 	w.jobType = wTypes.EcdsaSigning
 	w.signingOutputs = make([]*libCommon.SignatureData, request.BatchSize)
@@ -193,31 +178,33 @@ func baseWorker(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	callback WorkerCallback,
-	cfg WorkerConfig,
+	cfg config.TimeoutConfig,
+	jobTimeout time.Duration,
 	maxJob int,
 ) *DefaultWorker {
 	return &DefaultWorker{
-		request:           request,
-		workId:            request.WorkId,
-		batchSize:         request.BatchSize,
-		db:                db,
-		myPid:             myPid,
-		allParties:        allParties,
-		dispatcher:        dispatcher,
-		callback:          callback,
-		jobs:              make([]*Job, request.BatchSize),
-		jobsLock:          &sync.RWMutex{},
-		jobOutput:         make(map[string][]tss.Message),
-		jobOutputLock:     &sync.RWMutex{},
-		finalOutputLock:   &sync.RWMutex{},
-		preExecMsgCh:      make(chan *commonTypes.PreExecOutputMessage, 1),
-		memberResponseCh:  make(chan *commonTypes.TssMessage, len(allParties)),
-		availableParties:  NewAvailableParties(),
-		preExecutionCache: worker.NewMessageCache(),
-		blameMgr:          blame.NewManager(),
-		jobTimeout:        cfg.JobTimeout,
-		cfg:               cfg,
-		maxJob:            maxJob,
+		request:            request,
+		workId:             request.WorkId,
+		batchSize:          request.BatchSize,
+		db:                 db,
+		myPid:              myPid,
+		allParties:         allParties,
+		dispatcher:         dispatcher,
+		callback:           callback,
+		jobs:               make([]*Job, request.BatchSize),
+		jobsLock:           &sync.RWMutex{},
+		jobOutput:          make(map[string][]tss.Message),
+		jobOutputLock:      &sync.RWMutex{},
+		finalOutputLock:    &sync.RWMutex{},
+		preExecMsgCh:       make(chan *commonTypes.PreExecOutputMessage, 1),
+		memberResponseCh:   make(chan *commonTypes.TssMessage, len(allParties)),
+		availableParties:   NewAvailableParties(),
+		preExecutionCache:  worker.NewMessageCache(),
+		blameMgr:           blame.NewManager(),
+		jobTimeout:         jobTimeout,
+		cfg:                cfg,
+		maxJob:             maxJob,
+		messageMonitorLock: &sync.RWMutex{},
 	}
 }
 
@@ -275,11 +262,13 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 		case wTypes.EcdsaKeygen:
 			jobs[i] = NewKeygenJob(w.workId, i, w.pIDs, params, w.keygenInput, w, w.jobTimeout)
 			nextJobType = wTypes.EcdsaKeygen
+			w.startMessageMonitor(nextJobType)
 
 		case wTypes.EcdsaPresign:
 			w.presignInput = w.request.PresignInput
 			jobs[i] = NewPresignJob(w.workId, i, w.pIDs, params, w.presignInput, w, w.jobTimeout)
 			nextJobType = wTypes.EcdsaPresign
+			w.startMessageMonitor(nextJobType)
 
 		case wTypes.EcdsaSigning:
 			if w.signingInput == nil || len(w.signingInput) == 0 {
@@ -294,6 +283,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 				w.curRound = uint32(message.Sign1)
 				nextJobType = wTypes.EcdsaSigning
 				jobs[i] = NewSigningJob(w.workId, i, w.pIDs, params, w.signingMessages[i], w.signingInput[i], w, w.jobTimeout)
+				w.startMessageMonitor(nextJobType)
 			}
 
 		default:
@@ -303,13 +293,11 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 		}
 	}
 
-	w.startMessageMonitor(nextJobType)
-
 	log.Info("nextJobType = ", nextJobType)
 
 	for _, job := range jobs {
 		if err := job.Start(); err != nil {
-			log.Error("error when starting job", err)
+			log.Critical("error when starting job", err)
 			// If job cannot start, kill the whole worker.
 			w.callback.OnWorkFailed(w.request)
 			return err
@@ -327,7 +315,7 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 
 	msgCache := w.preExecutionCache.PopAllMessages(w.workId)
 	if len(msgCache) > 0 {
-		log.Info(w.workId, "Cache size =", len(msgCache))
+		log.Info(w.workId, " Cache size =", len(msgCache))
 	}
 
 	for _, msg := range msgCache {
@@ -494,7 +482,13 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		msgs[i] = msg
 	}
 
-	w.messageMonitor.NewMessageReceived(msgs[0], from)
+	// Update the message monitor
+	w.messageMonitorLock.RLock()
+	messageMonitor := w.messageMonitor
+	w.messageMonitorLock.RUnlock()
+	if messageMonitor != nil {
+		messageMonitor.NewMessageReceived(msgs[0], from)
+	}
 
 	for i, j := range jobs {
 		go func(id int, job *Job) {
@@ -611,7 +605,9 @@ func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureDat
 }
 
 func (w *DefaultWorker) finished() {
-	w.messageMonitor.Stop()
+	if w.messageMonitor != nil {
+		w.messageMonitor.Stop()
+	}
 }
 
 // Overrides MessageMonitorCallback
@@ -631,15 +627,6 @@ func (w *DefaultWorker) OnMissingMesssageDetected(m map[string][]string) {
 				w.dispatcher.UnicastMessage(w.pIDsMap[pid], msg)
 			}
 		}
-	}
-}
-
-// OnRequestTSSMessageFromPeers ask the peers to find missed message
-func (w *DefaultWorker) OnRequestTSSMessageFromPeers(_ *Job, msgKey string, pIDs []*tss.PartyID) {
-	log.Verbose("Asking tss messages from peers. msg key = ", msgKey)
-	msg := common.NewRequestMessage(w.myPid.Id, "", w.workId, msgKey)
-	for _, pid := range pIDs {
-		w.dispatcher.UnicastMessage(pid, msg)
 	}
 }
 
@@ -678,10 +665,17 @@ func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {
 }
 
 func (w *DefaultWorker) startMessageMonitor(jobType wTypes.WorkType) {
-	if w.messageMonitor != nil {
-		w.messageMonitor.Stop()
+	w.messageMonitorLock.RLock()
+	messageMonitor := w.messageMonitor
+	w.messageMonitorLock.RUnlock()
+
+	if messageMonitor != nil {
+		messageMonitor.Stop()
 	}
 
+	w.messageMonitorLock.Lock()
 	w.messageMonitor = components.NewMessageMonitor(w.myPid, jobType, w, w.pIDsMap, w.cfg.MonitorMessageTimeout)
+	w.messageMonitorLock.Unlock()
+
 	go w.messageMonitor.Start()
 }

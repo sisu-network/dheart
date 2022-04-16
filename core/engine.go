@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -14,6 +13,7 @@ import (
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/core/signer"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
@@ -35,15 +35,6 @@ const (
 	MaxBatchSize       = 4
 	MaxOutMsgCacheSize = 100
 )
-
-var defaultJobTimeout = 10 * time.Minute
-
-type EngineConfig struct {
-	PresignJobTimeout     time.Duration
-	KeygenJobTimeout      time.Duration
-	SigningJobTimeout     time.Duration
-	MonitorMessageTimeout time.Duration
-}
 
 // go:generate mockgen -source core/engine.go -destination=test/mock/core/engine.go -package=mock
 type Engine interface {
@@ -99,11 +90,11 @@ type DefaultEngine struct {
 	// TODO: Remove used presigns after getting a match to avoid using duplicated presigns.
 	presignsManager *AvailPresignManager
 
-	config EngineConfig
+	config config.TimeoutConfig
 }
 
 func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback,
-	privateKey ctypes.PrivKey, config EngineConfig) Engine {
+	privateKey ctypes.PrivKey, config config.TimeoutConfig) Engine {
 	return &DefaultEngine{
 		myNode:          myNode,
 		myPid:           myNode.PartyId,
@@ -120,15 +111,6 @@ func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback 
 		presignsManager: NewAvailPresignManager(db),
 		config:          config,
 		workCache:       worker.NewWorkMessageCache(worker.MaxMessagePerNode),
-	}
-}
-
-func NewDefaultEngineConfig() EngineConfig {
-	return EngineConfig{
-		KeygenJobTimeout:      defaultJobTimeout,
-		SigningJobTimeout:     defaultJobTimeout,
-		PresignJobTimeout:     defaultJobTimeout,
-		MonitorMessageTimeout: time.Second * 15,
 	}
 }
 
@@ -179,24 +161,15 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 	switch request.WorkType {
 	case types.EcdsaKeygen:
 		w = ecdsa.NewKeygenWorker(request, workPartyId, engine, engine.db, engine,
-			ecdsa.WorkerConfig{
-				JobTimeout:            engine.config.KeygenJobTimeout,
-				MonitorMessageTimeout: engine.config.MonitorMessageTimeout,
-			})
+			engine.config)
 
 	case types.EcdsaPresign:
 		w = ecdsa.NewPresignWorker(request, workPartyId, engine, engine.db, engine,
-			ecdsa.WorkerConfig{
-				JobTimeout:            engine.config.PresignJobTimeout,
-				MonitorMessageTimeout: engine.config.MonitorMessageTimeout,
-			}, MaxBatchSize)
+			engine.config, MaxBatchSize)
 
 	case types.EcdsaSigning:
 		w = ecdsa.NewSigningWorker(request, workPartyId, engine, engine.db, engine,
-			ecdsa.WorkerConfig{
-				JobTimeout:            engine.config.SigningJobTimeout,
-				MonitorMessageTimeout: engine.config.MonitorMessageTimeout,
-			}, MaxBatchSize)
+			engine.config, MaxBatchSize)
 	}
 
 	engine.workLock.Lock()
@@ -399,7 +372,7 @@ func (engine *DefaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *c
 		return
 	}
 
-	// Add this to the cache.
+	// Add this to the cache if it's an update message.
 	engine.cacheWorkMsg(signedMsg)
 
 	engine.sendSignMessaged(signedMsg, pIDs)
@@ -417,7 +390,7 @@ func (engine *DefaultEngine) UnicastMessage(dest *tss.PartyID, tssMessage *commo
 		return
 	}
 
-	// Add this to the cache.
+	// Add this to the cache if it's an update message.
 	engine.cacheWorkMsg(signedMsg)
 
 	engine.sendSignMessaged(signedMsg, []*tss.PartyID{dest})
@@ -556,15 +529,14 @@ func (engine *DefaultEngine) OnWorkFailed(request *types.WorkRequest) {
 	delete(engine.workers, request.WorkId)
 	engine.workLock.Unlock()
 
-	engine.startNextWork()
 	if worker == nil {
 		log.Error("Worker " + request.WorkId + " does not exist.")
 		return
 	}
-
 	culprits := worker.GetCulprits()
 	go engine.callback.OnWorkFailed(request, culprits)
-	worker.Stop()
+
+	engine.startNextWork()
 }
 
 func (engine *DefaultEngine) GetAvailablePresigns(batchSize int, n int,

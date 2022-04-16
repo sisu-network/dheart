@@ -144,10 +144,10 @@ func main() {
 
 	n = 2
 
-	config, privateKey := p2p.GetMockSecp256k1Config(n, index)
-	cm := p2p.NewConnectionManager(config)
+	cfg, privateKey := p2p.GetMockSecp256k1Config(n, index)
+	cm := p2p.NewConnectionManager(cfg)
 	if isSlow {
-		cm = thelper.NewSlowConnectionManager(config)
+		cm = thelper.NewSlowConnectionManager(cfg)
 	}
 	err := cm.Start(privateKey, "secp256k1")
 	if err != nil {
@@ -175,7 +175,7 @@ func main() {
 	cb := NewEngineCallback(keygenCh, nil, keysignch)
 	database := getDb(index)
 
-	engine := core.NewEngine(nodes[index], cm, database, cb, allKeys[index], core.NewDefaultEngineConfig())
+	engine := core.NewEngine(nodes[index], cm, database, cb, allKeys[index], config.NewDefaultTimeoutConfig())
 	cm.AddListener(p2p.TSSProtocolID, engine)
 
 	// Add nodes

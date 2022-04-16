@@ -13,6 +13,7 @@ import (
 	ecommon "github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
@@ -122,7 +123,7 @@ func TestSigningEndToEnd(t *testing.T) {
 					return wrapper.Outputs[workerIndex]
 				},
 			},
-			DefaultWorkerConfig(),
+			config.NewDefaultTimeoutConfig(),
 			1,
 		)
 
@@ -168,6 +169,8 @@ func TestSigning_PresignAndSign(t *testing.T) {
 		)
 
 		workerIndex := i
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.PreworkWaitTimeout = time.Second * 2
 
 		worker := NewSigningWorker(
 			request,
@@ -194,7 +197,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 					return nil
 				},
 			},
-			DefaultWorkerConfig(),
+			cfg,
 			1,
 		)
 
@@ -233,10 +236,13 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 			nil,
 		)
 
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.PreworkWaitTimeout = time.Second * 2
+
 		worker := NewSigningWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, PreExecutionRequestWaitTime+1*time.Second, 0),
+			helper.NewTestDispatcher(outCh, cfg.PreworkWaitTimeout+1*time.Second, 0),
 			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
 			&helper.MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
@@ -245,7 +251,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 					}
 				},
 			},
-			DefaultWorkerConfig(),
+			cfg,
 			1,
 		)
 
@@ -284,8 +290,8 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 		)
 
 		workerIndex := i
-		cfg := DefaultWorkerConfig()
-		cfg.JobTimeout = time.Second
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.SigningJobTimeout = time.Second
 
 		worker := NewSigningWorker(
 			request,
@@ -453,7 +459,7 @@ func doTestThreshold(t *testing.T) {
 					}
 				},
 			},
-			DefaultWorkerConfig(),
+			config.NewDefaultTimeoutConfig(),
 			1,
 		)
 

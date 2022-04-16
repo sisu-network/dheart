@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sisu-network/dheart/core/config"
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/helper"
@@ -63,7 +64,7 @@ func TestEngineDelayStart(t *testing.T) {
 				OnWorkPresignFinishedFunc: cb,
 			},
 			privKeys[i],
-			NewDefaultEngineConfig(),
+			config.NewDefaultTimeoutConfig(),
 		)
 		engines[i].AddNodes(nodes)
 	}
@@ -129,7 +130,7 @@ func TestEngineSendDuplicateMessage(t *testing.T) {
 	}()
 
 	for i := 0; i < nbEngines; i++ {
-		config := NewDefaultEngineConfig()
+		config := config.NewDefaultTimeoutConfig()
 		config.PresignJobTimeout = time.Second
 
 		engines[i] = NewEngine(
@@ -220,8 +221,9 @@ func TestEngineJobTimeout(t *testing.T) {
 	}
 
 	for i := 0; i < n; i++ {
-		config := NewDefaultEngineConfig()
-		config.PresignJobTimeout = time.Second
+		config := config.NewDefaultTimeoutConfig()
+		config.PreworkWaitTimeout = time.Second * 1
+		config.PresignJobTimeout = time.Second * 3
 
 		engines[i] = NewEngine(
 			nodes[i],
@@ -232,7 +234,6 @@ func TestEngineJobTimeout(t *testing.T) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					require.NotEmpty(t, culprits)
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true
@@ -319,6 +320,7 @@ func runEnginesWithDroppedMessages(engines []Engine, workId string, outCh chan *
 					}
 
 					time.Sleep(delay)
+
 					if err := engine.ProcessNewMessage(signedMessage.TssMessage); err != nil {
 						panic(err)
 					}
@@ -366,7 +368,7 @@ func TestEngine_MissingMessages(t *testing.T) {
 			}
 		}
 
-		config := NewDefaultEngineConfig()
+		config := config.NewDefaultTimeoutConfig()
 		config.MonitorMessageTimeout = time.Duration(time.Second * 1)
 
 		engines[i] = NewEngine(

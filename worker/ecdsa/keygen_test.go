@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
@@ -67,7 +68,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 					}
 				},
 			},
-			DefaultWorkerConfig(),
+			config.NewDefaultTimeoutConfig(),
 		)
 	}
 
@@ -122,8 +123,8 @@ func TestKeygenTimeout(t *testing.T) {
 			N:           totalParticipants,
 		}
 
-		cfg := DefaultWorkerConfig()
-		cfg.JobTimeout = time.Second
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.KeygenJobTimeout = time.Second
 
 		workers[i] = NewKeygenWorker(
 			request,

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
@@ -70,7 +71,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 					}
 				},
 			},
-			DefaultWorkerConfig(),
+			config.NewDefaultTimeoutConfig(),
 			1,
 		)
 
@@ -112,10 +113,13 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 			batchSize,
 		)
 
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.PreworkWaitTimeout = time.Second * 2
+
 		worker := NewPresignWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, PreExecutionRequestWaitTime+1*time.Second, 0),
+			helper.NewTestDispatcher(outCh, cfg.PreworkWaitTimeout+1*time.Second, 0),
 			helper.NewMockDatabase(),
 			&helper.MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
@@ -124,7 +128,7 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 					}
 				},
 			},
-			DefaultWorkerConfig(),
+			cfg,
 			1,
 		)
 
@@ -161,8 +165,8 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 			batchSize,
 		)
 
-		cfg := DefaultWorkerConfig()
-		cfg.JobTimeout = time.Second
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.PresignJobTimeout = time.Second
 
 		worker := NewPresignWorker(
 			request,
@@ -245,7 +249,7 @@ func TestPresign_Threshold(t *testing.T) {
 					}
 				},
 			},
-			DefaultWorkerConfig(),
+			config.NewDefaultTimeoutConfig(),
 			1,
 		)
 
