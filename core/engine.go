@@ -13,6 +13,7 @@ import (
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 
+	"github.com/sisu-network/dheart/core/cache"
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/core/signer"
 	"github.com/sisu-network/dheart/db"
@@ -76,9 +77,9 @@ type DefaultEngine struct {
 
 	workLock *sync.RWMutex
 	// Cache all message before a worker starts
-	preworkCache *worker.MessageCache
+	preworkCache *cache.MessageCache
 	// Cache messages during and after worker's execution.
-	workCache *worker.WorkMessageCache
+	workCache *cache.WorkMessageCache
 
 	callback EngineCallback
 	cm       p2p.ConnectionManager
@@ -103,14 +104,14 @@ func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback 
 		workers:         make(map[string]worker.Worker),
 		requestQueue:    NewRequestQueue(),
 		workLock:        &sync.RWMutex{},
-		preworkCache:    worker.NewMessageCache(),
+		preworkCache:    cache.NewMessageCache(),
 		callback:        callback,
 		nodes:           make(map[string]*Node),
 		signer:          signer.NewDefaultSigner(privateKey),
 		nodeLock:        &sync.RWMutex{},
 		presignsManager: NewAvailPresignManager(db),
 		config:          config,
-		workCache:       worker.NewWorkMessageCache(worker.MaxMessagePerNode),
+		workCache:       cache.NewWorkMessageCache(cache.MaxMessagePerNode, myNode.PartyId),
 	}
 }
 

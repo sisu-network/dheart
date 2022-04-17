@@ -1,10 +1,11 @@
-package worker
+package cache
 
 import (
 	"sync"
 
 	"github.com/sisu-network/dheart/tools"
 	"github.com/sisu-network/dheart/types/common"
+	"github.com/sisu-network/tss-lib/tss"
 )
 
 // A cache that saves all messages (with max size) per node during worker execution.
@@ -12,12 +13,14 @@ type WorkMessageCache struct {
 	cache       map[string]tools.CircularQueue
 	sizePerNode int
 	lock        *sync.RWMutex
+	myPid       *tss.PartyID
 }
 
-func NewWorkMessageCache(sizePerNode int) *WorkMessageCache {
+func NewWorkMessageCache(sizePerNode int, myPid *tss.PartyID) *WorkMessageCache {
 	return &WorkMessageCache{
 		cache:       make(map[string]tools.CircularQueue),
 		sizePerNode: sizePerNode,
+		myPid:       myPid,
 		lock:        &sync.RWMutex{},
 	}
 }
@@ -28,7 +31,11 @@ func (c *WorkMessageCache) Add(key string, msg *common.SignedMessage) {
 
 	q := c.cache[msg.From]
 	if q == nil {
-		q = tools.NewCircularQueue(c.sizePerNode)
+		if msg.From == c.myPid.Id {
+			q = tools.NewCircularQueue(c.sizePerNode * 5)
+		} else {
+			q = tools.NewCircularQueue(c.sizePerNode)
+		}
 	}
 
 	q.Add(key, msg)

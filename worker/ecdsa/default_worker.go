@@ -9,6 +9,8 @@ import (
 
 	"go.uber.org/atomic"
 
+	enginecache "github.com/sisu-network/dheart/core/cache"
+
 	"github.com/sisu-network/dheart/blame"
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/core/message"
@@ -70,7 +72,7 @@ type DefaultWorker struct {
 	// List of parties who indicate that they are available for current tss work.
 	availableParties *AvailableParties
 	// Cache all tss update messages when some parties start executing while this node has not.
-	preExecutionCache *worker.MessageCache
+	preExecutionCache *enginecache.MessageCache
 
 	// Execution
 	// threshold  int
@@ -201,7 +203,7 @@ func baseWorker(
 		preExecMsgCh:       make(chan *commonTypes.PreExecOutputMessage, 1),
 		memberResponseCh:   make(chan *commonTypes.TssMessage, len(allParties)),
 		availableParties:   NewAvailableParties(),
-		preExecutionCache:  worker.NewMessageCache(),
+		preExecutionCache:  enginecache.NewMessageCache(),
 		blameMgr:           blame.NewManager(),
 		jobTimeout:         jobTimeout,
 		cfg:                cfg,

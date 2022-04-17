@@ -1,14 +1,18 @@
-package worker
+package cache
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/sisu-network/dheart/types/common"
+	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/require"
 )
 
 func TestWorkMessageCache(t *testing.T) {
-	cache := NewWorkMessageCache(2)
+	myPid := tss.NewPartyID("node9", "", big.NewInt(0))
+
+	cache := NewWorkMessageCache(2, myPid)
 
 	node1Msg1 := &common.SignedMessage{
 		From:      "node1",
