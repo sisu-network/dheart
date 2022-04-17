@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"go.uber.org/atomic"
 
 	enginecache "github.com/sisu-network/dheart/core/cache"
 
-	"github.com/sisu-network/dheart/blame"
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/core/message"
 	"github.com/sisu-network/dheart/db"
@@ -109,12 +107,7 @@ type DefaultWorker struct {
 	signingOutputs  []*libCommon.SignatureData
 	finalOutputLock *sync.RWMutex
 
-	blameMgr *blame.Manager
-
-	curRound uint32
-
-	cfg        config.TimeoutConfig
-	jobTimeout time.Duration
+	cfg config.TimeoutConfig
 }
 
 func NewKeygenWorker(
@@ -125,12 +118,11 @@ func NewKeygenWorker(
 	callback WorkerCallback,
 	cfg config.TimeoutConfig,
 ) worker.Worker {
-	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, cfg.KeygenJobTimeout, 1)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, 1)
 
 	w.jobType = wTypes.EcdsaKeygen
 	w.keygenInput = request.KeygenInput
 	w.keygenOutputs = make([]*keygen.LocalPartySaveData, request.BatchSize)
-	w.curRound = uint32(message.Keygen1)
 
 	return w
 }
@@ -144,12 +136,11 @@ func NewPresignWorker(
 	cfg config.TimeoutConfig,
 	maxJob int,
 ) worker.Worker {
-	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, cfg.PresignJobTimeout, maxJob)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, maxJob)
 
 	w.jobType = wTypes.EcdsaPresign
 	w.presignInput = request.PresignInput
 	w.presignOutputs = make([]*presign.LocalPresignData, request.BatchSize)
-	w.curRound = uint32(message.Presign1)
 
 	return w
 }
@@ -164,12 +155,11 @@ func NewSigningWorker(
 	maxJob int,
 ) worker.Worker {
 	// TODO: The request.Pids
-	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, cfg.SigningJobTimeout, maxJob)
+	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, maxJob)
 
 	w.jobType = wTypes.EcdsaSigning
 	w.signingOutputs = make([]*libCommon.SignatureData, request.BatchSize)
 	w.signingMessages = request.Messages
-	w.curRound = uint32(message.Sign1)
 
 	return w
 }
@@ -182,7 +172,6 @@ func baseWorker(
 	db db.Database,
 	callback WorkerCallback,
 	cfg config.TimeoutConfig,
-	jobTimeout time.Duration,
 	maxJob int,
 ) *DefaultWorker {
 	return &DefaultWorker{
@@ -204,8 +193,6 @@ func baseWorker(
 		memberResponseCh:   make(chan *commonTypes.TssMessage, len(allParties)),
 		availableParties:   NewAvailableParties(),
 		preExecutionCache:  enginecache.NewMessageCache(),
-		blameMgr:           blame.NewManager(),
-		jobTimeout:         jobTimeout,
 		cfg:                cfg,
 		maxJob:             maxJob,
 		messageMonitorLock: &sync.RWMutex{},
@@ -284,13 +271,13 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 	for i := range jobs {
 		switch w.jobType {
 		case wTypes.EcdsaKeygen:
-			jobs[i] = NewKeygenJob(w.workId, i, w.getPids(), params, w.keygenInput, w, w.jobTimeout)
+			jobs[i] = NewKeygenJob(w.workId, i, w.getPids(), params, w.keygenInput, w, w.cfg.KeygenJobTimeout)
 			nextJobType = wTypes.EcdsaKeygen
 			w.startMessageMonitor(nextJobType)
 
 		case wTypes.EcdsaPresign:
 			w.presignInput = w.request.PresignInput
-			jobs[i] = NewPresignJob(w.workId, i, w.getPids(), params, w.presignInput, w, w.jobTimeout)
+			jobs[i] = NewPresignJob(w.workId, i, w.getPids(), params, w.presignInput, w, w.cfg.PresignJobTimeout)
 			nextJobType = wTypes.EcdsaPresign
 			w.startMessageMonitor(nextJobType)
 
@@ -299,14 +286,12 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 				// we have to do presign first.
 				w.presignInput = w.request.PresignInput
 				w.presignOutputs = make([]*presign.LocalPresignData, w.batchSize)
-				w.curRound = uint32(message.Presign1)
 				nextJobType = wTypes.EcdsaPresign
 
-				jobs[i] = NewPresignJob(w.workId, i, w.getPids(), params, w.presignInput, w, w.jobTimeout)
+				jobs[i] = NewPresignJob(w.workId, i, w.getPids(), params, w.presignInput, w, w.cfg.PresignJobTimeout)
 			} else {
-				w.curRound = uint32(message.Sign1)
 				nextJobType = wTypes.EcdsaSigning
-				jobs[i] = NewSigningJob(w.workId, i, w.getPids(), params, w.signingMessages[i], w.signingInput[i], w, w.jobTimeout)
+				jobs[i] = NewSigningJob(w.workId, i, w.getPids(), params, w.signingMessages[i], w.signingInput[i], w, w.cfg.SigningJobTimeout)
 				w.startMessageMonitor(nextJobType)
 			}
 
@@ -521,27 +506,15 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 
 	for i, j := range jobs {
 		go func(id int, job *Job) {
-			round, err := message.GetMsgRound(msgs[id].Content())
+			_, err := message.GetMsgRound(msgs[id].Content())
 			if err != nil {
 				log.Error("error when getting round %w", err)
-				// If we cannot get msg round, blame the sender
-				w.blameMgr.AddCulpritByRound(w.workId, uint32(w.curRound), []*tss.PartyID{msgs[id].GetFrom()})
 				return
 			}
 
-			w.blameMgr.AddSender(w.workId, uint32(round), tssMsg.From)
-
-			// If this is a signing worker (with presign step) and this message is a signing message
-			// while we are waiting for the last presign message, add the signing message to cache.
-
 			if err := job.processMessage(msgs[id]); err != nil {
-				// Message can be from bad actor/corrupted. Save the culprits, and ignore.
-				log.Error("cannot process message error", err)
-				if round > 0 {
-					w.blameMgr.AddCulpritByRound(w.workId, uint32(round), err.Culprits())
-				} else {
-					// w.blameMgr.AddCulpritByRound(w.workId, atomic.LoadUint32(&w.curRound), err.Culprits())
-				}
+				log.Error("worker: cannot process message, err = ", err)
+				return
 			}
 		}(i, j)
 	}
@@ -676,13 +649,6 @@ func (w *DefaultWorker) GetWorkId() string {
 }
 
 func (w *DefaultWorker) GetCulprits() []*tss.PartyID {
-	// If there's pre_execution error, return pre_execution culprits
-	culprits := w.blameMgr.GetPreExecutionCulprits()
-	if len(culprits) > 0 {
-		return culprits
-	}
-
-	// return w.blameMgr.GetRoundCulprits(w.workId, atomic.LoadUint32(&w.curRound), w.pIDsMap)
 	return make([]*tss.PartyID, 0)
 }
 

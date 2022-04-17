@@ -237,7 +237,6 @@ func (w *DefaultWorker) doPreExecutionAsMember(leader *tss.PartyID) {
 		// TODO: Report as failure here.
 		log.Error("member: leader wait timed out.")
 		// Blame leader
-		w.blameMgr.AddPreExecutionCulprit([]*tss.PartyID{leader})
 		w.callback.OnWorkFailed(w.request)
 		w.finished()
 
