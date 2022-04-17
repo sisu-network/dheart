@@ -87,16 +87,16 @@ func (m *DefaultMessageMonitor) Stop() {
 
 func (m *DefaultMessageMonitor) NewMessageReceived(msg tss.ParsedMessage, from *tss.PartyID) {
 	// Check if our cache contains the pid
-	m.lock.RLock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	receivedArr := m.receivedMessages[msg.GetFrom().Id]
-	m.lock.RUnlock()
 
 	if receivedArr == nil {
 		log.Warn("NewMessageReceived: cannot find pid in the receivedMessages, pid = ", msg.GetFrom().Id)
 		return
 	}
 
-	m.lock.Lock()
 	m.lastReceivedTime = time.Now()
 	for i, s := range m.allMessages {
 		if s == msg.Type() {
@@ -104,15 +104,15 @@ func (m *DefaultMessageMonitor) NewMessageReceived(msg tss.ParsedMessage, from *
 			break
 		}
 	}
-	m.lock.Unlock()
 }
 
 func (m *DefaultMessageMonitor) findMissingMessages() {
 	m.lock.RLock()
 	// Make a copy of received messages
-	receivedMessages := m.receivedMessages
+	receivedMessages := make(map[string][]bool)
 	for key, value := range m.receivedMessages {
-		receivedMessages[key] = value
+		receivedMessages[key] = make([]bool, len(value))
+		copy(receivedMessages[key], value)
 	}
 	m.lock.RUnlock()
 

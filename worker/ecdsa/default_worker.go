@@ -330,17 +330,15 @@ func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
 
 	w.jobsLock.Lock()
 	w.jobs = jobs
-	w.jobsLock.Unlock()
-
 	w.curJobType.Store(nextJobType)
 
 	// Mark execution started.
 	w.isExecutionStarted.Store(true)
 
 	msgCache := w.preExecutionCache.PopAllMessages(w.workId)
-	if len(msgCache) > 0 {
-		log.Info(w.workId, " Cache size =", len(msgCache))
-	}
+	w.jobsLock.Unlock()
+
+	log.Info(w.myPid.Id, " ", w.workId, " Cache size =", len(msgCache))
 
 	for _, msg := range msgCache {
 		if msg.Type == common.TssMessage_UPDATE_MESSAGES {
@@ -470,14 +468,31 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		return errors.New(fmt.Sprintf("batch size does not match %d %d", w.batchSize, len(tssMsg.UpdateMessages)))
 	}
 
+	w.jobsLock.Lock()
 	jobType := w.curJobType.Load().(wTypes.WorkType)
 	// If this is signing worker (with presign) and we are in still in the presigning phase but
 	// this update mesasge is for signing round, we have to catch this message.
 	if jobType == wTypes.EcdsaPresign && w.jobType == wTypes.EcdsaSigning &&
 		len(tssMsg.UpdateMessages) > 0 && tssMsg.UpdateMessages[0].Round == "SignRound1Message" {
-		log.Verbose("We are in presign phase, add signing message to cache: ", tssMsg.UpdateMessages[0].Round)
+		log.Verbose("We are in presign phase, add signing message to cache: ", tssMsg.UpdateMessages[0].Round, " ", w.myPid.Id)
 		w.preExecutionCache.AddMessage(tssMsg)
+
+		msgs := w.preExecutionCache.GetAllMessages(w.workId)
+		count := 0
+		for _, msg := range msgs {
+			if msg.Type == common.TssMessage_UPDATE_MESSAGES {
+				count++
+			}
+		}
+		log.Verbose(w.myPid.Id, " AAAAA size = ", count, " ", w.workId)
+
+		w.jobsLock.Unlock()
 		return nil
+	}
+	w.jobsLock.Unlock()
+
+	if tssMsg.UpdateMessages[0].Round == "SignRound1Message" {
+		fmt.Println("From -> to:", tssMsg.From, w.myPid.Id)
 	}
 
 	// Do all message validation first before processing.
