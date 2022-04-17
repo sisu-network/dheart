@@ -13,7 +13,6 @@ import (
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
-	"go.uber.org/atomic"
 
 	wTypes "github.com/sisu-network/dheart/worker/types"
 )
@@ -52,8 +51,6 @@ type Job struct {
 	callback JobCallback
 
 	timeOut time.Duration
-
-	receivedCount *atomic.Int32
 }
 
 func NewKeygenJob(
@@ -72,16 +69,15 @@ func NewKeygenJob(
 	party := keygen.NewLocalParty(params, outCh, endCh, *localPreparams).(*keygen.LocalParty)
 
 	return &Job{
-		workId:        workId,
-		index:         index,
-		jobType:       wTypes.EcdsaKeygen,
-		party:         party,
-		outCh:         outCh,
-		endKeygenCh:   endCh,
-		callback:      callback,
-		closeCh:       closeCh,
-		timeOut:       timeOut,
-		receivedCount: atomic.NewInt32(0),
+		workId:      workId,
+		index:       index,
+		jobType:     wTypes.EcdsaKeygen,
+		party:       party,
+		outCh:       outCh,
+		endKeygenCh: endCh,
+		callback:    callback,
+		closeCh:     closeCh,
+		timeOut:     timeOut,
 	}
 }
 
@@ -100,15 +96,14 @@ func NewPresignJob(
 	party := presign.NewLocalParty(pIDs, params, *savedData, outCh, endCh)
 
 	return &Job{
-		workId:        workId,
-		index:         index,
-		jobType:       wTypes.EcdsaPresign,
-		party:         party,
-		outCh:         outCh,
-		endPresignCh:  endCh,
-		callback:      callback,
-		timeOut:       timeOut,
-		receivedCount: atomic.NewInt32(0),
+		workId:       workId,
+		index:        index,
+		jobType:      wTypes.EcdsaPresign,
+		party:        party,
+		outCh:        outCh,
+		endPresignCh: endCh,
+		callback:     callback,
+		timeOut:      timeOut,
 	}
 }
 
@@ -129,15 +124,14 @@ func NewSigningJob(
 	party := signing.NewLocalParty(msgInt, params, signingInput, outCh, endCh)
 
 	return &Job{
-		workId:        workId,
-		index:         index,
-		jobType:       wTypes.EcdsaSigning,
-		party:         party,
-		outCh:         outCh,
-		endSigningCh:  endCh,
-		callback:      callback,
-		timeOut:       timeOut,
-		receivedCount: atomic.NewInt32(0),
+		workId:       workId,
+		index:        index,
+		jobType:      wTypes.EcdsaSigning,
+		party:        party,
+		outCh:        outCh,
+		endSigningCh: endCh,
+		callback:     callback,
+		timeOut:      timeOut,
 	}
 }
 
@@ -184,9 +178,6 @@ func (job *Job) startListening() {
 			return
 
 		case msg := <-outCh:
-			if len(msg.WireMsg().To) == 0 {
-				fmt.Println("There is out message, ", msg.Type(), msg.WireMsg().From.Id, msg.IsBroadcast())
-			}
 			job.callback.OnJobMessage(job, msg)
 
 		case data := <-job.endKeygenCh:
@@ -198,7 +189,6 @@ func (job *Job) startListening() {
 			return
 
 		case data := <-job.endSigningCh:
-			fmt.Println("Job is finished!", job.jobType)
 			job.callback.OnJobSignFinished(job, &data)
 			return
 		}
@@ -206,10 +196,5 @@ func (job *Job) startListening() {
 }
 
 func (job *Job) processMessage(msg tss.Message) *tss.Error {
-	if msg.Type() == "SignRound1Message" {
-		job.receivedCount.Inc()
-		fmt.Println("Received count = ", job.receivedCount.Load())
-	}
-
 	return helper.SharedPartyUpdater(job.party, msg)
 }

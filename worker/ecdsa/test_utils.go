@@ -1,7 +1,6 @@
 package ecdsa
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -55,10 +54,6 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, done 
 				for _, w := range workers {
 					if w.GetPartyId() == tssMsg.From {
 						continue
-					}
-
-					if tssMsg.Type == common.TssMessage_UPDATE_MESSAGES && tssMsg.UpdateMessages[0].Round == "SignRound1Message" {
-						fmt.Println("Sent from: ", tssMsg.From)
 					}
 
 					processMsgWithPanicOnFail(w, tssMsg)

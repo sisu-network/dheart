@@ -477,23 +477,10 @@ func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) er
 		log.Verbose("We are in presign phase, add signing message to cache: ", tssMsg.UpdateMessages[0].Round, " ", w.myPid.Id)
 		w.preExecutionCache.AddMessage(tssMsg)
 
-		msgs := w.preExecutionCache.GetAllMessages(w.workId)
-		count := 0
-		for _, msg := range msgs {
-			if msg.Type == common.TssMessage_UPDATE_MESSAGES {
-				count++
-			}
-		}
-		log.Verbose(w.myPid.Id, " AAAAA size = ", count, " ", w.workId)
-
 		w.jobsLock.Unlock()
 		return nil
 	}
 	w.jobsLock.Unlock()
-
-	if tssMsg.UpdateMessages[0].Round == "SignRound1Message" {
-		fmt.Println("From -> to:", tssMsg.From, w.myPid.Id)
-	}
 
 	// Do all message validation first before processing.
 	// TODO: Add more validation here.
