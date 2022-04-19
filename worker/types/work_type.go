@@ -28,6 +28,10 @@ func (w WorkType) String() string {
 	return WorkTypeStrings[w]
 }
 
+func (w WorkType) IsKeygen() bool {
+	return w == EcdsaKeygen || w == EddsaKeygen
+}
+
 func (w WorkType) IsPresign() bool {
 	return w == EcdsaPresign || w == EddsaPresign
 }

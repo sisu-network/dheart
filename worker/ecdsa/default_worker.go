@@ -204,7 +204,7 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 		return
 	}
 
-	fmt.Println("result.SelectedPids = ", result.SelectedPids)
+	sortedPids := tss.SortPartyIDs(result.SelectedPids)
 
 	// Handle success case
 	w.lock.Lock()
@@ -214,13 +214,13 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 		len(result.PresignIds) > 0) {
 		// In this case, work type = request.WorkType
 		w.curWorkType = w.request.WorkType
-		w.executor = w.startExecutor(result.SelectedPids)
+		w.executor = w.startExecutor(sortedPids)
 	} else {
 		// This is the case when the request is a signing work, has enough participants but cannot find
 		// an appropriate presign ids to fit them all. In this case, we need to do presign first.
 		// In this case work type != request.WorkType
 		w.curWorkType = wTypes.EcdsaPresign
-		w.secondaryExecutor = w.startExecutor(result.SelectedPids)
+		w.secondaryExecutor = w.startExecutor(sortedPids)
 	}
 }
 
@@ -291,7 +291,13 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 }
 
 func (w *DefaultWorker) onJobExecutionResult(result WorkExecutionResult) {
-
+	if result.Success {
+		if result.WorkType.IsKeygen() {
+			w.callback.OnWorkKeygenFinished(w.request, result.KeygenOutputs)
+		}
+	} else {
+		w.callback.OnWorkFailed(w.request)
+	}
 }
 
 func (w *DefaultWorker) Stop() {

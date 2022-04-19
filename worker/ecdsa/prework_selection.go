@@ -94,12 +94,10 @@ func chooseLeader(workId string, parties []*tss.PartyID) *tss.PartyID {
 }
 
 func (s *PreworkSelection) Init() {
-	fmt.Println("Selection Init")
 	s.availableParties.add(s.myPid, 1)
 }
 
 func (s *PreworkSelection) Run(cachedMsgs []*commonTypes.TssMessage) {
-	fmt.Println("Selection Run, leader = ", (s.myPid.Id == s.leader.Id))
 	if s.myPid.Id == s.leader.Id {
 		s.doPreExecutionAsLeader(cachedMsgs)
 	} else {

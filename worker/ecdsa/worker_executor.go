@@ -30,6 +30,7 @@ type WorkExecutionResult struct {
 	KeygenOutputs  []*keygen.LocalPartySaveData
 	PresignOutputs []*presign.LocalPresignData
 	SigningOutputs []*libCommon.SignatureData
+	WorkType       types.WorkType
 }
 
 type WorkerExecutor struct {
@@ -84,18 +85,22 @@ func NewWorkerExecutor(
 	}
 
 	return &WorkerExecutor{
-		request:       request,
-		workType:      workType,
-		myPid:         myPid,
-		pIDs:          pids,
-		pIDsMap:       pIDsMap,
-		dispatcher:    dispatcher,
-		db:            db,
-		callback:      callback,
-		jobsLock:      &sync.RWMutex{},
-		jobOutputLock: &sync.RWMutex{},
-		jobOutput:     make(map[string][]tss.Message),
-		cfg:           cfg,
+		request:         request,
+		workType:        workType,
+		myPid:           myPid,
+		pIDs:            pids,
+		pIDsMap:         pIDsMap,
+		dispatcher:      dispatcher,
+		db:              db,
+		callback:        callback,
+		jobsLock:        &sync.RWMutex{},
+		jobOutputLock:   &sync.RWMutex{},
+		finalOutputLock: &sync.RWMutex{},
+		keygenOutputs:   make([]*keygen.LocalPartySaveData, request.BatchSize),
+		presignOutputs:  make([]*presign.LocalPresignData, request.BatchSize),
+		signingOutputs:  make([]*libCommon.SignatureData, request.BatchSize),
+		jobOutput:       make(map[string][]tss.Message),
+		cfg:             cfg,
 	}
 }
 
@@ -150,8 +155,8 @@ func (w *WorkerExecutor) Run(cachedMsgs []*commonTypes.TssMessage) {
 
 		default:
 			// If job type is not correct, kill the whole worker.
-			w.callback(WorkExecutionResult{
-				Success: false,
+			w.broadcastResult(WorkExecutionResult{
+				Success: true,
 			})
 
 			log.Errorf("unknown work type %d", w.workType)
@@ -170,7 +175,7 @@ func (w *WorkerExecutor) Run(cachedMsgs []*commonTypes.TssMessage) {
 		if err := job.Start(); err != nil {
 			log.Critical("error when starting job, err = ", err)
 			// If job cannot start, kill the whole worker.
-			w.callback(WorkExecutionResult{
+			w.broadcastResult(WorkExecutionResult{
 				Success: false,
 			})
 
@@ -278,9 +283,7 @@ func (w *WorkerExecutor) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySa
 	w.finalOutputLock.RUnlock()
 
 	if count == w.request.BatchSize {
-		log.Verbose(w.request.WorkId, " Done!")
-
-		w.callback(WorkExecutionResult{
+		w.broadcastResult(WorkExecutionResult{
 			Success:       true,
 			KeygenOutputs: w.keygenOutputs,
 		})
@@ -309,7 +312,7 @@ func (w *WorkerExecutor) OnJobPresignFinished(job *Job, data *presign.LocalPresi
 		log.Verbose(w.request.WorkId, " Presign Done!")
 
 		// This is purely presign request. Make a callback after finish
-		w.callback(WorkExecutionResult{
+		w.broadcastResult(WorkExecutionResult{
 			Success:        true,
 			PresignOutputs: w.presignOutputs,
 		})
@@ -337,7 +340,8 @@ func (w *WorkerExecutor) OnJobSignFinished(job *Job, data *libCommon.SignatureDa
 	if count == w.request.BatchSize {
 		log.Verbose(w.request.WorkId, " Signing Done!")
 
-		w.callback(WorkExecutionResult{
+		w.broadcastResult(WorkExecutionResult{
+			Success:        true,
 			SigningOutputs: w.signingOutputs,
 		})
 
@@ -368,7 +372,9 @@ func (w *WorkerExecutor) OnMissingMesssageDetected(m map[string][]string) {
 }
 
 func (w *WorkerExecutor) ProcessUpdateMessage(tssMsg *commonTypes.TssMessage) error {
-	fmt.Println(tssMsg.From, "->", w.myPid.Id, ": ", tssMsg.UpdateMessages[0].Round)
+	if tssMsg.UpdateMessages[0].Round == "KGRound2Message1" && w.myPid.Index == 0 {
+		fmt.Println(w.pIDsMap[tssMsg.From].Index, "->", w.pIDsMap[w.myPid.Id].Index, ": ")
+	}
 
 	// Do all message validation first before processing.
 	// TODO: Add more validation here.
@@ -434,7 +440,7 @@ func (w *WorkerExecutor) Stop() {
 }
 
 func (w *WorkerExecutor) OnJobTimeout() {
-	w.callback(WorkExecutionResult{
+	w.broadcastResult(WorkExecutionResult{
 		Success: false,
 	})
 }
@@ -443,6 +449,11 @@ func (w *WorkerExecutor) finished() {
 	if w.messageMonitor != nil {
 		w.messageMonitor.Stop()
 	}
+}
+
+func (w *WorkerExecutor) broadcastResult(result WorkExecutionResult) {
+	result.WorkType = w.workType
+	w.callback(result)
 }
 
 func (w *WorkerExecutor) getCompletedJobCount(list []tss.Message) int {
