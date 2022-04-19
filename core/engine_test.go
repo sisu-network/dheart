@@ -17,19 +17,29 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-func runEngines(engines []Engine, workId string, outCh chan *p2pDataWrapper, errCh chan error, done chan bool, delay time.Duration) {
-	runEnginesWithDroppedMessages(engines, workId, outCh, errCh, done, delay, nil)
+func runEnginesWithDelay(engines []Engine, workId string, outCh chan *p2pDataWrapper, errCh chan error, done chan bool, delay time.Duration) {
+	runEngineWithOptions(engines, workId, outCh, errCh, done, delay, nil, false)
 }
 
 func getDropMsgPair(from, to string) string {
 	return fmt.Sprintf("%s__%s", from, to)
 }
 
+func runEnginesWithDroppedMessages(engines []Engine, workId string, outCh chan *p2pDataWrapper,
+	errCh chan error, done chan bool, drop map[string]map[string]bool) {
+	runEngineWithOptions(engines, workId, outCh, errCh, done, time.Second*0, drop, false)
+}
+
+func runEnginesWithDuplicatedMessage(engines []Engine, workId string, outCh chan *p2pDataWrapper,
+	errCh chan error, done chan bool) {
+	runEngineWithOptions(engines, workId, outCh, errCh, done, time.Second*0, nil, true)
+}
+
 // Run an engine with possible message drop. The message drop is defined in the drop map. Each
 // message from -> to with a specific type will be dropped once and removed from the map after
 // it is dropped.
-func runEnginesWithDroppedMessages(engines []Engine, workId string, outCh chan *p2pDataWrapper,
-	errCh chan error, done chan bool, delay time.Duration, drop map[string]map[string]bool) {
+func runEngineWithOptions(engines []Engine, workId string, outCh chan *p2pDataWrapper,
+	errCh chan error, done chan bool, delay time.Duration, drop map[string]map[string]bool, duplicateMessage bool) {
 	lock := &sync.RWMutex{}
 
 	// Run all engines
@@ -44,7 +54,7 @@ func runEnginesWithDroppedMessages(engines []Engine, workId string, outCh chan *
 
 		case p2pMsgWrapper := <-outCh:
 			for _, engine := range engines {
-				defaultEngine := engine.(*DefaultEngine)
+				defaultEngine := engine.(*defaultEngine)
 				if defaultEngine.myNode.PeerId.String() == p2pMsgWrapper.To {
 					signedMessage := &common.SignedMessage{}
 					if err := json.Unmarshal(p2pMsgWrapper.msg.Data, signedMessage); err != nil {
@@ -61,7 +71,7 @@ func runEnginesWithDroppedMessages(engines []Engine, workId string, outCh chan *
 						dropMsgs := drop[pair]
 						if dropMsgs != nil && dropMsgs[msg.UpdateMessages[0].Round] {
 							// This message needs to be drop
-							fmt.Println("Droping message: ", pair, msg.UpdateMessages[0].Round)
+							log.Verbose("Droping message: ", pair, msg.UpdateMessages[0].Round)
 							shouldDrop = true
 						}
 						lock.RUnlock()
@@ -80,11 +90,35 @@ func runEnginesWithDroppedMessages(engines []Engine, workId string, outCh chan *
 					if err := engine.ProcessNewMessage(signedMessage.TssMessage); err != nil {
 						panic(err)
 					}
+					if duplicateMessage {
+						// Run this again.
+						if err := engine.ProcessNewMessage(signedMessage.TssMessage); err != nil {
+							panic(err)
+						}
+					}
 					break
 				}
 			}
 		}
 	}
+}
+
+func getEngineTestPresignAndPids(n int, workId string, pIDs tss.SortedPartyIDs) ([]string, []string) {
+	pidString := ""
+	presignIds := make([]string, n)
+	pidStrings := make([]string, n)
+	for i := range presignIds {
+		presignIds[i] = fmt.Sprintf("%s-%d", workId, i)
+		pidString = pidString + pIDs[i].Id
+		if i < n-1 {
+			pidString = pidString + ","
+		}
+	}
+	for i := range presignIds {
+		pidStrings[i] = pidString
+	}
+
+	return presignIds, pidStrings
 }
 
 func TestEngineDelayStart(t *testing.T) {
@@ -100,19 +134,8 @@ func TestEngineDelayStart(t *testing.T) {
 	done := make(chan bool)
 	finishedWorkerCount := 0
 	outputLock := &sync.Mutex{}
-	pidString := ""
-	presignIds := make([]string, n)
-	pidStrings := make([]string, n)
-	for i := range presignIds {
-		presignIds[i] = fmt.Sprintf("%s-%d", workId, i)
-		pidString = pidString + pIDs[i].Id
-		if i < n-1 {
-			pidString = pidString + ","
-		}
-	}
-	for i := range presignIds {
-		pidStrings[i] = pidString
-	}
+
+	presignIds, pidStrings := getEngineTestPresignAndPids(n, workId, pIDs)
 
 	for i := 0; i < n; i++ {
 		cb := func(result *htypes.PresignResult) {
@@ -150,118 +173,63 @@ func TestEngineDelayStart(t *testing.T) {
 	}
 
 	// Run all engines
-	runEngines(engines, workId, outCh, errCh, done, 0)
+	runEnginesWithDelay(engines, workId, outCh, errCh, done, 0)
 }
 
-// func TestEngineSendDuplicateMessage(t *testing.T) {
-// 	t.Parallel()
+func TestEngineSendDuplicateMessage(t *testing.T) {
+	t.Parallel()
 
-// 	nbEngines := 4
-// 	privKeys, nodes, pIDs, savedData := getEngineTestData(nbEngines)
+	n := 4
 
-// 	workId := "presign0"
-// 	pidString := ""
-// 	presignIds := make([]string, nbEngines)
-// 	pidStrings := make([]string, nbEngines)
+	privKeys, nodes, pIDs, savedData := getEngineTestData(n)
 
-// 	doneCh := make(chan struct{}, nbEngines)
-// 	allEnginesDone := make(chan struct{}, nbEngines)
+	errCh := make(chan error)
+	outCh := make(chan *p2pDataWrapper)
+	engines := make([]Engine, n)
+	workId := "presign0"
+	done := make(chan bool)
+	finishedWorkerCount := 0
+	outputLock := &sync.Mutex{}
 
-// 	for i := range presignIds {
-// 		presignIds[i] = fmt.Sprintf("%s-%d", workId, i)
-// 		pidString = pidString + pIDs[i].Id
-// 		if i < nbEngines-1 {
-// 			pidString = pidString + ","
-// 		}
-// 	}
-// 	for i := range presignIds {
-// 		pidStrings[i] = pidString
-// 	}
-// 	engines := make([]Engine, nbEngines)
-// 	outCh := make(chan *p2pDataWrapper)
-// 	errCh := make(chan error, nbEngines)
+	presignIds, pidStrings := getEngineTestPresignAndPids(n, workId, pIDs)
 
-// 	// Init engines
-// 	failCb := func(request *types.WorkRequest, culprits []*tss.PartyID) {
-// 		debug.PrintStack()
-// 		errCh <- errors.New("fail work")
-// 	}
-// 	doneCb := func(result *htypes.PresignResult) {
-// 		doneCh <- struct{}{}
-// 	}
+	for i := 0; i < n; i++ {
+		cb := func(result *htypes.PresignResult) {
+			outputLock.Lock()
+			defer outputLock.Unlock()
 
-// 	go func() {
-// 		// Waiting for all engines done presign work
-// 		for i := 0; i < nbEngines; i++ {
-// 			<-doneCh
-// 		}
+			finishedWorkerCount += 1
+			if finishedWorkerCount == n {
+				done <- true
+			}
+		}
 
-// 		allEnginesDone <- struct{}{}
-// 	}()
+		engines[i] = NewEngine(
+			nodes[i],
+			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
+			components.GetMokDbForAvailManager(presignIds, pidStrings),
+			&helper.MockEngineCallback{
+				OnWorkPresignFinishedFunc: cb,
+			},
+			privKeys[i],
+			config.NewDefaultTimeoutConfig(),
+		)
+		engines[i].AddNodes(nodes)
+	}
 
-// 	for i := 0; i < nbEngines; i++ {
-// 		config := config.NewDefaultTimeoutConfig()
-// 		config.PresignJobTimeout = time.Second
+	// Start all engines
+	for i := 0; i < n; i++ {
+		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
 
-// 		engines[i] = NewEngine(
-// 			nodes[i],
-// 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
-// 			getMokDbForAvailManager(presignIds, pidStrings),
-// 			&helper.MockEngineCallback{
-// 				OnWorkPresignFinishedFunc: doneCb,
-// 				OnWorkFailedFunc:          failCb,
-// 			},
-// 			privKeys[i],
-// 			config,
-// 		)
-// 		engines[i].AddNodes(nodes)
-// 	}
+		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
+			// Deplay starting each engine to simulate that different workers can start at different times.
+			time.Sleep(delay)
+			engine.AddRequest(request)
+		}(engines[i], request, time.Millisecond*time.Duration(i*350))
+	}
 
-// 	for i := 0; i < nbEngines; i++ {
-// 		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), nbEngines-1, savedData[i], true, 1)
-// 		go func(en Engine, rq *types.WorkRequest, delay time.Duration) {
-// 			time.Sleep(delay)
-// 			require.NoError(t, en.AddRequest(rq))
-// 		}(engines[i], request, time.Millisecond*time.Duration(i*350))
-// 	}
-
-// 	// Simulate send duplicate messages
-// 	for {
-// 		select {
-// 		case err := <-errCh:
-// 			t.Log(err)
-// 			t.Fail()
-// 		case <-allEnginesDone:
-// 			return
-// 		case <-time.After(time.Second * 60):
-// 			t.Log("Testing timeout")
-// 			t.Fail()
-
-// 		case p2pMsgWrapper := <-outCh:
-// 			for _, engine := range engines {
-// 				defaultEngine := engine.(*DefaultEngine)
-// 				if defaultEngine.myNode.PeerId.String() != p2pMsgWrapper.To {
-// 					continue
-// 				}
-
-// 				signedMessage := &common.SignedMessage{}
-// 				if err := json.Unmarshal(p2pMsgWrapper.msg.Data, signedMessage); err != nil {
-// 					log.Error(err)
-// 					t.Fail()
-// 				}
-
-// 				// For each single tss message, duplicate it
-// 				for i := 0; i < 2; i++ {
-// 					if err := engine.ProcessNewMessage(signedMessage.TssMessage); err != nil {
-// 						log.Error(err)
-// 						t.Fail()
-// 					}
-// 				}
-// 				break
-// 			}
-// 		}
-// 	}
-// }
+	runEnginesWithDuplicatedMessage(engines, workId, outCh, errCh, done)
+}
 
 func TestEngineJobTimeout(t *testing.T) {
 	log.Verbose("Running test with tss works starting at different time.")
@@ -276,19 +244,8 @@ func TestEngineJobTimeout(t *testing.T) {
 	done := make(chan bool)
 	finishedWorkerCount := 0
 	outputLock := &sync.Mutex{}
-	pidString := ""
-	presignIds := make([]string, n)
-	pidStrings := make([]string, n)
-	for i := range presignIds {
-		presignIds[i] = fmt.Sprintf("%s-%d", workId, i)
-		pidString = pidString + pIDs[i].Id
-		if i < n-1 {
-			pidString = pidString + ","
-		}
-	}
-	for i := range presignIds {
-		pidStrings[i] = pidString
-	}
+
+	presignIds, pidStrings := getEngineTestPresignAndPids(n, workId, pIDs)
 
 	for i := 0; i < n; i++ {
 		config := config.NewDefaultTimeoutConfig()
@@ -328,7 +285,7 @@ func TestEngineJobTimeout(t *testing.T) {
 	}
 
 	// Run all engines
-	runEngines(engines, workId, outCh, errCh, done, 2*time.Second)
+	runEnginesWithDelay(engines, workId, outCh, errCh, done, 2*time.Second)
 }
 
 func TestEngine_MissingMessages(t *testing.T) {
@@ -343,19 +300,8 @@ func TestEngine_MissingMessages(t *testing.T) {
 	done := make(chan bool)
 	finishedWorkerCount := 0
 	outputLock := &sync.Mutex{}
-	pidString := ""
-	presignIds := make([]string, n)
-	pidStrings := make([]string, n)
-	for i := range presignIds {
-		presignIds[i] = fmt.Sprintf("%s-%d", workId, i)
-		pidString = pidString + pIDs[i].Id
-		if i < n-1 {
-			pidString = pidString + ","
-		}
-	}
-	for i := range presignIds {
-		pidStrings[i] = pidString
-	}
+
+	presignIds, pidStrings := getEngineTestPresignAndPids(n, workId, pIDs)
 
 	for i := 0; i < n; i++ {
 		cb := func(result *htypes.PresignResult) {
@@ -417,5 +363,5 @@ func TestEngine_MissingMessages(t *testing.T) {
 	}
 
 	// Run all engines
-	runEnginesWithDroppedMessages(engines, workId, outCh, errCh, done, 0, drop)
+	runEnginesWithDroppedMessages(engines, workId, outCh, errCh, done, drop)
 }
