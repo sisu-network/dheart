@@ -23,36 +23,45 @@ import (
 	"go.uber.org/atomic"
 )
 
+type SelectionFailureReason int64
+
+const (
+	SelectionTimeout SelectionFailureReason = iota
+)
+
 type SelectionResult struct {
 	Success        bool
 	IsNodeExcluded bool
+	FailureResason SelectionFailureReason
 
 	PresignIds   []string
 	SelectedPids []*tss.PartyID
 }
 
 type PreworkSelection struct {
-	request    *types.WorkRequest
-	allParties []*tss.PartyID
-	myPid      *tss.PartyID
+	///////////////////////
+	// Immutable data.
+	///////////////////////
+	request          *types.WorkRequest
+	allParties       []*tss.PartyID
+	myPid            *tss.PartyID
+	db               db.Database
+	dispatcher       interfaces.MessageDispatcher
+	callback         func(SelectionResult)
+	preExecMsgCh     chan *common.PreExecOutputMessage
+	memberResponseCh chan *common.TssMessage
+	cfg              config.TimeoutConfig
 
-	db              db.Database
-	dispatcher      interfaces.MessageDispatcher
+	///////////////////////
+	// Mutable data.
+	///////////////////////
+	leader          *tss.PartyID
 	presignsManager corecomponents.AvailablePresigns
 	// List of parties who indicate that they are available for current tss work.
 	availableParties *AvailableParties
-	callback         func(SelectionResult)
-
-	// PreExecution
-	preExecMsgCh     chan *common.PreExecOutputMessage
-	memberResponseCh chan *common.TssMessage
-
-	leader *tss.PartyID
 
 	// Cache all tss update messages when some parties start executing while this node has not.
 	stopped *atomic.Bool
-
-	cfg config.TimeoutConfig
 }
 
 func NewPreworkSelection(request *types.WorkRequest, allParties []*tss.PartyID, myPid *tss.PartyID,
@@ -166,7 +175,8 @@ func (s *PreworkSelection) doPreExecutionAsMember(leader *tss.PartyID, cachedMsg
 		// Blame leader
 
 		s.broadcastResult(SelectionResult{
-			Success: false,
+			Success:        false,
+			FailureResason: SelectionTimeout,
 		})
 
 	case msg := <-s.preExecMsgCh:
@@ -261,9 +271,6 @@ func (s *PreworkSelection) checkEnoughParticipants() (bool, []string, []*tss.Par
 		batchSize := s.request.BatchSize
 		// Check if we can find a presign list that match this of nodes.
 		presignIds, selectedPids := s.presignsManager.GetAvailablePresigns(batchSize, s.request.N, s.availableParties.getAllPartiesMap())
-		fmt.Println("len(presignIds) = ", len(presignIds))
-		fmt.Println("len(selectedPids) = ", len(selectedPids))
-
 		if len(presignIds) == batchSize {
 			log.Info("checkEnoughParticipants: presignIds = ", presignIds, " batchSize = ", batchSize, " selectedPids = ", selectedPids)
 			// Announce this as success and return

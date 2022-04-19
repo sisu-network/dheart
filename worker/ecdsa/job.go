@@ -170,7 +170,6 @@ func (job *Job) startListening() {
 	for {
 		select {
 		case <-time.After(endTime.Sub(time.Now())):
-			fmt.Println("Job timeout")
 			job.callback.OnJobTimeout()
 			return
 

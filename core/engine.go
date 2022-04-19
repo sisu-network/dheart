@@ -69,10 +69,21 @@ type EngineCallback interface {
 //      networking performing the same work might not start at the same time.
 // - Route a message to appropriate worker.
 type DefaultEngine struct {
-	myPid  *tss.PartyID
-	myNode *Node
-	db     db.Database
+	///////////////////////
+	// Immutable data.
+	///////////////////////
+	myPid    *tss.PartyID
+	myNode   *Node
+	db       db.Database
+	callback EngineCallback
+	cm       p2p.ConnectionManager
+	signer   signer.Signer
+	nodes    map[string]*Node
+	config   config.TimeoutConfig
 
+	///////////////////////
+	// Mutable data. Any data change requires a lock operation.
+	///////////////////////
 	workers      map[string]worker.Worker
 	requestQueue *requestQueue
 
@@ -80,19 +91,9 @@ type DefaultEngine struct {
 	// Cache all message before a worker starts
 	preworkCache *cache.MessageCache
 	// Cache messages during and after worker's execution.
-	workCache *cache.WorkMessageCache
-
-	callback EngineCallback
-	cm       p2p.ConnectionManager
-	signer   signer.Signer
-
-	nodes    map[string]*Node
-	nodeLock *sync.RWMutex
-
-	// TODO: Remove used presigns after getting a match to avoid using duplicated presigns.
+	workCache       *cache.WorkMessageCache
+	nodeLock        *sync.RWMutex
 	presignsManager components.AvailablePresigns
-
-	config config.TimeoutConfig
 }
 
 func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback EngineCallback,
@@ -175,15 +176,16 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 	}
 
 	engine.workLock.Lock()
-	engine.workers[request.WorkId] = w
-	engine.workLock.Unlock()
 
-	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId)
+	engine.workers[request.WorkId] = w
+	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId, nil)
 	log.Info("Starting a work with id ", request.WorkId, " with cache size ", len(cachedMsgs))
 
 	if err := w.Start(cachedMsgs); err != nil {
 		log.Error("Cannot start work error = ", err)
 	}
+
+	engine.workLock.Unlock()
 }
 
 // ProcessNewMessage processes new incoming tss message from network.
@@ -192,9 +194,6 @@ func (engine *DefaultEngine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) e
 		return nil
 	}
 
-	engine.workLock.RLock()
-	worker := engine.getWorker(tssMsg.WorkId)
-	engine.workLock.RUnlock()
 	switch tssMsg.Type {
 	case common.TssMessage_ASK_MESSAGE_REQUEST:
 		if err := engine.OnAskMessage(tssMsg); err != nil {
@@ -202,16 +201,20 @@ func (engine *DefaultEngine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) e
 		}
 
 	default:
-		if worker != nil {
+		addToCache := false
+
+		engine.workLock.RLock()
+		worker := engine.getWorker(tssMsg.WorkId)
+		if worker == nil {
+			// This could be the case when a worker has not started yet. Save it to the cache.
+			engine.preworkCache.AddMessage(tssMsg)
+			addToCache = true
+		}
+		engine.workLock.RUnlock()
+
+		if !addToCache {
 			if err := worker.ProcessNewMessage(tssMsg); err != nil {
 				return fmt.Errorf("error when worker processing new message %w", err)
-			}
-		} else {
-			if tssMsg.Type == common.TssMessage_AVAILABILITY_REQUEST {
-				// TODO: Check if we still have some available workers, create a worker and respond to the leader.
-			} else {
-				// This could be the case when a worker has not started yet. Save it to the cache.
-				engine.preworkCache.AddMessage(tssMsg)
 			}
 		}
 	}

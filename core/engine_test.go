@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sisu-network/dheart/core/components"
 	"github.com/sisu-network/dheart/core/config"
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
@@ -60,7 +61,7 @@ func runEnginesWithDroppedMessages(engines []Engine, workId string, outCh chan *
 						dropMsgs := drop[pair]
 						if dropMsgs != nil && dropMsgs[msg.UpdateMessages[0].Round] {
 							// This message needs to be drop
-							log.Info("Droping message: ", pair, msg.UpdateMessages[0].Round)
+							fmt.Println("Droping message: ", pair, msg.UpdateMessages[0].Round)
 							shouldDrop = true
 						}
 						lock.RUnlock()
@@ -127,7 +128,7 @@ func TestEngineDelayStart(t *testing.T) {
 		engines[i] = NewEngine(
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
-			getMokDbForAvailManager(presignIds, pidStrings),
+			components.GetMokDbForAvailManager(presignIds, pidStrings),
 			&helper.MockEngineCallback{
 				OnWorkPresignFinishedFunc: cb,
 			},
@@ -297,7 +298,7 @@ func TestEngineJobTimeout(t *testing.T) {
 		engines[i] = NewEngine(
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
-			getMokDbForAvailManager(presignIds, pidStrings),
+			components.GetMokDbForAvailManager(presignIds, pidStrings),
 			&helper.MockEngineCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest, culprits []*tss.PartyID) {
 					outputLock.Lock()
@@ -373,7 +374,7 @@ func TestEngine_MissingMessages(t *testing.T) {
 		engines[i] = NewEngine(
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
-			getMokDbForAvailManager(presignIds, pidStrings),
+			components.GetMokDbForAvailManager(presignIds, pidStrings),
 			&helper.MockEngineCallback{
 				OnWorkPresignFinishedFunc: cb,
 			},
