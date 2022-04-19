@@ -33,6 +33,10 @@ type WorkExecutionResult struct {
 }
 
 type WorkerExecutor struct {
+	///////////////////////
+	// Immutable data
+	///////////////////////
+
 	request    *types.WorkRequest
 	workType   wTypes.WorkType
 	myPid      *tss.PartyID
@@ -46,6 +50,12 @@ type WorkerExecutor struct {
 	keygenInput  *keygen.LocalPreParams
 	presignInput *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
 	signingInput []*presign.LocalPresignData
+
+	callback func(*WorkerExecutor, WorkExecutionResult)
+
+	///////////////////////
+	// Mutable data
+	///////////////////////
 
 	// A map between of rounds and list of messages that have been produced. The size of the list
 	// is the same as batchSize.
@@ -61,7 +71,6 @@ type WorkerExecutor struct {
 	presignOutputs  []*presign.LocalPresignData
 	signingOutputs  []*libCommon.SignatureData
 	finalOutputLock *sync.RWMutex
-	callback        func(*WorkerExecutor, WorkExecutionResult)
 
 	jobs           []*Job
 	jobsLock       *sync.RWMutex
@@ -117,10 +126,6 @@ func (w *WorkerExecutor) Init() (err error) {
 	w.messageMonitor = components.NewMessageMonitor(w.myPid, w.workType, w, w.pIDsMap, w.cfg.MonitorMessageTimeout)
 	go w.messageMonitor.Start()
 
-	return nil
-}
-
-func (w *WorkerExecutor) Run(cachedMsgs []*commonTypes.TssMessage) {
 	log.Info("Executing work type ", wTypes.WorkTypeStrings[w.workType])
 	p2pCtx := tss.NewPeerContext(w.pIDs)
 
@@ -157,7 +162,7 @@ func (w *WorkerExecutor) Run(cachedMsgs []*commonTypes.TssMessage) {
 		default:
 			// If job type is not correct, kill the whole worker.
 			w.broadcastResult(WorkExecutionResult{
-				Success: true,
+				Success: false,
 			})
 
 			log.Errorf("unknown work type %d", w.workType)
@@ -168,8 +173,6 @@ func (w *WorkerExecutor) Run(cachedMsgs []*commonTypes.TssMessage) {
 	w.jobsLock.Lock()
 	w.jobs = jobs
 	w.jobsLock.Unlock()
-
-	fmt.Println("Starting all jobs....")
 
 	startedJobs := make([]*Job, 0)
 	for _, job := range jobs {
@@ -185,8 +188,6 @@ func (w *WorkerExecutor) Run(cachedMsgs []*commonTypes.TssMessage) {
 		startedJobs = append(startedJobs, job)
 	}
 
-	fmt.Println("len(startedJobs) = ", len(startedJobs))
-
 	if len(startedJobs) != len(jobs) {
 		for _, job := range startedJobs {
 			job.Stop()
@@ -194,7 +195,11 @@ func (w *WorkerExecutor) Run(cachedMsgs []*commonTypes.TssMessage) {
 		return
 	}
 
-	log.Info(w.myPid.Id, " ", w.request.WorkId, " Cache size =", len(cachedMsgs))
+	return nil
+}
+
+func (w *WorkerExecutor) Run(cachedMsgs []*commonTypes.TssMessage) {
+	log.Info(w.myPid.Id, " ", w.request.WorkId, " ", w.workType, " Cache size =", len(cachedMsgs))
 
 	for _, msg := range cachedMsgs {
 		if msg.Type == common.TssMessage_UPDATE_MESSAGES {
@@ -270,18 +275,17 @@ func (w *WorkerExecutor) OnJobMessage(job *Job, msg tss.Message) {
 // generation finishes.
 func (w *WorkerExecutor) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySaveData) {
 	w.finalOutputLock.Lock()
-	w.keygenOutputs[job.index] = data
-	w.finalOutputLock.Unlock()
 
+	w.keygenOutputs[job.index] = data
 	// Count the number of finished job.
-	w.finalOutputLock.RLock()
 	count := 0
 	for _, item := range w.keygenOutputs {
 		if item != nil {
 			count++
 		}
 	}
-	w.finalOutputLock.RUnlock()
+
+	w.finalOutputLock.Unlock()
 
 	if count == w.request.BatchSize {
 		w.broadcastResult(WorkExecutionResult{
@@ -373,10 +377,6 @@ func (w *WorkerExecutor) OnMissingMesssageDetected(m map[string][]string) {
 }
 
 func (w *WorkerExecutor) ProcessUpdateMessage(tssMsg *commonTypes.TssMessage) error {
-	if tssMsg.UpdateMessages[0].Round == "KGRound2Message1" && w.myPid.Index == 0 {
-		fmt.Println(w.pIDsMap[tssMsg.From].Index, "->", w.pIDsMap[w.myPid.Id].Index, ": ")
-	}
-
 	// Do all message validation first before processing.
 	// TODO: Add more validation here.
 	msgs := make([]tss.ParsedMessage, w.request.BatchSize)

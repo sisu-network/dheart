@@ -48,29 +48,35 @@ type WorkerCallback interface {
 
 // Implements worker.Worker interface
 type DefaultWorker struct {
-	batchSize  int
-	request    *types.WorkRequest
-	myPid      *tss.PartyID
-	allParties []*tss.PartyID
-	pIDs       tss.SortedPartyIDs
-	pIDsMap    map[string]*tss.PartyID
-	pidsLock   *sync.RWMutex
-	jobType    wTypes.WorkType
-	callback   WorkerCallback
-	workId     string
-	db         db.Database
-	maxJob     int
-
-	// PreExecution
-	preExecMsgCh     chan *common.PreExecOutputMessage
-	memberResponseCh chan *common.TssMessage
-	// Cache all tss update messages when some parties start executing while this node has not.
-	preExecutionCache *enginecache.MessageCache
-
-	// Execution
-	jobs            []*Job
+	///////////////////////
+	// Immutable data.
+	///////////////////////
+	batchSize       int
+	request         *types.WorkRequest
+	myPid           *tss.PartyID
+	allParties      []*tss.PartyID
+	pIDs            tss.SortedPartyIDs
+	pIDsMap         map[string]*tss.PartyID
+	pidsLock        *sync.RWMutex
+	jobType         wTypes.WorkType
+	callback        WorkerCallback
+	workId          string
+	db              db.Database
+	maxJob          int
 	dispatcher      interfaces.MessageDispatcher
 	presignsManager corecomponents.AvailablePresigns
+	cfg             config.TimeoutConfig
+
+	// PreExecution
+	// Cache all tss messages when sub-components have not started.
+	preExecutionCache *enginecache.MessageCache
+
+	///////////////////////
+	// Mutable data. Any data change requires a lock operation.
+	///////////////////////
+
+	// Execution
+	jobs []*Job
 
 	// This lock controls read/write for critical state change in this default worker: preworkSelection,
 	// executor, secondExecutor, curJobType.
@@ -88,8 +94,6 @@ type DefaultWorker struct {
 	// value equal presign.
 	isExecutionStarted atomic.Value
 	isStopped          atomic.Value
-
-	cfg config.TimeoutConfig
 }
 
 func NewKeygenWorker(
@@ -166,8 +170,6 @@ func baseWorker(
 		callback:          callback,
 		jobs:              make([]*Job, request.BatchSize),
 		lock:              &sync.RWMutex{},
-		preExecMsgCh:      make(chan *commonTypes.PreExecOutputMessage, 1),
-		memberResponseCh:  make(chan *commonTypes.TssMessage, len(allParties)),
 		preExecutionCache: preExecutionCache,
 		cfg:               cfg,
 		maxJob:            maxJob,
@@ -218,6 +220,8 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
+	fmt.Println("len(result.PresignIds)  = ", len(result.PresignIds))
+
 	if w.request.IsKeygen() || w.request.IsPresign() || (w.request.IsSigning() &&
 		len(result.PresignIds) > 0) {
 		// In this case, work type = request.WorkType
@@ -227,6 +231,7 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 		// This is the case when the request is a signing work, has enough participants but cannot find
 		// an appropriate presign ids to fit them all. In this case, we need to do presign first.
 		// In this case work type != request.WorkType
+		log.Info("Doing presign for a signing work")
 		w.curWorkType = wTypes.EcdsaPresign
 		w.secondaryExecutor = w.startExecutor(sortedPids, nil)
 	}
@@ -256,20 +261,26 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 	switch msg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
 		w.lock.RLock()
-		curExecutor := w.executor
+
 		if w.executor == nil && w.secondaryExecutor == nil {
 			// We have not started execution yet.
 			w.preExecutionCache.AddMessage(msg)
 			addToCache = true
-			fmt.Println("Adding to cache:", w.myPid.Id, msg.UpdateMessages[0].Round)
+			fmt.Println("Adding to cache 1:", w.myPid.Id, msg.UpdateMessages[0].Round)
 		} else if w.request.IsSigning() && w.curWorkType.IsPresign() && msg.IsSigningMessage() {
 			// This is the case when we are still in the presign phase of a signing request but some other
 			// nodes finish presign early and send us a signing message. We need to cache this message
 			// for later signing execution.
 			w.preExecutionCache.AddMessage(msg)
 			addToCache = true
+
+			fmt.Println("Adding to cache 2:", w.myPid.Id, msg.UpdateMessages[0].Round, w.executor)
+		}
+
+		// Read the correct executor.
+		curExecutor := w.executor
+		if w.request.IsSigning() && w.curWorkType.IsPresign() {
 			curExecutor = w.secondaryExecutor
-			fmt.Println("Adding to cache:", w.myPid.Id, msg.UpdateMessages[0].Round)
 		}
 		w.lock.RUnlock()
 
@@ -312,12 +323,10 @@ func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result Wo
 					presignStrings[i] = pid.Id
 				}
 
-				signingInput := w.callback.GetPresignOutputs(presignStrings)
-
 				// This is the finished presign phase of the signing task. Continue with the signing phase.
 				w.lock.Lock()
 				w.curWorkType = types.EcdsaSigning
-				w.secondaryExecutor = w.startExecutor(executor.pIDs, signingInput)
+				w.executor = w.startExecutor(tss.SortPartyIDs(executor.pIDs), result.PresignOutputs)
 				w.lock.Unlock()
 			} else {
 				w.callback.OnWorkPresignFinished(w.request, executor.pIDs, result.PresignOutputs)

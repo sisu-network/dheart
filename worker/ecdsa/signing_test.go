@@ -124,7 +124,6 @@ func TestSigningEndToEnd(t *testing.T) {
 			1,
 			&components.MockAvailablePresigns{
 				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
-					fmt.Println("AAAAA batchSize = ", batchSize, len(make([]string, batchSize)))
 					return make([]string, batchSize), flattenPidMaps(allPids)
 				},
 			},
