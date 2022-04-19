@@ -64,11 +64,13 @@ func NewPreworkSelection(request *types.WorkRequest, allParties []*tss.PartyID, 
 	return &PreworkSelection{
 		request:          request,
 		allParties:       allParties,
+		db:               db,
 		availableParties: NewAvailableParties(),
 		myPid:            myPid,
 		leader:           leader,
 		dispatcher:       dispatcher,
 		preExecMsgCh:     make(chan *commonTypes.PreExecOutputMessage, 1),
+		presignsManager:  presignsManager,
 		memberResponseCh: make(chan *commonTypes.TssMessage, len(allParties)),
 		callback:         callback,
 		stopped:          atomic.NewBool(false),
@@ -259,6 +261,9 @@ func (s *PreworkSelection) checkEnoughParticipants() (bool, []string, []*tss.Par
 		batchSize := s.request.BatchSize
 		// Check if we can find a presign list that match this of nodes.
 		presignIds, selectedPids := s.presignsManager.GetAvailablePresigns(batchSize, s.request.N, s.availableParties.getAllPartiesMap())
+		fmt.Println("len(presignIds) = ", len(presignIds))
+		fmt.Println("len(selectedPids) = ", len(selectedPids))
+
 		if len(presignIds) == batchSize {
 			log.Info("checkEnoughParticipants: presignIds = ", presignIds, " batchSize = ", batchSize, " selectedPids = ", selectedPids)
 			// Announce this as success and return
@@ -311,6 +316,7 @@ func (s *PreworkSelection) memberFinalized(msg *common.PreExecOutputMessage) {
 
 			if s.request.IsSigning() && len(msg.PresignIds) > 0 {
 				// Check if the leader is giving us a valid presign id set.
+				fmt.Println("s.db = ", s.db)
 				signingInput, err := s.db.LoadPresign(msg.PresignIds)
 				if err != nil || len(signingInput) == 0 {
 					log.Error("Cannot load presign, err =", err, " len(signingInput) = ", len(signingInput))

@@ -75,6 +75,7 @@ func NewWorkerExecutor(
 	pids []*tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
+	signingInput []*presign.LocalPresignData,
 	callback func(*WorkerExecutor, WorkExecutionResult),
 	cfg config.TimeoutConfig,
 ) *WorkerExecutor {
@@ -92,6 +93,7 @@ func NewWorkerExecutor(
 		dispatcher:      dispatcher,
 		db:              db,
 		callback:        callback,
+		signingInput:    signingInput,
 		jobsLock:        &sync.RWMutex{},
 		jobOutputLock:   &sync.RWMutex{},
 		finalOutputLock: &sync.RWMutex{},

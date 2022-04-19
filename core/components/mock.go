@@ -27,7 +27,7 @@ func (m *MockAvailablePresigns) Load() error {
 
 func (m *MockAvailablePresigns) GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
 	if m.GetAvailablePresignsFunc != nil {
-		m.GetAvailablePresigns(batchSize, n, allPids)
+		return m.GetAvailablePresignsFunc(batchSize, n, allPids)
 	}
 
 	return nil, nil

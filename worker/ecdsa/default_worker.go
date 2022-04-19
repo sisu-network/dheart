@@ -208,6 +208,12 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 
 	sortedPids := tss.SortPartyIDs(result.SelectedPids)
 
+	// We need to load the set of presigns data
+	var signingInput []*presign.LocalPresignData
+	if w.request.IsSigning() && len(result.PresignIds) > 0 {
+		signingInput = w.callback.GetPresignOutputs(result.PresignIds)
+	}
+
 	// Handle success case
 	w.lock.Lock()
 	defer w.lock.Unlock()
@@ -216,19 +222,19 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 		len(result.PresignIds) > 0) {
 		// In this case, work type = request.WorkType
 		w.curWorkType = w.request.WorkType
-		w.executor = w.startExecutor(sortedPids)
+		w.executor = w.startExecutor(sortedPids, signingInput)
 	} else {
 		// This is the case when the request is a signing work, has enough participants but cannot find
 		// an appropriate presign ids to fit them all. In this case, we need to do presign first.
 		// In this case work type != request.WorkType
 		w.curWorkType = wTypes.EcdsaPresign
-		w.secondaryExecutor = w.startExecutor(sortedPids)
+		w.secondaryExecutor = w.startExecutor(sortedPids, nil)
 	}
 }
 
-func (w *DefaultWorker) startExecutor(selectedPids []*tss.PartyID) *WorkerExecutor {
+func (w *DefaultWorker) startExecutor(selectedPids []*tss.PartyID, signingInput []*presign.LocalPresignData) *WorkerExecutor {
 	executor := NewWorkerExecutor(w.request, w.curWorkType, w.myPid, selectedPids, w.dispatcher,
-		w.db, w.onJobExecutionResult, w.cfg)
+		w.db, signingInput, w.onJobExecutionResult, w.cfg)
 	executor.Init()
 
 	cacheMsgs := w.preExecutionCache.PopAllMessages(w.workId, commonTypes.GetUpdateMessageType())
@@ -298,8 +304,27 @@ func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result Wo
 		case types.EcdsaKeygen, types.EddsaKeygen:
 			w.callback.OnWorkKeygenFinished(w.request, result.KeygenOutputs)
 
-		case types.EcdsaPresign, types.EddsaPresign:
-			w.callback.OnWorkPresignFinished(w.request, executor.pIDs, result.PresignOutputs)
+		case types.EcdsaPresign:
+			if w.request.IsSigning() {
+				// Load signing input from db.
+				presignStrings := make([]string, len(executor.pIDs))
+				for i, pid := range executor.pIDs {
+					presignStrings[i] = pid.Id
+				}
+
+				signingInput := w.callback.GetPresignOutputs(presignStrings)
+
+				// This is the finished presign phase of the signing task. Continue with the signing phase.
+				w.lock.Lock()
+				w.curWorkType = types.EcdsaSigning
+				w.secondaryExecutor = w.startExecutor(executor.pIDs, signingInput)
+				w.lock.Unlock()
+			} else {
+				w.callback.OnWorkPresignFinished(w.request, executor.pIDs, result.PresignOutputs)
+			}
+
+		case types.EcdsaSigning, types.EddsaSigning:
+			w.callback.OnWorkSigningFinished(w.request, result.SigningOutputs)
 		}
 	} else {
 		w.callback.OnWorkFailed(w.request)
