@@ -247,13 +247,13 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 
 	switch msg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
-
 		w.lock.RLock()
 		curExecutor := w.executor
 		if w.executor == nil && w.secondaryExecutor == nil {
 			// We have not started execution yet.
 			w.preExecutionCache.AddMessage(msg)
 			addToCache = true
+			fmt.Println("Adding to cache:", w.myPid.Id, msg.UpdateMessages[0].Round)
 		} else if w.request.IsSigning() && w.curWorkType.IsPresign() && msg.IsSigningMessage() {
 			// This is the case when we are still in the presign phase of a signing request but some other
 			// nodes finish presign early and send us a signing message. We need to cache this message
@@ -261,6 +261,7 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 			w.preExecutionCache.AddMessage(msg)
 			addToCache = true
 			curExecutor = w.secondaryExecutor
+			fmt.Println("Adding to cache:", w.myPid.Id, msg.UpdateMessages[0].Round)
 		}
 		w.lock.RUnlock()
 

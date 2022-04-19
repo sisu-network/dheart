@@ -249,7 +249,7 @@ func (w *WorkerExecutor) OnJobMessage(job *Job, msg tss.Message) {
 			return
 		}
 
-		log.Verbose(w.request.WorkId, " sending message ", msg.Type(), " to ", dest)
+		log.Verbose(w.request.WorkId, ": ", w.myPid.Id, " sending message ", msg.Type(), " to ", dest)
 
 		if dest == nil {
 			// broadcast
@@ -368,6 +368,8 @@ func (w *WorkerExecutor) OnMissingMesssageDetected(m map[string][]string) {
 }
 
 func (w *WorkerExecutor) ProcessUpdateMessage(tssMsg *commonTypes.TssMessage) error {
+	fmt.Println(tssMsg.From, "->", w.myPid.Id, ": ", tssMsg.UpdateMessages[0].Round)
+
 	// Do all message validation first before processing.
 	// TODO: Add more validation here.
 	msgs := make([]tss.ParsedMessage, w.request.BatchSize)
