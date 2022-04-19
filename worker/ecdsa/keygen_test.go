@@ -49,6 +49,8 @@ func TestKeygenEndToEnd(t *testing.T) {
 		}
 
 		workerIndex := i
+		timeoutConfig := config.NewDefaultTimeoutConfig()
+		timeoutConfig.MonitorMessageTimeout = time.Second * 60
 
 		workers[i] = NewKeygenWorker(
 			request,
@@ -68,7 +70,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 					}
 				},
 			},
-			config.NewDefaultTimeoutConfig(),
+			timeoutConfig,
 		)
 	}
 
