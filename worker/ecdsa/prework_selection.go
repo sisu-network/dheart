@@ -316,7 +316,6 @@ func (s *PreworkSelection) memberFinalized(msg *common.PreExecOutputMessage) {
 
 			if s.request.IsSigning() && len(msg.PresignIds) > 0 {
 				// Check if the leader is giving us a valid presign id set.
-				fmt.Println("s.db = ", s.db)
 				signingInput, err := s.db.LoadPresign(msg.PresignIds)
 				if err != nil || len(signingInput) == 0 {
 					log.Error("Cannot load presign, err =", err, " len(signingInput) = ", len(signingInput))

@@ -326,7 +326,7 @@ func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result Wo
 				// This is the finished presign phase of the signing task. Continue with the signing phase.
 				w.lock.Lock()
 				w.curWorkType = types.EcdsaSigning
-				w.executor = w.startExecutor(tss.SortPartyIDs(executor.pIDs), result.PresignOutputs)
+				w.executor = w.startExecutor(executor.pIDs, result.PresignOutputs)
 				w.lock.Unlock()
 			} else {
 				w.callback.OnWorkPresignFinished(w.request, executor.pIDs, result.PresignOutputs)

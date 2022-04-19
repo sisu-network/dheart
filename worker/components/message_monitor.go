@@ -90,9 +90,6 @@ func (m *DefaultMessageMonitor) NewMessageReceived(msg tss.ParsedMessage, from *
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	// fmt.Println("m.receivedMessages = ", m.receivedMessages)
-	// fmt.Println("msg = ", msg)
-
 	receivedArr := m.receivedMessages[msg.GetFrom().Id]
 
 	if receivedArr == nil {
