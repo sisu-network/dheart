@@ -196,11 +196,13 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 	log.Info("Selection result: Success = ", result.Success)
 	if !result.Success {
+		w.callback.OnWorkFailed(w.request)
 		return
 	}
 
 	if result.IsNodeExcluded {
 		// We are not selected. Return result in the callback and do nothing.
+		w.callback.OnNodeNotSelected(w.request)
 		return
 	}
 
@@ -290,10 +292,14 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 	return nil
 }
 
-func (w *DefaultWorker) onJobExecutionResult(result WorkExecutionResult) {
+func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result WorkExecutionResult) {
 	if result.Success {
-		if result.WorkType.IsKeygen() {
+		switch executor.workType {
+		case types.EcdsaKeygen, types.EddsaKeygen:
 			w.callback.OnWorkKeygenFinished(w.request, result.KeygenOutputs)
+
+		case types.EcdsaPresign, types.EddsaPresign:
+			w.callback.OnWorkPresignFinished(w.request, executor.pIDs, result.PresignOutputs)
 		}
 	} else {
 		w.callback.OnWorkFailed(w.request)

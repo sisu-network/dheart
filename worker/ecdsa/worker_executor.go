@@ -30,7 +30,6 @@ type WorkExecutionResult struct {
 	KeygenOutputs  []*keygen.LocalPartySaveData
 	PresignOutputs []*presign.LocalPresignData
 	SigningOutputs []*libCommon.SignatureData
-	WorkType       types.WorkType
 }
 
 type WorkerExecutor struct {
@@ -62,7 +61,7 @@ type WorkerExecutor struct {
 	presignOutputs  []*presign.LocalPresignData
 	signingOutputs  []*libCommon.SignatureData
 	finalOutputLock *sync.RWMutex
-	callback        func(WorkExecutionResult)
+	callback        func(*WorkerExecutor, WorkExecutionResult)
 
 	jobs           []*Job
 	jobsLock       *sync.RWMutex
@@ -76,7 +75,7 @@ func NewWorkerExecutor(
 	pids []*tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
-	callback func(WorkExecutionResult),
+	callback func(*WorkerExecutor, WorkExecutionResult),
 	cfg config.TimeoutConfig,
 ) *WorkerExecutor {
 	pIDsMap := make(map[string]*tss.PartyID)
@@ -452,8 +451,7 @@ func (w *WorkerExecutor) finished() {
 }
 
 func (w *WorkerExecutor) broadcastResult(result WorkExecutionResult) {
-	result.WorkType = w.workType
-	w.callback(result)
+	w.callback(w, result)
 }
 
 func (w *WorkerExecutor) getCompletedJobCount(list []tss.Message) int {
