@@ -1,7 +1,6 @@
 package ecdsa
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -9,16 +8,14 @@ import (
 	"go.uber.org/atomic"
 
 	enginecache "github.com/sisu-network/dheart/core/cache"
+	corecomponents "github.com/sisu-network/dheart/core/components"
+	"github.com/sisu-network/lib/log"
 
 	"github.com/sisu-network/dheart/core/config"
-	"github.com/sisu-network/dheart/core/message"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/worker"
-	"github.com/sisu-network/dheart/worker/components"
-	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/interfaces"
 	"github.com/sisu-network/dheart/worker/types"
-	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -67,45 +64,30 @@ type DefaultWorker struct {
 	// PreExecution
 	preExecMsgCh     chan *common.PreExecOutputMessage
 	memberResponseCh chan *common.TssMessage
-	// List of parties who indicate that they are available for current tss work.
-	availableParties *AvailableParties
 	// Cache all tss update messages when some parties start executing while this node has not.
 	preExecutionCache *enginecache.MessageCache
 
 	// Execution
-	// threshold  int
-	jobs       []*Job
-	jobsLock   *sync.RWMutex
-	dispatcher interfaces.MessageDispatcher
+	jobs            []*Job
+	dispatcher      interfaces.MessageDispatcher
+	presignsManager corecomponents.AvailablePresigns
+
+	// This lock controls read/write for critical state change in this default worker: preworkSelection,
+	// executor, secondExecutor, curJobType.
+	lock *sync.RWMutex
+	// For keygen and presign works, we onnly need 1 executor. For signing work, it's possible to have
+	// 2 executors (presigning first and then signing) in case we cannot find a presign set that
+	// satisfies available nodes.
+	preworkSelection  *PreworkSelection
+	executor          *WorkerExecutor
+	secondaryExecutor *WorkerExecutor
+	curWorkType       wTypes.WorkType
+
 	// Current job type of this worker. In most case, it's the same as jobType. However, in some case
 	// it could be different. For example, a signing work that requires presign will have curJobType
 	// value equal presign.
-	curJobType atomic.Value
-
 	isExecutionStarted atomic.Value
 	isStopped          atomic.Value
-	keygenInput        *keygen.LocalPreParams
-	presignInput       *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
-	signingInput       []*presign.LocalPresignData
-	signingMessages    []string
-
-	messageMonitor     components.MessageMonitor
-	messageMonitorLock *sync.RWMutex
-
-	// A map between of rounds and list of messages that have been produced. The size of the list
-	// is the same as batchSize.
-	//
-	// key: one of the 2 values
-	//      - round if a message is broadcast
-	//      - round-partyId if a message is unicast
-	// value: list of messages that have been produced for the round.
-	jobOutput     map[string][]tss.Message
-	jobOutputLock *sync.RWMutex
-
-	keygenOutputs   []*keygen.LocalPartySaveData
-	presignOutputs  []*presign.LocalPresignData
-	signingOutputs  []*libCommon.SignatureData
-	finalOutputLock *sync.RWMutex
 
 	cfg config.TimeoutConfig
 }
@@ -121,8 +103,6 @@ func NewKeygenWorker(
 	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, 1)
 
 	w.jobType = wTypes.EcdsaKeygen
-	w.keygenInput = request.KeygenInput
-	w.keygenOutputs = make([]*keygen.LocalPartySaveData, request.BatchSize)
 
 	return w
 }
@@ -139,8 +119,6 @@ func NewPresignWorker(
 	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, maxJob)
 
 	w.jobType = wTypes.EcdsaPresign
-	w.presignInput = request.PresignInput
-	w.presignOutputs = make([]*presign.LocalPresignData, request.BatchSize)
 
 	return w
 }
@@ -153,13 +131,13 @@ func NewSigningWorker(
 	callback WorkerCallback,
 	cfg config.TimeoutConfig,
 	maxJob int,
+	presignsManager corecomponents.AvailablePresigns,
 ) worker.Worker {
 	// TODO: The request.Pids
 	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, maxJob)
 
 	w.jobType = wTypes.EcdsaSigning
-	w.signingOutputs = make([]*libCommon.SignatureData, request.BatchSize)
-	w.signingMessages = request.Messages
+	w.presignsManager = presignsManager
 
 	return w
 }
@@ -174,28 +152,25 @@ func baseWorker(
 	cfg config.TimeoutConfig,
 	maxJob int,
 ) *DefaultWorker {
+	preExecutionCache := enginecache.NewMessageCache()
+
 	return &DefaultWorker{
-		request:            request,
-		workId:             request.WorkId,
-		batchSize:          request.BatchSize,
-		db:                 db,
-		myPid:              myPid,
-		pidsLock:           &sync.RWMutex{},
-		allParties:         allParties,
-		dispatcher:         dispatcher,
-		callback:           callback,
-		jobs:               make([]*Job, request.BatchSize),
-		jobsLock:           &sync.RWMutex{},
-		jobOutput:          make(map[string][]tss.Message),
-		jobOutputLock:      &sync.RWMutex{},
-		finalOutputLock:    &sync.RWMutex{},
-		preExecMsgCh:       make(chan *commonTypes.PreExecOutputMessage, 1),
-		memberResponseCh:   make(chan *commonTypes.TssMessage, len(allParties)),
-		availableParties:   NewAvailableParties(),
-		preExecutionCache:  enginecache.NewMessageCache(),
-		cfg:                cfg,
-		maxJob:             maxJob,
-		messageMonitorLock: &sync.RWMutex{},
+		request:           request,
+		workId:            request.WorkId,
+		batchSize:         request.BatchSize,
+		db:                db,
+		myPid:             myPid,
+		pidsLock:          &sync.RWMutex{},
+		allParties:        allParties,
+		dispatcher:        dispatcher,
+		callback:          callback,
+		jobs:              make([]*Job, request.BatchSize),
+		lock:              &sync.RWMutex{},
+		preExecMsgCh:      make(chan *commonTypes.PreExecOutputMessage, 1),
+		memberResponseCh:  make(chan *commonTypes.TssMessage, len(allParties)),
+		preExecutionCache: preExecutionCache,
+		cfg:               cfg,
+		maxJob:            maxJob,
 	}
 }
 
@@ -204,36 +179,59 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 		w.preExecutionCache.AddMessage(msg)
 	}
 
-	// Do leader election and participants selection first.
-	if w.request.IsKeygen() {
-		// For keygen, we skip the leader selection part since all parties need to be involved in the
-		// signing process.
-		w.setPids(w.request.AllParties)
-		go func() {
-			if err := w.executeWork(w.jobType); err != nil {
-				log.Error("Error when executing work", err)
-				return
-			}
-		}()
-	} else {
-		go w.preExecution()
-	}
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
+	// Start the selection result.
+	w.preworkSelection = NewPreworkSelection(w.request, w.allParties, w.myPid, w.db,
+		w.preExecutionCache, w.dispatcher, w.presignsManager, w.cfg, w.onSelectionResult)
+	w.preworkSelection.Init()
+
+	cacheMsgs := w.preExecutionCache.PopAllMessages(w.workId, commonTypes.GetPreworkSelectionMsgType())
+	go w.preworkSelection.Run(cacheMsgs)
 
 	return nil
 }
 
-func (w *DefaultWorker) setPids(pids []*tss.PartyID) {
-	w.pidsLock.Lock()
-	w.pIDs = pids
-	w.pIDsMap = pidsToMap(pids)
-	w.pidsLock.Unlock()
+func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
+	log.Info("Selection result: Success = ", result.Success)
+	if !result.Success {
+		return
+	}
+
+	if result.IsNodeExcluded {
+		// We are not selected. Return result in the callback and do nothing.
+		return
+	}
+
+	fmt.Println("result.SelectedPids = ", result.SelectedPids)
+
+	// Handle success case
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
+	if w.request.IsKeygen() || w.request.IsPresign() || (w.request.IsSigning() &&
+		len(result.PresignIds) > 0) {
+		// In this case, work type = request.WorkType
+		w.curWorkType = w.request.WorkType
+		w.executor = w.startExecutor(result.SelectedPids)
+	} else {
+		// This is the case when the request is a signing work, has enough participants but cannot find
+		// an appropriate presign ids to fit them all. In this case, we need to do presign first.
+		// In this case work type != request.WorkType
+		w.curWorkType = wTypes.EcdsaPresign
+		w.secondaryExecutor = w.startExecutor(result.SelectedPids)
+	}
 }
 
-func (w *DefaultWorker) getPids() []*tss.PartyID {
-	w.pidsLock.RLock()
-	defer w.pidsLock.RUnlock()
+func (w *DefaultWorker) startExecutor(selectedPids []*tss.PartyID) *WorkerExecutor {
+	executor := NewWorkerExecutor(w.request, w.curWorkType, w.myPid, selectedPids, w.dispatcher,
+		w.db, w.onJobExecutionResult, w.cfg)
+	executor.Init()
 
-	return w.pIDs
+	cacheMsgs := w.preExecutionCache.PopAllMessages(w.workId, commonTypes.GetUpdateMessageType())
+	go executor.Run(cacheMsgs)
+	return executor
 }
 
 func (w *DefaultWorker) getPidFromId(id string) *tss.PartyID {
@@ -243,437 +241,67 @@ func (w *DefaultWorker) getPidFromId(id string) *tss.PartyID {
 	return w.pIDsMap[id]
 }
 
-// TODO: handle error when this executeWork fails.
-// Start actual execution of the work.
-func (w *DefaultWorker) executeWork(workType wTypes.WorkType) error {
-	if workType == wTypes.EcdsaKeygen && w.request.KeygenInput == nil {
-		if err := w.loadPreparams(); err != nil {
-			return err
-		}
-	}
-
-	log.Info("Executing work type ", wTypes.WorkTypeStrings[workType])
-	p2pCtx := tss.NewPeerContext(w.getPids())
-
-	// Assign the correct index for our pid.
-	for _, p := range w.pIDs {
-		if w.myPid.Id == p.Id {
-			w.myPid.Index = p.Index
-		}
-	}
-
-	params := tss.NewParameters(p2pCtx, w.myPid, len(w.getPids()), w.request.Threshold)
-
-	jobs := make([]*Job, w.batchSize)
-	log.Info("batchSize = ", w.batchSize)
-	nextJobType := w.jobType
-	// Creates all jobs
-	for i := range jobs {
-		switch w.jobType {
-		case wTypes.EcdsaKeygen:
-			jobs[i] = NewKeygenJob(w.workId, i, w.getPids(), params, w.keygenInput, w, w.cfg.KeygenJobTimeout)
-			nextJobType = wTypes.EcdsaKeygen
-			w.startMessageMonitor(nextJobType)
-
-		case wTypes.EcdsaPresign:
-			w.presignInput = w.request.PresignInput
-			jobs[i] = NewPresignJob(w.workId, i, w.getPids(), params, w.presignInput, w, w.cfg.PresignJobTimeout)
-			nextJobType = wTypes.EcdsaPresign
-			w.startMessageMonitor(nextJobType)
-
-		case wTypes.EcdsaSigning:
-			if w.signingInput == nil || len(w.signingInput) == 0 {
-				// we have to do presign first.
-				w.presignInput = w.request.PresignInput
-				w.presignOutputs = make([]*presign.LocalPresignData, w.batchSize)
-				nextJobType = wTypes.EcdsaPresign
-
-				jobs[i] = NewPresignJob(w.workId, i, w.getPids(), params, w.presignInput, w, w.cfg.PresignJobTimeout)
-			} else {
-				nextJobType = wTypes.EcdsaSigning
-				jobs[i] = NewSigningJob(w.workId, i, w.getPids(), params, w.signingMessages[i], w.signingInput[i], w, w.cfg.SigningJobTimeout)
-				w.startMessageMonitor(nextJobType)
-			}
-
-		default:
-			// If job type is not correct, kill the whole worker.
-			w.callback.OnWorkFailed(w.request)
-			return fmt.Errorf("unknown job type %d", w.jobType)
-		}
-	}
-
-	log.Info("nextJobType = ", nextJobType)
-
-	for _, job := range jobs {
-		if err := job.Start(); err != nil {
-			log.Critical("error when starting job", err)
-			// If job cannot start, kill the whole worker.
-			w.callback.OnWorkFailed(w.request)
-			return err
-		}
-	}
-
-	w.jobsLock.Lock()
-	w.jobs = jobs
-	w.curJobType.Store(nextJobType)
-
-	// Mark execution started.
-	w.isExecutionStarted.Store(true)
-
-	msgCache := w.preExecutionCache.PopAllMessages(w.workId)
-	w.jobsLock.Unlock()
-
-	log.Info(w.myPid.Id, " ", w.workId, " Cache size =", len(msgCache))
-
-	for _, msg := range msgCache {
-		if msg.Type == common.TssMessage_UPDATE_MESSAGES {
-			if err := w.ProcessNewMessage(msg); err != nil {
-				// Message can be corrupted or from bad actor, continue to execute.
-				log.Error("Error when processing new message", err)
-			}
-		}
-	}
-
-	return nil
-}
-
-func (w *DefaultWorker) loadPreparams() error {
-	// Check if we have generated preparams
-	var err error
-	preparams, err := w.db.LoadPreparams()
-	if err == nil {
-		log.Info("Preparams found")
-		w.keygenInput = preparams
-	} else {
-		log.Error("Failed to get preparams, err =", err)
-		return err
-	}
-
-	return nil
-}
-
-// Called when there is a new message from tss-lib
-func (w *DefaultWorker) OnJobMessage(job *Job, msg tss.Message) {
-	// Update the list of completed jobs for current round (in the message)
-	msgKey := msg.Type()
-	if !msg.IsBroadcast() {
-		msgKey = msgKey + "-" + msg.GetTo()[0].Id
-	}
-
-	// Update the list of finished jobs for msgKey
-	w.jobOutputLock.Lock()
-	list := w.jobOutput[msgKey]
-	if list == nil {
-		list = make([]tss.Message, w.batchSize)
-	}
-	list[job.index] = msg
-	w.jobOutput[msgKey] = list
-	// Count how many job that have completed.
-	count := w.getCompletedJobCount(list)
-	w.jobOutputLock.Unlock()
-
-	if count == w.batchSize {
-		// We have completed all jobs for current round. Send the list to the dispatcher. Move the worker to next round.
-		dest := msg.GetTo()
-		to := ""
-		if dest != nil {
-			to = dest[0].Id
-		}
-
-		tssMsg, err := common.NewTssMessage(w.myPid.Id, to, w.workId, list, msg.Type())
-		if err != nil {
-			log.Critical("Cannot build TSS message, err", err)
-			return
-		}
-
-		// atomic.StoreUint32(&w.curRound, uint32(message.NextRound(w.jobType, message.Round(w.curRound))))
-
-		log.Verbose(w.workId, " sending message ", msg.Type(), " to ", dest)
-
-		if dest == nil {
-			// broadcast
-			w.dispatcher.BroadcastMessage(w.getPids(), tssMsg)
-		} else {
-			w.dispatcher.UnicastMessage(dest[0], tssMsg)
-		}
-	}
-}
-
-func (w *DefaultWorker) getCompletedJobCount(list []tss.Message) int {
-	count := 0
-	for _, item := range list {
-		if item != nil {
-			count++
-		}
-	}
-
-	return count
-}
-
 // Process incoming update message.
-func (w *DefaultWorker) ProcessNewMessage(tssMsg *commonTypes.TssMessage) error {
-	switch tssMsg.Type {
+func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
+	var addToCache bool
+
+	switch msg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
-		// TODO: Do message validation here. Make sure that the round type is correct.
-		if err := w.processUpdateMessages(tssMsg); err != nil {
-			return fmt.Errorf("error when processing update message %w", err)
+
+		w.lock.RLock()
+		curExecutor := w.executor
+		if w.executor == nil && w.secondaryExecutor == nil {
+			// We have not started execution yet.
+			w.preExecutionCache.AddMessage(msg)
+			addToCache = true
+		} else if w.request.IsSigning() && w.curWorkType.IsPresign() && msg.IsSigningMessage() {
+			// This is the case when we are still in the presign phase of a signing request but some other
+			// nodes finish presign early and send us a signing message. We need to cache this message
+			// for later signing execution.
+			w.preExecutionCache.AddMessage(msg)
+			addToCache = true
+			curExecutor = w.secondaryExecutor
 		}
-	case common.TssMessage_AVAILABILITY_REQUEST:
-		if err := w.onPreExecutionRequest(tssMsg); err != nil {
-			return fmt.Errorf("error when processing execution request %w", err)
+		w.lock.RUnlock()
+
+		if !addToCache && curExecutor != nil {
+			curExecutor.ProcessUpdateMessage(msg)
 		}
-	case common.TssMessage_AVAILABILITY_RESPONSE:
-		if err := w.onPreExecutionResponse(tssMsg); err != nil {
-			return fmt.Errorf("error when processing execution response %w", err)
+
+	case common.TssMessage_AVAILABILITY_REQUEST, common.TssMessage_AVAILABILITY_RESPONSE, common.TssMessage_PRE_EXEC_OUTPUT:
+		w.lock.RLock()
+		if w.preworkSelection == nil {
+			// Add this to cache
+			w.preExecutionCache.AddMessage(msg)
+			addToCache = true
 		}
-	case common.TssMessage_PRE_EXEC_OUTPUT:
-		log.Debug("Received pre exec output")
-		if len(w.getPids()) == 0 {
-			// This output of workParticipantCh is called only once. We do checking for pids length to
-			// make sure we only send message to this channel once.
-			w.preExecMsgCh <- tssMsg.PreExecOutputMessage
+		w.lock.RUnlock()
+
+		if !addToCache {
+			return w.preworkSelection.ProcessNewMessage(msg)
 		}
 
 	default:
 		// Don't call callback here because this can be from bad actor/corrupted.
-		return errors.New("invalid message " + tssMsg.Type.String())
+		return errors.New("invalid message " + msg.Type.String())
 	}
 
 	return nil
 }
 
-func (w *DefaultWorker) processUpdateMessages(tssMsg *commonTypes.TssMessage) error {
-	// If execution has not started, save this in the cache
-	if w.isExecutionStarted.Load() != true {
-		w.preExecutionCache.AddMessage(tssMsg)
-		return nil
-	}
+func (w *DefaultWorker) onJobExecutionResult(result WorkExecutionResult) {
 
-	if w.batchSize != len(tssMsg.UpdateMessages) {
-		return errors.New(fmt.Sprintf("batch size does not match %d %d", w.batchSize, len(tssMsg.UpdateMessages)))
-	}
-
-	w.jobsLock.Lock()
-	jobType := w.curJobType.Load().(wTypes.WorkType)
-	// If this is signing worker (with presign) and we are in still in the presigning phase but
-	// this update mesasge is for signing round, we have to catch this message.
-	if jobType == wTypes.EcdsaPresign && w.jobType == wTypes.EcdsaSigning &&
-		len(tssMsg.UpdateMessages) > 0 && tssMsg.UpdateMessages[0].Round == "SignRound1Message" {
-		log.Verbose("We are in presign phase, add signing message to cache: ", tssMsg.UpdateMessages[0].Round, " ", w.myPid.Id)
-		w.preExecutionCache.AddMessage(tssMsg)
-
-		w.jobsLock.Unlock()
-		return nil
-	}
-	w.jobsLock.Unlock()
-
-	// Do all message validation first before processing.
-	// TODO: Add more validation here.
-	msgs := make([]tss.ParsedMessage, w.batchSize)
-	// Now update all messages
-	w.jobsLock.RLock()
-	jobs := w.jobs
-	w.jobsLock.RUnlock()
-
-	fromString := tssMsg.From
-	from := helper.GetPidFromString(fromString, w.getPids())
-	if from == nil {
-		return errors.New("sender is nil")
-	}
-
-	for i := range jobs {
-		updateMessage := tssMsg.UpdateMessages[i]
-		msg, err := tss.ParseWireMessage(updateMessage.Data, from, tssMsg.IsBroadcast())
-		if err != nil {
-			return fmt.Errorf("error when parsing wire message %w", err)
-		}
-
-		msgRouting := tss.MessageRouting{}
-		if err := json.Unmarshal(updateMessage.SerializedMessageRouting, &msgRouting); err != nil {
-			return fmt.Errorf("error when unmarshal message routing %w", err)
-		}
-
-		msgs[i] = msg
-	}
-
-	// Update the message monitor
-	w.messageMonitorLock.RLock()
-	messageMonitor := w.messageMonitor
-	w.messageMonitorLock.RUnlock()
-	if messageMonitor != nil {
-		messageMonitor.NewMessageReceived(msgs[0], from)
-	}
-
-	for i, j := range jobs {
-		go func(id int, job *Job) {
-			_, err := message.GetMsgRound(msgs[id].Content())
-			if err != nil {
-				log.Error("error when getting round %w", err)
-				return
-			}
-
-			if err := job.processMessage(msgs[id]); err != nil {
-				log.Error("worker: cannot process message, err = ", err)
-				return
-			}
-		}(i, j)
-	}
-
-	return nil
 }
 
-// Implements OnJobKeygenFinished of JobCallback. This function is called from a job after key
-// generation finishes.
-func (w *DefaultWorker) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySaveData) {
-	w.finalOutputLock.Lock()
-	w.keygenOutputs[job.index] = data
-	w.finalOutputLock.Unlock()
-
-	// Count the number of finished job.
-	w.finalOutputLock.RLock()
-	count := 0
-	for _, item := range w.keygenOutputs {
-		if item != nil {
-			count++
-		}
-	}
-	w.finalOutputLock.RUnlock()
-
-	if count == w.batchSize {
-		log.Verbose(w.GetWorkId(), " Done!")
-		w.callback.OnWorkKeygenFinished(w.request, w.keygenOutputs)
-		w.finished()
-	}
+func (w *DefaultWorker) Stop() {
 }
 
-// Implements OnJobPresignFinished of JobCallback.
-func (w *DefaultWorker) OnJobPresignFinished(job *Job, data *presign.LocalPresignData) {
-	w.finalOutputLock.Lock()
-	w.presignOutputs[job.index] = data
-	w.finalOutputLock.Unlock()
-
-	// Count the number of finished job.
-	w.finalOutputLock.RLock()
-	count := 0
-	for _, item := range w.presignOutputs {
-		if item != nil {
-			count++
-		}
-	}
-	w.finalOutputLock.RUnlock()
-
-	if count == w.batchSize {
-		log.Verbose(w.GetWorkId(), " Presign Done!")
-
-		// If this is a signing request, we have to do signing after generating presign input
-		if w.jobType == types.EcdsaSigning {
-			w.signingInput = w.presignOutputs
-
-			w.executeWork(types.EcdsaSigning)
-		} else {
-			// This is purely presign request. Make a callback after finish
-			w.callback.OnWorkPresignFinished(w.request, w.getPids(), w.presignOutputs)
-			w.finished()
-		}
-	}
-}
-
-func (w *DefaultWorker) OnJobTimeout() {
-	w.callback.OnWorkFailed(w.request)
-	w.finished()
-}
-
-// Implements OnJobSignFinished of JobCallback.
-func (w *DefaultWorker) OnJobSignFinished(job *Job, data *libCommon.SignatureData) {
-	w.finalOutputLock.Lock()
-	w.signingOutputs[job.index] = data
-	w.finalOutputLock.Unlock()
-
-	// Count the number of finished job.
-	w.finalOutputLock.RLock()
-	count := 0
-	for _, item := range w.signingOutputs {
-		if item != nil {
-			count++
-		}
-	}
-	w.finalOutputLock.RUnlock()
-
-	if count == w.batchSize {
-		log.Verbose(w.GetWorkId(), " Signing Done!")
-		w.callback.OnWorkSigningFinished(w.request, w.signingOutputs)
-		w.finished()
-	}
-}
-
-func (w *DefaultWorker) finished() {
-	if w.messageMonitor != nil {
-		w.messageMonitor.Stop()
-	}
-}
-
-// Overrides MessageMonitorCallback
-func (w *DefaultWorker) OnMissingMesssageDetected(m map[string][]string) {
-	// We have found missing messages
-	for pid, msgTypes := range m {
-		for _, msgType := range msgTypes {
-			if message.IsBroadcastMessage(msgType) {
-				msgKey := common.GetMessageKey(w.workId, pid, "", msgType)
-				msg := common.NewRequestMessage(w.myPid.Id, "", w.workId, msgKey)
-
-				w.dispatcher.BroadcastMessage(w.getPids(), msg)
-			} else {
-				msgKey := common.GetMessageKey(w.workId, pid, w.myPid.Id, msgType)
-				msg := common.NewRequestMessage(w.myPid.Id, pid, w.workId, msgKey)
-
-				w.dispatcher.UnicastMessage(w.getPidFromId(pid), msg)
-			}
-		}
-	}
-}
-
-func (w *DefaultWorker) GetPartyMap() map[string]*tss.PartyID {
-	w.pidsLock.RLock()
-	defer w.pidsLock.RUnlock()
-
-	return w.pIDsMap
+func (w *DefaultWorker) GetCulprits() []*tss.PartyID {
+	// TODO: Reimplement blame manager.
+	return make([]*tss.PartyID, 0)
 }
 
 // Implements GetPartyId() of Worker interface.
 func (w *DefaultWorker) GetPartyId() string {
 	return w.myPid.Id
-}
-
-func (w *DefaultWorker) GetWorkId() string {
-	return w.workId
-}
-
-func (w *DefaultWorker) GetCulprits() []*tss.PartyID {
-	return make([]*tss.PartyID, 0)
-}
-
-func (w *DefaultWorker) getPartyIdFromString(pid string) *tss.PartyID {
-	for _, p := range w.allParties {
-		if p.Id == pid {
-			return p
-		}
-	}
-
-	return nil
-}
-
-func (w *DefaultWorker) startMessageMonitor(jobType wTypes.WorkType) {
-	w.messageMonitorLock.RLock()
-	messageMonitor := w.messageMonitor
-	w.messageMonitorLock.RUnlock()
-
-	if messageMonitor != nil {
-		messageMonitor.Stop()
-	}
-
-	w.messageMonitorLock.Lock()
-	w.messageMonitor = components.NewMessageMonitor(w.myPid, jobType, w, w.GetPartyMap(), w.cfg.MonitorMessageTimeout)
-	w.messageMonitorLock.Unlock()
-
-	go w.messageMonitor.Start()
 }

@@ -1,13 +1,15 @@
-package core
+package components
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,7 +38,7 @@ func TestAvailPresignManager_HappyCase(t *testing.T) {
 	allPids := []string{"2", "3", "4", "5", "6", "7"}
 	partyIds := getPartyIdsFromStrings(allPids)
 
-	availManager := NewAvailPresignManager(mockDb)
+	availManager := NewAvailPresignManager(mockDb).(*defaultAvailablePresigns)
 	assert.NoError(t, availManager.Load())
 	assert.Equal(t, 3, len(availManager.available))
 
@@ -69,7 +71,7 @@ func TestAvailPresignManager_NotFound(t *testing.T) {
 	appPids := []string{"2", "3", "4", "5", "6", "7"}
 	partyIds := getPartyIdsFromStrings(appPids)
 
-	availManager := NewAvailPresignManager(mockDb)
+	availManager := NewAvailPresignManager(mockDb).(*defaultAvailablePresigns)
 	assert.NoError(t, availManager.Load())
 	assert.Equal(t, 3, len(availManager.available))
 
@@ -103,4 +105,22 @@ func TestAvailPresignManager_NotUsed(t *testing.T) {
 			PidsString: selectedPids,
 		}
 	}
+}
+
+func getPartyIdsFromStrings(pids []string) []*tss.PartyID {
+	partyIds := make([]*tss.PartyID, len(pids))
+	for i := 0; i < len(pids); i++ {
+		partyIds[i] = tss.NewPartyID(pids[i], "", big.NewInt(int64(i+1)))
+	}
+
+	return partyIds
+}
+
+func getPartyIdMap(partyIds []*tss.PartyID) map[string]*tss.PartyID {
+	m := make(map[string]*tss.PartyID)
+	for _, partyId := range partyIds {
+		m[partyId.Id] = partyId
+	}
+
+	return m
 }

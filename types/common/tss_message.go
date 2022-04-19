@@ -104,6 +104,11 @@ func (msg *TssMessage) GetMessageKey() (string, error) {
 	return GetMessageKey(msg.WorkId, msg.From, msg.To, msg.UpdateMessages[0].Round), nil
 }
 
+func (msg *TssMessage) IsSigningMessage() bool {
+	return msg.Type == TssMessage_UPDATE_MESSAGES && len(msg.UpdateMessages) > 0 &&
+		msg.UpdateMessages[0].Round == "SignRound1Message"
+}
+
 func GetMessageKey(workdId, from, to, tssMsgType string) string {
 	return fmt.Sprintf("%s__%s__%s__%s", workdId, from, to, tssMsgType)
 }
@@ -121,4 +126,18 @@ func ExtractMessageKey(msgKey string) ([]string, error) {
 	}
 
 	return keys, nil
+}
+
+func GetPreworkSelectionMsgType() map[TssMessage_Type]bool {
+	return map[TssMessage_Type]bool{
+		TssMessage_AVAILABILITY_REQUEST:  true,
+		TssMessage_AVAILABILITY_RESPONSE: true,
+		TssMessage_PRE_EXEC_OUTPUT:       true,
+	}
+}
+
+func GetUpdateMessageType() map[TssMessage_Type]bool {
+	return map[TssMessage_Type]bool{
+		TssMessage_UPDATE_MESSAGES: true,
+	}
 }

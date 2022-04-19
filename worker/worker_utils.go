@@ -1,26 +1,18 @@
 package worker
 
-import (
-	"crypto/sha256"
-	"encoding/hex"
-	"sort"
+// func ChooseLeader(workId string, parties []*tss.PartyID) *tss.PartyID {
+// 	keyStore := make(map[string]int)
+// 	sortedHashes := make([]string, len(parties))
 
-	"github.com/sisu-network/tss-lib/tss"
-)
+// 	for i, party := range parties {
+// 		sum := sha256.Sum256([]byte(party.Id + workId))
+// 		encodedSum := hex.EncodeToString(sum[:])
 
-func ChooseLeader(workId string, parties []*tss.PartyID) *tss.PartyID {
-	keyStore := make(map[string]int)
-	sortedHashes := make([]string, len(parties))
+// 		keyStore[encodedSum] = i
+// 		sortedHashes[i] = encodedSum
+// 	}
 
-	for i, party := range parties {
-		sum := sha256.Sum256([]byte(party.Id + workId))
-		encodedSum := hex.EncodeToString(sum[:])
+// 	sort.Strings(sortedHashes)
 
-		keyStore[encodedSum] = i
-		sortedHashes[i] = encodedSum
-	}
-
-	sort.Strings(sortedHashes)
-
-	return parties[keyStore[sortedHashes[0]]]
-}
+// 	return parties[keyStore[sortedHashes[0]]]
+// }

@@ -47,15 +47,15 @@ func (c *MessageCache) AddMessage(msg *commonTypes.TssMessage) {
 	c.cache[msg.From] = value
 }
 
-func (c *MessageCache) PopAllMessages(workId string) []*commonTypes.TssMessage {
-	return c.getAllMessages(workId, true)
+func (c *MessageCache) PopAllMessages(workId string, filter map[commonTypes.TssMessage_Type]bool) []*commonTypes.TssMessage {
+	return c.getAllMessages(workId, true, filter)
 }
 
 func (c *MessageCache) GetAllMessages(workId string) []*commonTypes.TssMessage {
-	return c.getAllMessages(workId, false)
+	return c.getAllMessages(workId, false, nil)
 }
 
-func (c *MessageCache) getAllMessages(workId string, update bool) []*commonTypes.TssMessage {
+func (c *MessageCache) getAllMessages(workId string, update bool, filter map[commonTypes.TssMessage_Type]bool) []*commonTypes.TssMessage {
 	c.cacheLock.Lock()
 	defer c.cacheLock.Unlock()
 
@@ -68,7 +68,7 @@ func (c *MessageCache) getAllMessages(workId string, update bool) []*commonTypes
 		}
 
 		for _, msg := range value.msgs {
-			if msg.WorkId == workId {
+			if msg.WorkId == workId && (filter == nil || filter[msg.Type]) {
 				result = append(result, msg)
 			} else {
 				// Remove the selected messages from the list.

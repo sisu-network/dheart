@@ -13,6 +13,7 @@ import (
 	ecommon "github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/sisu-network/dheart/core/components"
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
@@ -115,16 +116,17 @@ func TestSigningEndToEnd(t *testing.T) {
 					}
 				},
 
-				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
-					return make([]string, batchSize), flattenPidMaps(allPids)
-				},
-
 				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
 					return wrapper.Outputs[workerIndex]
 				},
 			},
 			config.NewDefaultTimeoutConfig(),
 			1,
+			&components.MockAvailablePresigns{
+				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
+					return make([]string, batchSize), flattenPidMaps(allPids)
+				},
+			},
 		)
 
 		workers[i] = worker
@@ -189,16 +191,17 @@ func TestSigning_PresignAndSign(t *testing.T) {
 					}
 				},
 
-				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
-					return nil, nil
-				},
-
 				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
 					return nil
 				},
 			},
 			cfg,
 			1,
+			&components.MockAvailablePresigns{
+				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
+					return nil, nil
+				},
+			},
 		)
 
 		workers[i] = worker
@@ -253,6 +256,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 			},
 			cfg,
 			1,
+			&components.MockAvailablePresigns{},
 		)
 
 		workers[i] = worker
@@ -304,17 +308,17 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 						done <- true
 					}
 				},
-
-				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
-					return make([]string, batchSize), flattenPidMaps(allPids)
-				},
-
 				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
 					return wrapper.Outputs[workerIndex]
 				},
 			},
 			cfg,
 			1,
+			&components.MockAvailablePresigns{
+				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
+					return make([]string, batchSize), flattenPidMaps(allPids)
+				},
+			},
 		)
 
 		workers[i] = worker
@@ -419,26 +423,6 @@ func doTestThreshold(t *testing.T) {
 					}
 				},
 
-				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
-					if len(allPids) < len(wrapper.Outputs) {
-						return []string{}, []*tss.PartyID{}
-					}
-
-					found := true
-					for _, selected := range selectedPids {
-						if _, ok := allPids[selected.Id]; !ok {
-							found = false
-							break
-						}
-					}
-
-					if !found {
-						return []string{}, []*tss.PartyID{}
-					}
-
-					return make([]string, batchSize), selectedPids
-				},
-
 				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
 					for i := 0; i < len(selectedPids); i++ {
 						if selectedPids[i].Id == myPid.Id {
@@ -461,6 +445,27 @@ func doTestThreshold(t *testing.T) {
 			},
 			config.NewDefaultTimeoutConfig(),
 			1,
+			&components.MockAvailablePresigns{
+				GetAvailablePresignsFunc: func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
+					if len(allPids) < len(wrapper.Outputs) {
+						return []string{}, []*tss.PartyID{}
+					}
+
+					found := true
+					for _, selected := range selectedPids {
+						if _, ok := allPids[selected.Id]; !ok {
+							found = false
+							break
+						}
+					}
+
+					if !found {
+						return []string{}, []*tss.PartyID{}
+					}
+
+					return make([]string, batchSize), selectedPids
+				},
+			},
 		)
 
 		workers[i] = worker

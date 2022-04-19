@@ -1,4 +1,4 @@
-package core
+package components
 
 import (
 	"fmt"
@@ -13,7 +13,13 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-type AvailPresignManager struct {
+type AvailablePresigns interface {
+	Load() error
+	GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
+	AddPresign(workId string, partyIds []*tss.PartyID, presignOutputs []*presign.LocalPresignData)
+}
+
+type defaultAvailablePresigns struct {
 	db db.Database
 	// Group all available presign by its list of pids.
 	// map between: list of pids (string) -> array of available presigns.
@@ -25,15 +31,15 @@ type AvailPresignManager struct {
 	lock *sync.RWMutex
 }
 
-func NewAvailPresignManager(db db.Database) *AvailPresignManager {
-	return &AvailPresignManager{
+func NewAvailPresignManager(db db.Database) AvailablePresigns {
+	return &defaultAvailablePresigns{
 		db:        db,
 		available: make(map[string][]*common.AvailablePresign),
 		lock:      &sync.RWMutex{},
 	}
 }
 
-func (m *AvailPresignManager) Load() error {
+func (m *defaultAvailablePresigns) Load() error {
 	presignIds, pidStrings, err := m.db.GetAvailablePresignShortForm()
 	if err != nil {
 		return err
@@ -59,7 +65,7 @@ func (m *AvailPresignManager) Load() error {
 	return nil
 }
 
-func (m *AvailPresignManager) AddPresign(workId string, partyIds []*tss.PartyID, presignOutputs []*presign.LocalPresignData) {
+func (m *defaultAvailablePresigns) AddPresign(workId string, partyIds []*tss.PartyID, presignOutputs []*presign.LocalPresignData) {
 	if err := m.db.SavePresignData(workId, partyIds, presignOutputs); err != nil {
 		log.Error("error when saving presign data", err)
 
@@ -95,7 +101,7 @@ func (m *AvailPresignManager) AddPresign(workId string, partyIds []*tss.PartyID,
 // GetAvailablePresigns returns a list of presigns with size batchSize for a list of parties. It
 // immediately consumes the presign set (i.e. the set is longer available.) to avoid dpulicated
 // usage of presign.
-func (m *AvailPresignManager) GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
+func (m *defaultAvailablePresigns) GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID) {
 	selectedPidstring := ""
 	var selectedAps []*common.AvailablePresign
 

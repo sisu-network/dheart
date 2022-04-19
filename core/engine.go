@@ -14,6 +14,7 @@ import (
 	libCommon "github.com/sisu-network/tss-lib/common"
 
 	"github.com/sisu-network/dheart/core/cache"
+	"github.com/sisu-network/dheart/core/components"
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/core/signer"
 	"github.com/sisu-network/dheart/db"
@@ -89,7 +90,7 @@ type DefaultEngine struct {
 	nodeLock *sync.RWMutex
 
 	// TODO: Remove used presigns after getting a match to avoid using duplicated presigns.
-	presignsManager *AvailPresignManager
+	presignsManager components.AvailablePresigns
 
 	config config.TimeoutConfig
 }
@@ -109,7 +110,7 @@ func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback 
 		nodes:           make(map[string]*Node),
 		signer:          signer.NewDefaultSigner(privateKey),
 		nodeLock:        &sync.RWMutex{},
-		presignsManager: NewAvailPresignManager(db),
+		presignsManager: components.NewAvailPresignManager(db),
 		config:          config,
 		workCache:       cache.NewWorkMessageCache(cache.MaxMessagePerNode, myNode.PartyId),
 	}
@@ -170,7 +171,7 @@ func (engine *DefaultEngine) startWork(request *types.WorkRequest) {
 
 	case types.EcdsaSigning:
 		w = ecdsa.NewSigningWorker(request, workPartyId, engine, engine.db, engine,
-			engine.config, MaxBatchSize)
+			engine.config, MaxBatchSize, engine.presignsManager)
 	}
 
 	engine.workLock.Lock()

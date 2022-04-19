@@ -1,6 +1,7 @@
 package ecdsa
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -56,6 +57,8 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, done 
 						continue
 					}
 
+					fmt.Println("Broadcasting message from ", tssMsg.From)
+
 					processMsgWithPanicOnFail(w, tssMsg)
 				}
 			} else {
@@ -65,6 +68,7 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, done 
 
 				for _, w := range workers {
 					if w.GetPartyId() == tssMsg.To {
+						fmt.Println("Unitcast: ", w.GetPartyId(), tssMsg.To)
 						processMsgWithPanicOnFail(w, tssMsg)
 						break
 					}

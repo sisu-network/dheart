@@ -10,9 +10,6 @@ type Worker interface {
 	// this node before this worker starts.
 	Start(cachedMsgs []*commonTypes.TssMessage) error
 
-	// GetWorkId returns the work id of the current worker.
-	GetWorkId() string
-
 	// GetPartyId returns party id of the current node.
 	GetPartyId() string
 
@@ -21,8 +18,6 @@ type Worker interface {
 
 	// GetCulprits ...
 	GetCulprits() []*tss.PartyID
-
-	GetPartyMap() map[string]*tss.PartyID
 
 	// Stop stops the worker and cleans all the resources
 	Stop()

@@ -181,6 +181,7 @@ func (job *Job) startListening() {
 			job.callback.OnJobMessage(job, msg)
 
 		case data := <-job.endKeygenCh:
+			fmt.Println("BBBBBB Keygen DONE ")
 			job.callback.OnJobKeygenFinished(job, &data)
 			return
 

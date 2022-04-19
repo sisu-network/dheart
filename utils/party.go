@@ -28,3 +28,13 @@ func GetPidsArray(pids []*tss.PartyID) []string {
 
 	return idArr
 }
+
+func GetPartyIdFromString(pid string, allParties []*tss.PartyID) *tss.PartyID {
+	for _, p := range allParties {
+		if p.Id == pid {
+			return p
+		}
+	}
+
+	return nil
+}
