@@ -53,6 +53,8 @@ func TestPresign_EndToEnd(t *testing.T) {
 		)
 
 		workerIndex := i
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.MonitorMessageTimeout = time.Second * 60
 
 		worker := NewPresignWorker(
 			request,
@@ -71,7 +73,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 					}
 				},
 			},
-			config.NewDefaultTimeoutConfig(),
+			cfg,
 			1,
 		)
 
@@ -223,6 +225,9 @@ func TestPresign_Threshold(t *testing.T) {
 			batchSize,
 		)
 
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.MonitorMessageTimeout = time.Second * 60
+
 		worker := NewPresignWorker(
 			request,
 			pIDs[i],
@@ -249,7 +254,7 @@ func TestPresign_Threshold(t *testing.T) {
 					}
 				},
 			},
-			config.NewDefaultTimeoutConfig(),
+			cfg,
 			1,
 		)
 
