@@ -126,7 +126,6 @@ func (w *WorkerExecutor) Init() (err error) {
 	w.messageMonitor = components.NewMessageMonitor(w.myPid, w.workType, w, w.pIDsMap, w.cfg.MonitorMessageTimeout)
 	go w.messageMonitor.Start()
 
-	log.Info("Executing work type ", wTypes.WorkTypeStrings[w.workType])
 	p2pCtx := tss.NewPeerContext(w.pIDs)
 
 	// Assign the correct index for our pid.
@@ -142,7 +141,6 @@ func (w *WorkerExecutor) Init() (err error) {
 
 	jobs := make([]*Job, batchSize)
 	log.Info("batchSize = ", batchSize)
-
 	log.Info("WorkerExecutor WorkType = ", w.workType)
 
 	workId := w.request.WorkId

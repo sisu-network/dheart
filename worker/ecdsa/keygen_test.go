@@ -130,6 +130,7 @@ func TestKeygenTimeout(t *testing.T) {
 
 		cfg := config.NewDefaultTimeoutConfig()
 		cfg.KeygenJobTimeout = time.Second
+		cfg.MonitorMessageTimeout = time.Second * 60
 
 		workers[i] = NewKeygenWorker(
 			request,

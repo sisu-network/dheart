@@ -61,6 +61,7 @@ func NewMessageMonitor(mypid *tss.PartyID, jobType wTypes.WorkType, callback Mes
 }
 
 func (m *DefaultMessageMonitor) Start() {
+	log.Info("Monitor message time out = ", m.timeout)
 	for {
 		select {
 		case <-time.After(m.timeout):
