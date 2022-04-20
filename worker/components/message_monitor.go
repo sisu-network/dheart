@@ -31,8 +31,7 @@ type DefaultMessageMonitor struct {
 	callback         MessageMonitorCallback
 	pIDsMap          map[string]*tss.PartyID
 	receivedMessages map[string][]bool
-
-	mypid *tss.PartyID
+	mypid            *tss.PartyID
 
 	lastReceivedTime time.Time
 	lock             *sync.RWMutex

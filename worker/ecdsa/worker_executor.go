@@ -452,6 +452,9 @@ func (w *WorkerExecutor) finished() {
 
 func (w *WorkerExecutor) broadcastResult(result WorkExecutionResult) {
 	w.callback(w, result)
+	if w.messageMonitor != nil {
+		w.messageMonitor.Stop()
+	}
 }
 
 func (w *WorkerExecutor) getCompletedJobCount(list []tss.Message) int {
