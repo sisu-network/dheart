@@ -12,6 +12,7 @@ import (
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,7 @@ import (
 // }
 
 func TestPresign_EndToEnd(t *testing.T) {
+	log.Verbose("Running TestPresign_EndToEnd")
 	n := 4
 	batchSize := 1
 
@@ -95,6 +97,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 }
 
 func TestPresign_PreExecutionTimeout(t *testing.T) {
+	log.Verbose("Running TestPresign_PreExecutionTimeout")
 	n := 4
 	batchSize := 1
 	pIDs := helper.GetTestPartyIds(n)
@@ -147,6 +150,7 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 }
 
 func TestPresign_ExecutionTimeout(t *testing.T) {
+	log.Verbose("Running TestPresign_ExecutionTimeout")
 	n := 4
 	batchSize := 1
 	pIDs := helper.GetTestPartyIds(n)
@@ -200,6 +204,7 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 
 // Runs test when we have a strict threshold < n - 1.
 func TestPresign_Threshold(t *testing.T) {
+	log.Verbose("Running TestPresign_Threshold")
 	n := 4
 	threshold := 2
 	batchSize := 1
