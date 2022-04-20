@@ -3,7 +3,7 @@ package types
 type WorkType int32
 
 const (
-	EcdsaKeygen WorkType = iota
+	EcdsaKeygen WorkType = iota + 1
 	EcdsaPresign
 	EcdsaSigning
 
@@ -26,4 +26,16 @@ var (
 
 func (w WorkType) String() string {
 	return WorkTypeStrings[w]
+}
+
+func (w WorkType) IsKeygen() bool {
+	return w == EcdsaKeygen || w == EddsaKeygen
+}
+
+func (w WorkType) IsPresign() bool {
+	return w == EcdsaPresign || w == EddsaPresign
+}
+
+func (w WorkType) IsSigning() bool {
+	return w == EcdsaSigning || w == EddsaSigning
 }

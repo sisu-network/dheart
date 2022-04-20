@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"time"
 
+	thelper "github.com/sisu-network/dheart/test/e2e/helper"
 	libchain "github.com/sisu-network/lib/chain"
 
 	"github.com/sisu-network/dheart/core"
@@ -120,7 +121,7 @@ func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan
 	var result *htypes.KeygenResult
 	select {
 	case result = <-outCh:
-	case <-time.After(time.Second * 20):
+	case <-time.After(time.Second * 100):
 		panic("Keygen timeout")
 	}
 
@@ -136,13 +137,18 @@ func verifySignature(pubkey *ecdsa.PublicKey, msg string, R, S *big.Int) {
 
 func main() {
 	var index, n int
+	var isSlow bool
 	flag.IntVar(&index, "index", 0, "listening port")
+	flag.BoolVar(&isSlow, "is-slow", false, "Use it when testing message caching mechanism")
 	flag.Parse()
 
 	n = 2
 
-	config, privateKey := p2p.GetMockSecp256k1Config(n, index)
-	cm := p2p.NewConnectionManager(config)
+	cfg, privateKey := p2p.GetMockSecp256k1Config(n, index)
+	cm := p2p.NewConnectionManager(cfg)
+	if isSlow {
+		cm = thelper.NewSlowConnectionManager(cfg)
+	}
 	err := cm.Start(privateKey, "secp256k1")
 	if err != nil {
 		panic(err)
@@ -169,7 +175,7 @@ func main() {
 	cb := NewEngineCallback(keygenCh, nil, keysignch)
 	database := getDb(index)
 
-	engine := core.NewEngine(nodes[index], cm, database, cb, allKeys[index], core.NewDefaultEngineConfig())
+	engine := core.NewEngine(nodes[index], cm, database, cb, allKeys[index], config.NewDefaultTimeoutConfig())
 	cm.AddListener(p2p.TSSProtocolID, engine)
 
 	// Add nodes
@@ -182,11 +188,11 @@ func main() {
 
 	// Keygen
 	keygenResult := doKeygen(pids, index, engine, keygenCh)
-	log.Info("Doing keysign now!")
 
 	// Keysign
+	log.Info("Doing keysign now!")
 	workId := "keysign"
-	messages := []string{"First message", "second message"}
+	messages := []string{"First message", "Second message"}
 	chains := []string{"eth", "eth"}
 
 	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
@@ -203,8 +209,8 @@ func main() {
 	var result *htypes.KeysignResult
 	select {
 	case result = <-keysignch:
-	case <-time.After(time.Second * 20):
-		panic("Keygen timeout")
+	case <-time.After(time.Second * 100):
+		panic("Signing timeout")
 	}
 
 	for i, msg := range messages {

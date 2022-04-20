@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
@@ -27,6 +29,7 @@ import (
 // }
 
 func TestPresign_EndToEnd(t *testing.T) {
+	log.Verbose("Running TestPresign_EndToEnd")
 	n := 4
 	batchSize := 1
 
@@ -52,6 +55,8 @@ func TestPresign_EndToEnd(t *testing.T) {
 		)
 
 		workerIndex := i
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.MonitorMessageTimeout = time.Second * 60
 
 		worker := NewPresignWorker(
 			request,
@@ -70,7 +75,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 					}
 				},
 			},
-			10*time.Minute,
+			cfg,
 			1,
 		)
 
@@ -92,6 +97,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 }
 
 func TestPresign_PreExecutionTimeout(t *testing.T) {
+	log.Verbose("Running TestPresign_PreExecutionTimeout")
 	n := 4
 	batchSize := 1
 	pIDs := helper.GetTestPartyIds(n)
@@ -112,10 +118,13 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 			batchSize,
 		)
 
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.PreworkWaitTimeout = time.Second * 2
+
 		worker := NewPresignWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, PreExecutionRequestWaitTime+1*time.Second, 0),
+			helper.NewTestDispatcher(outCh, cfg.PreworkWaitTimeout+1*time.Second, 0),
 			helper.NewMockDatabase(),
 			&helper.MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
@@ -124,7 +133,7 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 					}
 				},
 			},
-			10*time.Minute,
+			cfg,
 			1,
 		)
 
@@ -141,6 +150,7 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 }
 
 func TestPresign_ExecutionTimeout(t *testing.T) {
+	log.Verbose("Running TestPresign_ExecutionTimeout")
 	n := 4
 	batchSize := 1
 	pIDs := helper.GetTestPartyIds(n)
@@ -161,6 +171,9 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 			batchSize,
 		)
 
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.PresignJobTimeout = time.Second
+
 		worker := NewPresignWorker(
 			request,
 			pIDs[i],
@@ -173,7 +186,7 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 					}
 				},
 			},
-			time.Second,
+			cfg,
 			1,
 		)
 
@@ -191,6 +204,7 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 
 // Runs test when we have a strict threshold < n - 1.
 func TestPresign_Threshold(t *testing.T) {
+	log.Verbose("Running TestPresign_Threshold")
 	n := 4
 	threshold := 2
 	batchSize := 1
@@ -215,6 +229,9 @@ func TestPresign_Threshold(t *testing.T) {
 			false,
 			batchSize,
 		)
+
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.MonitorMessageTimeout = time.Second * 60
 
 		worker := NewPresignWorker(
 			request,
@@ -242,7 +259,7 @@ func TestPresign_Threshold(t *testing.T) {
 					}
 				},
 			},
-			10*time.Minute,
+			cfg,
 			1,
 		)
 

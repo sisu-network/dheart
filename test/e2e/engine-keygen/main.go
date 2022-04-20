@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/sisu-network/dheart/core"
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/p2p"
+	thelper "github.com/sisu-network/dheart/test/e2e/helper"
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
@@ -61,14 +63,20 @@ func getSortedPartyIds(n int) tss.SortedPartyIDs {
 
 func main() {
 	var index, n int
+	var isSlowNode bool
+
 	flag.IntVar(&index, "index", 0, "listening port")
+	flag.IntVar(&n, "n", 2, "number of nodes")
+	flag.BoolVar(&isSlowNode, "is-slow", false, "Use it when testing message caching mechanism")
 	flag.Parse()
 
-	n = 2
-
-	config, privateKey := p2p.GetMockSecp256k1Config(n, index)
-	cm := p2p.NewConnectionManager(config)
+	cfg, privateKey := p2p.GetMockSecp256k1Config(n, index)
+	cm := p2p.NewConnectionManager(cfg)
+	if isSlowNode {
+		cm = thelper.NewSlowConnectionManager(cfg)
+	}
 	err := cm.Start(privateKey, "secp256k1")
+
 	if err != nil {
 		panic(err)
 	}
@@ -90,7 +98,7 @@ func main() {
 	// Create new engine
 	outCh := make(chan *htypes.KeygenResult)
 	cb := NewEngineCallback(outCh, nil, nil)
-	engine := core.NewEngine(nodes[index], cm, helper.NewMockDatabase(), cb, allKeys[index], core.NewDefaultEngineConfig())
+	engine := core.NewEngine(nodes[index], cm, helper.NewMockDatabase(), cb, allKeys[index], config.NewDefaultTimeoutConfig())
 	cm.AddListener(p2p.TSSProtocolID, engine)
 
 	// Add nodes

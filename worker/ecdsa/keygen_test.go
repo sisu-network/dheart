@@ -8,16 +8,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 )
 
 //--- Miscellaneous helpers functions -- /
 
 func TestKeygenEndToEnd(t *testing.T) {
+	log.Verbose("Running TestKeygenEndToEnd test")
 	totalParticipants := 6
 	threshold := 1
 	batchSize := 1
@@ -48,6 +51,8 @@ func TestKeygenEndToEnd(t *testing.T) {
 		}
 
 		workerIndex := i
+		timeoutConfig := config.NewDefaultTimeoutConfig()
+		timeoutConfig.MonitorMessageTimeout = time.Second * 60 // 1 minute
 
 		workers[i] = NewKeygenWorker(
 			request,
@@ -67,7 +72,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 					}
 				},
 			},
-			10*time.Minute,
+			timeoutConfig,
 		)
 	}
 
@@ -95,6 +100,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 }
 
 func TestKeygenTimeout(t *testing.T) {
+	log.Verbose("Running TestKeygenTimeout test")
 	totalParticipants := 6
 	threshold := 1
 	batchSize := 1
@@ -122,6 +128,10 @@ func TestKeygenTimeout(t *testing.T) {
 			N:           totalParticipants,
 		}
 
+		cfg := config.NewDefaultTimeoutConfig()
+		cfg.KeygenJobTimeout = time.Second
+		cfg.MonitorMessageTimeout = time.Second * 60
+
 		workers[i] = NewKeygenWorker(
 			request,
 			pIDs[i],
@@ -138,7 +148,7 @@ func TestKeygenTimeout(t *testing.T) {
 					}
 				},
 			},
-			time.Second,
+			cfg,
 		)
 	}
 

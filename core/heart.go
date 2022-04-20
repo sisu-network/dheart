@@ -115,7 +115,7 @@ func (h *Heart) initConnectionManager() error {
 
 	// Engine
 	myNode := NewNode(h.privateKey.PubKey())
-	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey, NewDefaultEngineConfig())
+	h.engine = NewEngine(myNode, h.cm, h.db, h, h.privateKey, config.NewDefaultTimeoutConfig())
 
 	if h.valPubkeys != nil {
 		h.engine.AddNodes(NewNodes(h.valPubkeys))

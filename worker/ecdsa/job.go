@@ -17,6 +17,8 @@ import (
 	wTypes "github.com/sisu-network/dheart/worker/types"
 )
 
+const MaxWaitRound = 10 * time.Second
+
 type JobCallback interface {
 	// Called when there is a tss message output.
 	OnJobMessage(job *Job, msg tss.Message)
@@ -35,6 +37,7 @@ type JobCallback interface {
 }
 
 type Job struct {
+	workId  string
 	jobType wTypes.WorkType
 	index   int
 
@@ -51,6 +54,7 @@ type Job struct {
 }
 
 func NewKeygenJob(
+	workId string,
 	index int,
 	pIDs tss.SortedPartyIDs,
 	params *tss.Parameters,
@@ -65,6 +69,7 @@ func NewKeygenJob(
 	party := keygen.NewLocalParty(params, outCh, endCh, *localPreparams).(*keygen.LocalParty)
 
 	return &Job{
+		workId:      workId,
 		index:       index,
 		jobType:     wTypes.EcdsaKeygen,
 		party:       party,
@@ -77,6 +82,7 @@ func NewKeygenJob(
 }
 
 func NewPresignJob(
+	workId string,
 	index int,
 	pIDs tss.SortedPartyIDs,
 	params *tss.Parameters,
@@ -90,6 +96,7 @@ func NewPresignJob(
 	party := presign.NewLocalParty(pIDs, params, *savedData, outCh, endCh)
 
 	return &Job{
+		workId:       workId,
 		index:        index,
 		jobType:      wTypes.EcdsaPresign,
 		party:        party,
@@ -101,6 +108,7 @@ func NewPresignJob(
 }
 
 func NewSigningJob(
+	workId string,
 	index int,
 	pIDs tss.SortedPartyIDs,
 	params *tss.Parameters,
@@ -116,6 +124,7 @@ func NewSigningJob(
 	party := signing.NewLocalParty(msgInt, params, signingInput, outCh, endCh)
 
 	return &Job{
+		workId:       workId,
 		index:        index,
 		jobType:      wTypes.EcdsaSigning,
 		party:        party,
@@ -156,10 +165,8 @@ func (job *Job) Stop() {
 
 func (job *Job) startListening() {
 	outCh := job.outCh
-
 	endTime := time.Now().Add(job.timeOut)
 
-	// TODO: Add timeout and missing messages.
 	for {
 		select {
 		case <-time.After(endTime.Sub(time.Now())):
