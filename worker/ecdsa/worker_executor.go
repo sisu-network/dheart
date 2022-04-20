@@ -21,6 +21,7 @@ import (
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
+	"go.uber.org/atomic"
 )
 
 type WorkExecutionResult struct {
@@ -71,6 +72,7 @@ type WorkerExecutor struct {
 	presignOutputs  []*presign.LocalPresignData
 	signingOutputs  []*libCommon.SignatureData
 	finalOutputLock *sync.RWMutex
+	isStop          atomic.Bool
 
 	jobs           []*Job
 	jobsLock       *sync.RWMutex
@@ -110,6 +112,7 @@ func NewWorkerExecutor(
 		presignOutputs:  make([]*presign.LocalPresignData, request.BatchSize),
 		signingOutputs:  make([]*libCommon.SignatureData, request.BatchSize),
 		jobOutput:       make(map[string][]tss.Message),
+		isStop:          *atomic.NewBool(false),
 		cfg:             cfg,
 	}
 }
@@ -451,9 +454,13 @@ func (w *WorkerExecutor) finished() {
 }
 
 func (w *WorkerExecutor) broadcastResult(result WorkExecutionResult) {
-	w.callback(w, result)
-	if w.messageMonitor != nil {
-		w.messageMonitor.Stop()
+	if !w.isStop.Load() {
+		w.isStop.Store(true)
+
+		w.callback(w, result)
+		if w.messageMonitor != nil {
+			w.messageMonitor.Stop()
+		}
 	}
 }
 

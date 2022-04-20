@@ -290,7 +290,7 @@ func (s *PreworkSelection) checkEnoughParticipants() (bool, []string, []*tss.Par
 // memberFinalized is called when all the participants have been finalized by the leader.
 // We either start execution or finish this work.
 func (s *PreworkSelection) memberFinalized(msg *common.PreExecOutputMessage) {
-	fmt.Println("memberFinalized, success = ", msg.Success)
+	log.Verbose("memberFinalized, success = ", msg.Success)
 
 	if msg.Success {
 		// Do basic message validation
@@ -376,6 +376,8 @@ func (s *PreworkSelection) validateLeaderSelection(msg *common.PreExecOutputMess
 
 // Finalize work as a leader and start execution.
 func (s *PreworkSelection) leaderFinalized(success bool, presignIds []string, selectedPids []*tss.PartyID) {
+	log.Verbose("Leader finalized, success = ", success)
+
 	workId := s.request.WorkId
 	if !success { // Failure case
 		msg := common.NewPreExecOutputMessage(s.myPid.Id, "", workId, false, nil, nil)

@@ -2,7 +2,6 @@ package ecdsa
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"go.uber.org/atomic"
@@ -220,8 +219,6 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
-	fmt.Println("len(result.PresignIds)  = ", len(result.PresignIds))
-
 	if w.request.IsKeygen() || w.request.IsPresign() || (w.request.IsSigning() &&
 		len(result.PresignIds) > 0) {
 		// In this case, work type = request.WorkType
@@ -266,7 +263,7 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 			// We have not started execution yet.
 			w.preExecutionCache.AddMessage(msg)
 			addToCache = true
-			fmt.Println("Adding to cache 1:", w.myPid.Id, msg.UpdateMessages[0].Round)
+			log.Verbose("Adding to cache 1:", w.workId, w.myPid.Id, msg.UpdateMessages[0].Round)
 		} else if w.request.IsSigning() && w.curWorkType.IsPresign() && msg.IsSigningMessage() {
 			// This is the case when we are still in the presign phase of a signing request but some other
 			// nodes finish presign early and send us a signing message. We need to cache this message
@@ -274,7 +271,7 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 			w.preExecutionCache.AddMessage(msg)
 			addToCache = true
 
-			fmt.Println("Adding to cache 2:", w.myPid.Id, msg.UpdateMessages[0].Round, w.executor)
+			log.Verbose("Adding to cache 2:", w.workId, w.myPid.Id, msg.UpdateMessages[0].Round, w.executor)
 		}
 
 		// Read the correct executor.
