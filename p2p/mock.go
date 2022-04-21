@@ -198,8 +198,12 @@ func GetMockConnectionConfig(n, index int, keyType string) (p2ptypes.Connections
 		port := TEST_PORT_BASE * (i + 1)
 		peerId := peerIds[i]
 
+		peerKey := &secp256k1.PrivKey{Key: GetPrivateKeyBytes(i, "secp256k1")}
+
 		peer := &p2ptypes.Peer{
-			Address: fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, peerId),
+			Address:    fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", port, peerId),
+			PubKey:     hex.EncodeToString(peerKey.PubKey().Bytes()),
+			PubKeyType: "secp256k1",
 		}
 
 		peers = append(peers, peer)

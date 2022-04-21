@@ -176,7 +176,6 @@ func (job *Job) startListening() {
 			job.callback.OnJobMessage(job, msg)
 
 		case data := <-job.endKeygenCh:
-			fmt.Println("Output is produced")
 			job.callback.OnJobResult(job, JobResult{
 				Success:    true,
 				KeygenData: data,

@@ -285,7 +285,6 @@ func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
 			workResult, batchCompleted = w.onJobKeygenFinished(job, result)
 		case types.EcdsaPresign:
 			workResult, batchCompleted = w.onJobPresignFinished(job, result)
-			fmt.Println("Presign is done, batchCompleted = ", batchCompleted)
 		case types.EcdsaSigning:
 			workResult, batchCompleted = w.onJobSignFinished(job, result)
 		}
