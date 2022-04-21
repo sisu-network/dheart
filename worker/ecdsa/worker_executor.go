@@ -24,7 +24,7 @@ import (
 	"go.uber.org/atomic"
 )
 
-type WorkExecutionResult struct {
+type ExecutionResult struct {
 	Success bool
 	Request *types.WorkRequest
 
@@ -52,7 +52,7 @@ type WorkerExecutor struct {
 	presignInput *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
 	signingInput []*presign.LocalPresignData
 
-	callback func(*WorkerExecutor, WorkExecutionResult)
+	callback func(*WorkerExecutor, ExecutionResult)
 
 	///////////////////////
 	// Mutable data
@@ -87,7 +87,7 @@ func NewWorkerExecutor(
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
 	signingInput []*presign.LocalPresignData,
-	callback func(*WorkerExecutor, WorkExecutionResult),
+	callback func(*WorkerExecutor, ExecutionResult),
 	cfg config.TimeoutConfig,
 ) *WorkerExecutor {
 	pIDsMap := make(map[string]*tss.PartyID)
@@ -162,7 +162,7 @@ func (w *WorkerExecutor) Init() (err error) {
 
 		default:
 			// If job type is not correct, kill the whole worker.
-			w.broadcastResult(WorkExecutionResult{
+			w.broadcastResult(ExecutionResult{
 				Success: false,
 			})
 
@@ -179,7 +179,7 @@ func (w *WorkerExecutor) Init() (err error) {
 		if err := job.Start(); err != nil {
 			log.Critical("error when starting job, err = ", err)
 			// If job cannot start, kill the whole worker.
-			go w.broadcastResult(WorkExecutionResult{
+			go w.broadcastResult(ExecutionResult{
 				Success: false,
 			})
 
@@ -278,7 +278,7 @@ func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
 	}
 
 	if result.Success {
-		var workResult WorkExecutionResult
+		var workResult ExecutionResult
 		var batchCompleted bool
 		switch job.jobType {
 		case types.EcdsaKeygen:
@@ -296,7 +296,7 @@ func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
 	} else {
 		// Failure case
 		if result.Failure == JobFailureTimeout {
-			w.broadcastResult(WorkExecutionResult{
+			w.broadcastResult(ExecutionResult{
 				Success: false,
 			})
 		}
@@ -305,7 +305,7 @@ func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
 
 // Implements onJobKeygenFinished of JobCallback. This function is called from a job after key
 // generation finishes.
-func (w *WorkerExecutor) onJobKeygenFinished(job *Job, result JobResult) (WorkExecutionResult, bool) {
+func (w *WorkerExecutor) onJobKeygenFinished(job *Job, result JobResult) (ExecutionResult, bool) {
 	w.finalOutputLock.Lock()
 	w.keygenOutputs[job.index] = &result.KeygenData
 	// Count the number of finished job.
@@ -320,17 +320,17 @@ func (w *WorkerExecutor) onJobKeygenFinished(job *Job, result JobResult) (WorkEx
 	if count == w.request.BatchSize {
 		log.Verbose(w.request.WorkId, " Keygen Done!")
 
-		return WorkExecutionResult{
+		return ExecutionResult{
 			Success:       true,
 			KeygenOutputs: w.keygenOutputs,
 		}, true
 	}
 
-	return WorkExecutionResult{}, false
+	return ExecutionResult{}, false
 }
 
 // Implements onJobPresignFinished of JobCallback.
-func (w *WorkerExecutor) onJobPresignFinished(job *Job, result JobResult) (WorkExecutionResult, bool) {
+func (w *WorkerExecutor) onJobPresignFinished(job *Job, result JobResult) (ExecutionResult, bool) {
 	w.finalOutputLock.Lock()
 	w.presignOutputs[job.index] = &result.PresignData
 	// Count the number of finished job.
@@ -344,17 +344,17 @@ func (w *WorkerExecutor) onJobPresignFinished(job *Job, result JobResult) (WorkE
 
 	if count == w.request.BatchSize {
 		log.Verbose(w.request.WorkId, " Presign Done!")
-		return WorkExecutionResult{
+		return ExecutionResult{
 			Success:        true,
 			PresignOutputs: w.presignOutputs,
 		}, true
 	}
 
-	return WorkExecutionResult{}, false
+	return ExecutionResult{}, false
 }
 
 // Implements onJobSignFinished of JobCallback.
-func (w *WorkerExecutor) onJobSignFinished(job *Job, result JobResult) (WorkExecutionResult, bool) {
+func (w *WorkerExecutor) onJobSignFinished(job *Job, result JobResult) (ExecutionResult, bool) {
 	w.finalOutputLock.Lock()
 	w.signingOutputs[job.index] = &result.SigningData
 	// Count the number of finished job.
@@ -369,13 +369,13 @@ func (w *WorkerExecutor) onJobSignFinished(job *Job, result JobResult) (WorkExec
 	if count == w.request.BatchSize {
 		log.Verbose(w.request.WorkId, " Signing Done!")
 
-		return WorkExecutionResult{
+		return ExecutionResult{
 			Success:        true,
 			SigningOutputs: w.signingOutputs,
 		}, true
 	}
 
-	return WorkExecutionResult{}, false
+	return ExecutionResult{}, false
 }
 
 // Implements MessageMonitorCallback
@@ -464,18 +464,21 @@ func (w *WorkerExecutor) Stop() {
 }
 
 func (w *WorkerExecutor) OnJobTimeout() {
-	w.broadcastResult(WorkExecutionResult{
+	w.broadcastResult(ExecutionResult{
 		Success: false,
 	})
 }
 
-func (w *WorkerExecutor) broadcastResult(result WorkExecutionResult) {
+func (w *WorkerExecutor) broadcastResult(result ExecutionResult) {
+	w.jobsLock.Lock()
+	defer w.jobsLock.Unlock()
+
 	if !w.isStopped.Load() {
 		w.isStopped.Store(true)
 
 		go w.callback(w, result) // Make the callback in separate go routine to avoid expensive blocking.
 		if w.messageMonitor != nil {
-			w.messageMonitor.Stop()
+			go w.messageMonitor.Stop()
 		}
 	}
 }

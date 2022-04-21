@@ -116,6 +116,10 @@ func (s *PreworkSelection) Run(cachedMsgs []*commonTypes.TssMessage) {
 	}
 }
 
+func (s *PreworkSelection) Stop() {
+	s.stopped.Store(true)
+}
+
 func (s *PreworkSelection) doPreExecutionAsLeader(cachedMsgs []*commonTypes.TssMessage) {
 	// Update availability from cache first.
 	for _, tssMsg := range cachedMsgs {
@@ -399,10 +403,6 @@ func (s *PreworkSelection) leaderFinalized(success bool, presignIds []string, se
 		SelectedPids: selectedPids,
 		PresignIds:   presignIds,
 	})
-
-	// if err := s.executeWork(workType); err != nil {
-	// 	log.Error("Error when executing work", err)
-	// }
 }
 
 func (s *PreworkSelection) broadcastResult(result SelectionResult) {
