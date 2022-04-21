@@ -72,7 +72,7 @@ type WorkerExecutor struct {
 	presignOutputs  []*presign.LocalPresignData
 	signingOutputs  []*libCommon.SignatureData
 	finalOutputLock *sync.RWMutex
-	isStop          atomic.Bool
+	isStopped       atomic.Bool
 
 	jobs           []*Job
 	jobsLock       *sync.RWMutex
@@ -112,7 +112,7 @@ func NewWorkerExecutor(
 		presignOutputs:  make([]*presign.LocalPresignData, request.BatchSize),
 		signingOutputs:  make([]*libCommon.SignatureData, request.BatchSize),
 		jobOutput:       make(map[string][]tss.Message),
-		isStop:          *atomic.NewBool(false),
+		isStopped:       *atomic.NewBool(false),
 		cfg:             cfg,
 	}
 }
@@ -175,31 +175,26 @@ func (w *WorkerExecutor) Init() (err error) {
 	w.jobs = jobs
 	w.jobsLock.Unlock()
 
-	startedJobs := make([]*Job, 0)
 	for _, job := range jobs {
 		if err := job.Start(); err != nil {
 			log.Critical("error when starting job, err = ", err)
 			// If job cannot start, kill the whole worker.
-			w.broadcastResult(WorkExecutionResult{
+			go w.broadcastResult(WorkExecutionResult{
 				Success: false,
 			})
 
 			break
 		}
-		startedJobs = append(startedJobs, job)
-	}
-
-	if len(startedJobs) != len(jobs) {
-		for _, job := range startedJobs {
-			job.Stop()
-		}
-		return
 	}
 
 	return nil
 }
 
 func (w *WorkerExecutor) Run(cachedMsgs []*commonTypes.TssMessage) {
+	if w.isStopped.Load() {
+		return
+	}
+
 	log.Info(w.myPid.Id, " ", w.request.WorkId, " ", w.workType, " Cache size =", len(cachedMsgs))
 
 	for _, msg := range cachedMsgs {
@@ -229,6 +224,10 @@ func (w *WorkerExecutor) loadPreparams() error {
 
 // Called when there is a new message from tss-lib
 func (w *WorkerExecutor) OnJobMessage(job *Job, msg tss.Message) {
+	if w.isStopped.Load() {
+		return
+	}
+
 	// Update the list of completed jobs for current round (in the message)
 	msgKey := msg.Type()
 	if !msg.IsBroadcast() {
@@ -272,12 +271,43 @@ func (w *WorkerExecutor) OnJobMessage(job *Job, msg tss.Message) {
 	}
 }
 
-// Implements OnJobKeygenFinished of JobCallback. This function is called from a job after key
-// generation finishes.
-func (w *WorkerExecutor) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySaveData) {
-	w.finalOutputLock.Lock()
+// Implements JobCallback
+func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
+	if w.isStopped.Load() {
+		return
+	}
 
-	w.keygenOutputs[job.index] = data
+	if result.Success {
+		var workResult WorkExecutionResult
+		var batchCompleted bool
+		switch job.jobType {
+		case types.EcdsaKeygen:
+			workResult, batchCompleted = w.onJobKeygenFinished(job, result)
+		case types.EcdsaPresign:
+			workResult, batchCompleted = w.onJobPresignFinished(job, result)
+			fmt.Println("Presign is done, batchCompleted = ", batchCompleted)
+		case types.EcdsaSigning:
+			workResult, batchCompleted = w.onJobSignFinished(job, result)
+		}
+
+		if batchCompleted {
+			w.broadcastResult(workResult)
+		}
+	} else {
+		// Failure case
+		if result.Failure == JobFailureTimeout {
+			w.broadcastResult(WorkExecutionResult{
+				Success: false,
+			})
+		}
+	}
+}
+
+// Implements onJobKeygenFinished of JobCallback. This function is called from a job after key
+// generation finishes.
+func (w *WorkerExecutor) onJobKeygenFinished(job *Job, result JobResult) (WorkExecutionResult, bool) {
+	w.finalOutputLock.Lock()
+	w.keygenOutputs[job.index] = &result.KeygenData
 	// Count the number of finished job.
 	count := 0
 	for _, item := range w.keygenOutputs {
@@ -285,80 +315,76 @@ func (w *WorkerExecutor) OnJobKeygenFinished(job *Job, data *keygen.LocalPartySa
 			count++
 		}
 	}
-
 	w.finalOutputLock.Unlock()
 
 	if count == w.request.BatchSize {
-		w.broadcastResult(WorkExecutionResult{
+		log.Verbose(w.request.WorkId, " Keygen Done!")
+
+		return WorkExecutionResult{
 			Success:       true,
 			KeygenOutputs: w.keygenOutputs,
-		})
-
-		w.finished()
+		}, true
 	}
+
+	return WorkExecutionResult{}, false
 }
 
-// Implements OnJobPresignFinished of JobCallback.
-func (w *WorkerExecutor) OnJobPresignFinished(job *Job, data *presign.LocalPresignData) {
+// Implements onJobPresignFinished of JobCallback.
+func (w *WorkerExecutor) onJobPresignFinished(job *Job, result JobResult) (WorkExecutionResult, bool) {
 	w.finalOutputLock.Lock()
-	w.presignOutputs[job.index] = data
-	w.finalOutputLock.Unlock()
-
+	w.presignOutputs[job.index] = &result.PresignData
 	// Count the number of finished job.
-	w.finalOutputLock.RLock()
 	count := 0
 	for _, item := range w.presignOutputs {
 		if item != nil {
 			count++
 		}
 	}
-	w.finalOutputLock.RUnlock()
+	w.finalOutputLock.Unlock()
 
 	if count == w.request.BatchSize {
 		log.Verbose(w.request.WorkId, " Presign Done!")
-
-		// This is purely presign request. Make a callback after finish
-		w.broadcastResult(WorkExecutionResult{
+		return WorkExecutionResult{
 			Success:        true,
 			PresignOutputs: w.presignOutputs,
-		})
-
-		w.finished()
+		}, true
 	}
+
+	return WorkExecutionResult{}, false
 }
 
-// Implements OnJobSignFinished of JobCallback.
-func (w *WorkerExecutor) OnJobSignFinished(job *Job, data *libCommon.SignatureData) {
+// Implements onJobSignFinished of JobCallback.
+func (w *WorkerExecutor) onJobSignFinished(job *Job, result JobResult) (WorkExecutionResult, bool) {
 	w.finalOutputLock.Lock()
-	w.signingOutputs[job.index] = data
-	w.finalOutputLock.Unlock()
-
+	w.signingOutputs[job.index] = &result.SigningData
 	// Count the number of finished job.
-	w.finalOutputLock.RLock()
 	count := 0
 	for _, item := range w.signingOutputs {
 		if item != nil {
 			count++
 		}
 	}
-	w.finalOutputLock.RUnlock()
+	w.finalOutputLock.Unlock()
 
 	if count == w.request.BatchSize {
 		log.Verbose(w.request.WorkId, " Signing Done!")
 
-		w.broadcastResult(WorkExecutionResult{
+		return WorkExecutionResult{
 			Success:        true,
 			SigningOutputs: w.signingOutputs,
-		})
-
-		w.finished()
+		}, true
 	}
+
+	return WorkExecutionResult{}, false
 }
 
 // Implements MessageMonitorCallback
 func (w *WorkerExecutor) OnMissingMesssageDetected(m map[string][]string) {
-	workId := w.request.WorkId
+	if w.isStopped.Load() {
+		return
+	}
 
+	workId := w.request.WorkId
 	// We have found missing messages
 	for pid, msgTypes := range m {
 		for _, msgType := range msgTypes {
@@ -378,6 +404,10 @@ func (w *WorkerExecutor) OnMissingMesssageDetected(m map[string][]string) {
 }
 
 func (w *WorkerExecutor) ProcessUpdateMessage(tssMsg *commonTypes.TssMessage) error {
+	if w.isStopped.Load() {
+		return nil
+	}
+
 	// Do all message validation first before processing.
 	// TODO: Add more validation here.
 	msgs := make([]tss.ParsedMessage, w.request.BatchSize)
@@ -430,15 +460,7 @@ func (w *WorkerExecutor) ProcessUpdateMessage(tssMsg *commonTypes.TssMessage) er
 }
 
 func (w *WorkerExecutor) Stop() {
-	w.jobsLock.RLock()
-	jobs := w.jobs
-	w.jobsLock.RUnlock()
-
-	for _, job := range jobs {
-		if job != nil {
-			job.Stop()
-		}
-	}
+	w.isStopped.Store(true)
 }
 
 func (w *WorkerExecutor) OnJobTimeout() {
@@ -447,17 +469,11 @@ func (w *WorkerExecutor) OnJobTimeout() {
 	})
 }
 
-func (w *WorkerExecutor) finished() {
-	if w.messageMonitor != nil {
-		w.messageMonitor.Stop()
-	}
-}
-
 func (w *WorkerExecutor) broadcastResult(result WorkExecutionResult) {
-	if !w.isStop.Load() {
-		w.isStop.Store(true)
+	if !w.isStopped.Load() {
+		w.isStopped.Store(true)
 
-		w.callback(w, result)
+		go w.callback(w, result) // Make the callback in separate go routine to avoid expensive blocking.
 		if w.messageMonitor != nil {
 			w.messageMonitor.Stop()
 		}
