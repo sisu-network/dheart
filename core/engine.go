@@ -194,8 +194,6 @@ func (engine *defaultEngine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) e
 		return nil
 	}
 
-	fmt.Println("Received message ", tssMsg.Type)
-
 	switch tssMsg.Type {
 	case common.TssMessage_ASK_MESSAGE_REQUEST:
 		if err := engine.OnAskMessage(tssMsg); err != nil {

@@ -34,7 +34,7 @@ func (ap *AvailableParties) add(p *tss.PartyID, computingPower int) {
 	}
 }
 
-func (ap *AvailableParties) getLength() int {
+func (ap *AvailableParties) Length() int {
 	ap.lock.RLock()
 	defer ap.lock.RUnlock()
 

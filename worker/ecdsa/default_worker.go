@@ -203,6 +203,8 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 	cacheMsgs := w.preExecutionCache.PopAllMessages(w.workId, commonTypes.GetPreworkSelectionMsgType())
 	go w.preworkSelection.Run(cacheMsgs)
 
+	log.Info("Worker started for job ", w.request.WorkType)
+
 	return nil
 }
 
@@ -214,6 +216,7 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 	}
 
 	if result.IsNodeExcluded {
+		log.Info("I am not selected")
 		// We are not selected. Return result in the callback and do nothing.
 		w.callback.OnNodeNotSelected(w.request)
 		return
@@ -270,7 +273,7 @@ func (w *DefaultWorker) startTimeoutClock() {
 		return
 	}
 
-	timeout = timeout + w.cfg.PreworkWaitTimeout
+	timeout = timeout + w.cfg.SelectionLeaderTimeout
 
 	select {
 	case <-time.After(timeout):

@@ -69,7 +69,6 @@ func NewPreworkSelection(request *types.WorkRequest, allParties []*tss.PartyID, 
 	presignsManager corecomponents.AvailablePresigns, cfg config.TimeoutConfig, callback func(SelectionResult)) *PreworkSelection {
 
 	leader := chooseLeader(request.WorkId, request.AllParties)
-
 	return &PreworkSelection{
 		request:          request,
 		allParties:       allParties,
@@ -120,6 +119,10 @@ func (s *PreworkSelection) Stop() {
 	s.stopped.Store(true)
 }
 
+////////////////////////////////////////////////////////////////////////////
+// LEADER
+////////////////////////////////////////////////////////////////////////////
+
 func (s *PreworkSelection) doPreExecutionAsLeader(cachedMsgs []*commonTypes.TssMessage) {
 	// Update availability from cache first.
 	for _, tssMsg := range cachedMsgs {
@@ -127,11 +130,18 @@ func (s *PreworkSelection) doPreExecutionAsLeader(cachedMsgs []*commonTypes.TssM
 			// update the availability.
 			for _, p := range s.allParties {
 				if p.Id == tssMsg.From {
+					log.Verbose("Leader: Pid", p.Id, "has responded to us from a message in the cache for workId = ", s.request.WorkId)
 					s.availableParties.add(p, 1)
 					break
 				}
 			}
 		}
+	}
+
+	// Check if we have received enough response but stored in the cache.
+	if success, presignIds, selectedPids := s.checkEnoughParticipants(); success {
+		s.leaderFinalized(true, presignIds, selectedPids)
+		return
 	}
 
 	for _, p := range s.allParties {
@@ -142,6 +152,7 @@ func (s *PreworkSelection) doPreExecutionAsLeader(cachedMsgs []*commonTypes.TssM
 		// Only send request message to parties that has not sent a message to us.
 		if s.availableParties.getParty(p.Id) == nil {
 			tssMsg := common.NewAvailabilityRequestMessage(s.myPid.Id, p.Id, s.request.WorkId)
+			log.Verbose("Leader: sending query to ", p.Id, "for workId = ", s.request.WorkId)
 			go s.dispatcher.UnicastMessage(p, tssMsg)
 		}
 	}
@@ -157,37 +168,6 @@ func (s *PreworkSelection) doPreExecutionAsLeader(cachedMsgs []*commonTypes.TssM
 	s.leaderFinalized(true, presignIds, selectedPids)
 }
 
-func (s *PreworkSelection) doPreExecutionAsMember(leader *tss.PartyID, cachedMsgs []*commonTypes.TssMessage) {
-	// Check in the cache to see if the leader has sent a message to this node regarding the participants.
-	for _, msg := range cachedMsgs {
-		if msg.Type == common.TssMessage_PRE_EXEC_OUTPUT {
-			log.Verbose("We have received participant list of work", s.request.WorkId)
-			s.memberFinalized(msg.PreExecOutputMessage)
-			return
-		}
-	}
-
-	// Send a message to the leader.
-	tssMsg := common.NewAvailabilityResponseMessage(s.myPid.Id, leader.Id, s.request.WorkId, common.AvailabilityResponseMessage_YES, 1)
-	go s.dispatcher.UnicastMessage(leader, tssMsg)
-
-	// Waits for response from the leader.
-	select {
-	case <-time.After(s.cfg.PreworkWaitTimeout):
-		// TODO: Report as failure here.
-		log.Error("member: leader wait timed out.")
-		// Blame leader
-
-		s.broadcastResult(SelectionResult{
-			Success:        false,
-			FailureResason: SelectionTimeout,
-		})
-
-	case msg := <-s.preExecMsgCh:
-		s.memberFinalized(msg)
-	}
-}
-
 func (s *PreworkSelection) waitForMemberResponse() ([]string, []*tss.PartyID, error) {
 	if ok, presignIds, selectedPids := s.checkEnoughParticipants(); ok {
 		// We have enough participants from cached message. No need to wait.
@@ -195,7 +175,7 @@ func (s *PreworkSelection) waitForMemberResponse() ([]string, []*tss.PartyID, er
 	}
 
 	// Wait for everyone to reply or timeout.
-	end := time.Now().Add(s.cfg.PreworkWaitTimeout)
+	end := time.Now().Add(s.cfg.SelectionLeaderTimeout)
 	for {
 		now := time.Now()
 		if now.After(end) {
@@ -206,8 +186,17 @@ func (s *PreworkSelection) waitForMemberResponse() ([]string, []*tss.PartyID, er
 		hashNewAvailableMember := false
 		select {
 		case <-time.After(timeDiff):
+			if s.request.IsSigning() && s.availableParties.Length() >= s.request.Threshold+1 {
+				log.Info("Wait timeouted for signing but we got enough participants for presign.")
+				// We have enough online participants but cannot find a presign set for all of them. This
+				// still returns success and we do a presign round.
+				selectedPids := s.availableParties.getPartyList(s.request.Threshold + 1)
+				return nil, selectedPids, nil
+			}
+
 			log.Info("LEADER: timeout")
-			return s.leaderWaitFinalized()
+
+			return nil, nil, errors.New("timeout: cannot find enough members for this work")
 
 		case tssMsg := <-s.memberResponseCh:
 			log.Info("LEADER: There is a member response, from: ", tssMsg.From)
@@ -234,11 +223,13 @@ func (s *PreworkSelection) waitForMemberResponse() ([]string, []*tss.PartyID, er
 
 		if hashNewAvailableMember {
 			if ok, presignIds, selectedPids := s.checkEnoughParticipants(); ok {
-				log.Info("Leader: presign ids found")
+				log.Info("Leader: selectedPids found")
 				return presignIds, selectedPids, nil
-			} else if s.availableParties.getLength() == len(s.allParties) {
-				log.Info("All responses have been received")
-				return s.leaderWaitFinalized()
+			} else if s.availableParties.Length() == len(s.allParties) && s.request.IsSigning() {
+				// All parties has replied but we have not found a presign set for signing, there is no
+				// need for us to wait more.
+				selectedPids := s.availableParties.getPartyList(s.request.Threshold + 1)
+				return nil, selectedPids, nil
 			}
 		}
 	}
@@ -246,28 +237,10 @@ func (s *PreworkSelection) waitForMemberResponse() ([]string, []*tss.PartyID, er
 	return nil, nil, errors.New("cannot find enough members for this work")
 }
 
-// leaderWaitFinalized is called when the leader's waiting for members timeouted or it cannot find
-// enough members for the tasks or it cannot find a presign id set for the group of available
-// members.
-func (s *PreworkSelection) leaderWaitFinalized() ([]string, []*tss.PartyID, error) {
-	// Time out, this returns failure except for 1 case:
-	//
-	// If this is a signing task and we have enough online (>= threshold + 1) but cannot find
-	// the presigns set to do the signing, we have to do the presign first before doing signing
-	if s.request.IsSigning() {
-		// We have to do presign + signing ƒrom online nodes since we cannot find appropriate presign data.
-		parties := s.availableParties.getPartyList(s.request.Threshold + 1)
-		if len(parties) >= s.request.Threshold+1 {
-			return nil, parties, nil
-		}
-	}
-	return nil, nil, errors.New("Leader fails to find enough participants for the task")
-}
-
 // checkEnoughParticipants is a function called by the leader in the election to see if we have
-// enough nodes to participate and find a common presign set.
+// enough nodes to participate and find a common presign set.result.PresignIds
 func (s *PreworkSelection) checkEnoughParticipants() (bool, []string, []*tss.PartyID) {
-	if s.availableParties.getLength() < s.request.GetMinPartyCount() {
+	if s.availableParties.Length() < s.request.GetMinPartyCount() {
 		return false, nil, make([]*tss.PartyID, 0)
 	}
 
@@ -276,18 +249,81 @@ func (s *PreworkSelection) checkEnoughParticipants() (bool, []string, []*tss.Par
 		// Check if we can find a presign list that match this of nodes.
 		presignIds, selectedPids := s.presignsManager.GetAvailablePresigns(batchSize, s.request.N, s.availableParties.getAllPartiesMap())
 		if len(presignIds) == batchSize {
-			log.Info("checkEnoughParticipants: presignIds = ", presignIds, " batchSize = ", batchSize, " selectedPids = ", selectedPids)
+			log.Info("We found a presign set: presignIds = ", presignIds, " batchSize = ", batchSize, " selectedPids = ", selectedPids)
 			// Announce this as success and return
 			return true, presignIds, selectedPids
 		} else {
-			// Otherwise, keep waiting
-			return false, nil, make([]*tss.PartyID, 0)
+			// We cannot find enough presign, keep waiting.
+			return false, nil, nil
 		}
 	} else {
 		// Choose top parties with highest computing power.
 		topParties, _ := s.availableParties.getTopParties(s.request.GetMinPartyCount())
 
 		return true, nil, topParties
+	}
+}
+
+// Finalize work as a leader and start execution.
+func (s *PreworkSelection) leaderFinalized(success bool, presignIds []string, selectedPids []*tss.PartyID) {
+	log.Verbose("Leader finalized, success = ", success)
+
+	workId := s.request.WorkId
+	if !success { // Failure case
+		msg := common.NewPreExecOutputMessage(s.myPid.Id, "", workId, false, nil, nil)
+		go s.dispatcher.BroadcastMessage(s.allParties, msg)
+
+		s.broadcastResult(SelectionResult{
+			Success: false,
+		})
+		return
+	}
+
+	// Broadcast success to everyone
+	msg := common.NewPreExecOutputMessage(s.myPid.Id, "", workId, true, presignIds, selectedPids)
+	log.Info("Leader: Broadcasting PreExecOutput to everyone...")
+	go s.dispatcher.BroadcastMessage(s.allParties, msg)
+
+	s.broadcastResult(SelectionResult{
+		Success:      true,
+		SelectedPids: selectedPids,
+		PresignIds:   presignIds,
+	})
+}
+
+////////////////////////////////////////////////////////////////////////////
+// MEMBER
+////////////////////////////////////////////////////////////////////////////
+
+func (s *PreworkSelection) doPreExecutionAsMember(leader *tss.PartyID, cachedMsgs []*commonTypes.TssMessage) {
+	// Check in the cache to see if the leader has sent a message to this node regarding the participants.
+	for _, msg := range cachedMsgs {
+		if msg.Type == common.TssMessage_PRE_EXEC_OUTPUT {
+			log.Verbose("We have received final OUTCOME, work id = ", s.request.WorkId)
+			s.memberFinalized(msg.PreExecOutputMessage)
+			return
+		}
+	}
+
+	// Send a message to the leader.
+	tssMsg := common.NewAvailabilityResponseMessage(s.myPid.Id, leader.Id, s.request.WorkId, common.AvailabilityResponseMessage_YES, 1)
+	log.Verbose("Member: Sending response message to the leader, workId = ", s.request.WorkId)
+	go s.dispatcher.UnicastMessage(leader, tssMsg)
+
+	// Waits for response from the leader.
+	select {
+	case <-time.After(s.cfg.SelectionMemberTimeout):
+		// TODO: Report as failure here.
+		log.Error("member: leader wait timed out.")
+		// Blame leader
+
+		s.broadcastResult(SelectionResult{
+			Success:        false,
+			FailureResason: SelectionTimeout,
+		})
+
+	case msg := <-s.preExecMsgCh:
+		s.memberFinalized(msg)
 	}
 }
 
@@ -376,33 +412,6 @@ func (s *PreworkSelection) validateLeaderSelection(msg *common.PreExecOutputMess
 	}
 
 	return true
-}
-
-// Finalize work as a leader and start execution.
-func (s *PreworkSelection) leaderFinalized(success bool, presignIds []string, selectedPids []*tss.PartyID) {
-	log.Verbose("Leader finalized, success = ", success)
-
-	workId := s.request.WorkId
-	if !success { // Failure case
-		msg := common.NewPreExecOutputMessage(s.myPid.Id, "", workId, false, nil, nil)
-		go s.dispatcher.BroadcastMessage(s.allParties, msg)
-
-		s.broadcastResult(SelectionResult{
-			Success: false,
-		})
-		return
-	}
-
-	// Broadcast success to everyone
-	msg := common.NewPreExecOutputMessage(s.myPid.Id, "", workId, true, presignIds, selectedPids)
-	log.Info("Leader: Broadcasting PreExecOutput to everyone...")
-	go s.dispatcher.BroadcastMessage(s.allParties, msg)
-
-	s.broadcastResult(SelectionResult{
-		Success:      true,
-		SelectedPids: selectedPids,
-		PresignIds:   presignIds,
-	})
 }
 
 func (s *PreworkSelection) broadcastResult(result SelectionResult) {

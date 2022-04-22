@@ -119,12 +119,12 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 		)
 
 		cfg := config.NewDefaultTimeoutConfig()
-		cfg.PreworkWaitTimeout = time.Second * 2
+		cfg.SelectionLeaderTimeout = time.Second * 2
 
 		worker := NewPresignWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, cfg.PreworkWaitTimeout+1*time.Second, 0),
+			helper.NewTestDispatcher(outCh, cfg.SelectionLeaderTimeout+1*time.Second, 0),
 			helper.NewMockDatabase(),
 			&helper.MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {

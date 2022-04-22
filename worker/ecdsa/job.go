@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
+	"go.uber.org/atomic"
 
 	wTypes "github.com/sisu-network/dheart/worker/types"
 )
@@ -53,6 +55,8 @@ type Job struct {
 	callback JobCallback
 
 	timeOut time.Duration
+
+	isDone *atomic.Bool
 }
 
 func NewKeygenJob(
@@ -78,6 +82,7 @@ func NewKeygenJob(
 		endKeygenCh: endCh,
 		callback:    callback,
 		timeOut:     timeOut,
+		isDone:      atomic.NewBool(false),
 	}
 }
 
@@ -104,6 +109,7 @@ func NewPresignJob(
 		endPresignCh: endCh,
 		callback:     callback,
 		timeOut:      timeOut,
+		isDone:       atomic.NewBool(false),
 	}
 }
 
@@ -132,6 +138,7 @@ func NewSigningJob(
 		endSigningCh: endCh,
 		callback:     callback,
 		timeOut:      timeOut,
+		isDone:       atomic.NewBool(false),
 	}
 }
 
@@ -163,42 +170,62 @@ func (job *Job) startListening() {
 	outCh := job.outCh
 	endTime := time.Now().Add(job.timeOut)
 
-	for {
-		select {
-		case <-time.After(endTime.Sub(time.Now())):
-			job.callback.OnJobResult(job, JobResult{
-				Success: false,
-				Failure: JobFailureTimeout,
-			})
-			return
+	// Put listening out message channel and end result channel in two separate go routine. Both of
+	// them should run independent of each other.
+	go func() {
+		for {
+			select {
+			case <-time.After(endTime.Sub(time.Now())):
+				log.Warn("Job timeout while waiting for out message")
+				job.callback.OnJobResult(job, JobResult{
+					Success: false,
+					Failure: JobFailureTimeout,
+				})
+				return
 
-		case msg := <-outCh:
-			job.callback.OnJobMessage(job, msg)
-
-		case data := <-job.endKeygenCh:
-			job.callback.OnJobResult(job, JobResult{
-				Success:    true,
-				KeygenData: data,
-			})
-			return
-
-		case data := <-job.endPresignCh:
-			job.callback.OnJobResult(job, JobResult{
-				Success:     true,
-				PresignData: data,
-			})
-			return
-
-		case data := <-job.endSigningCh:
-			job.callback.OnJobResult(job, JobResult{
-				Success:     true,
-				SigningData: data,
-			})
-			return
+			case msg := <-outCh:
+				job.callback.OnJobMessage(job, msg)
+			}
 		}
+	}()
+
+	// Wait for one of the end channel.
+	select {
+	case <-time.After(endTime.Sub(time.Now())):
+		log.Warn("Job timeout waiting for end channel")
+		go job.callback.OnJobResult(job, JobResult{
+			Success: false,
+			Failure: JobFailureTimeout,
+		})
+		return
+
+	case data := <-job.endKeygenCh:
+		job.callback.OnJobResult(job, JobResult{
+			Success:    true,
+			KeygenData: data,
+		})
+		return
+
+	case data := <-job.endPresignCh:
+		job.callback.OnJobResult(job, JobResult{
+			Success:     true,
+			PresignData: data,
+		})
+		return
+
+	case data := <-job.endSigningCh:
+		job.callback.OnJobResult(job, JobResult{
+			Success:     true,
+			SigningData: data,
+		})
+		return
 	}
 }
 
 func (job *Job) processMessage(msg tss.Message) *tss.Error {
-	return helper.SharedPartyUpdater(job.party, msg)
+	err := helper.SharedPartyUpdater(job.party, msg)
+	if err != nil {
+		log.Error("Failed to process message:", msg.Type(), "err = ", err)
+	}
+	return err
 }

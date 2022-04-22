@@ -222,12 +222,10 @@ func (w *WorkerExecutor) loadPreparams() error {
 	return nil
 }
 
-// Called when there is a new message from tss-lib
+// Called when there is a new message from tss-lib. We want this callback to be open even when the
+// executor might stop. Other validator nodes are dependent on our messages and we should keep
+// producing and sending tss update messages to other nodes.
 func (w *WorkerExecutor) OnJobMessage(job *Job, msg tss.Message) {
-	if w.isStopped.Load() {
-		return
-	}
-
 	// Update the list of completed jobs for current round (in the message)
 	msgKey := msg.Type()
 	if !msg.IsBroadcast() {

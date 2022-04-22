@@ -249,7 +249,7 @@ func TestEngineJobTimeout(t *testing.T) {
 
 	for i := 0; i < n; i++ {
 		config := config.NewDefaultTimeoutConfig()
-		config.PreworkWaitTimeout = time.Second * 1
+		config.SelectionLeaderTimeout = time.Second * 1
 		config.PresignJobTimeout = time.Second * 3
 
 		engines[i] = NewEngine(

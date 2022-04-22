@@ -281,7 +281,7 @@ func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error 
 
 func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey) error {
 	if h.ready.Load() != true {
-		fmt.Println("Heart not ready")
+		log.Verbose("Heart not ready")
 		return ErrDheartNotReady
 	}
 
