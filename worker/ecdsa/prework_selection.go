@@ -169,11 +169,6 @@ func (s *PreworkSelection) doPreExecutionAsLeader(cachedMsgs []*commonTypes.TssM
 }
 
 func (s *PreworkSelection) waitForMemberResponse() ([]string, []*tss.PartyID, error) {
-	if ok, presignIds, selectedPids := s.checkEnoughParticipants(); ok {
-		// We have enough participants from cached message. No need to wait.
-		return presignIds, selectedPids, nil
-	}
-
 	// Wait for everyone to reply or timeout.
 	end := time.Now().Add(s.cfg.SelectionLeaderTimeout)
 	for {
@@ -183,7 +178,6 @@ func (s *PreworkSelection) waitForMemberResponse() ([]string, []*tss.PartyID, er
 		}
 
 		timeDiff := end.Sub(now)
-		hashNewAvailableMember := false
 		select {
 		case <-time.After(timeDiff):
 			if s.request.IsSigning() && s.availableParties.Length() >= s.request.Threshold+1 {
@@ -217,19 +211,11 @@ func (s *PreworkSelection) waitForMemberResponse() ([]string, []*tss.PartyID, er
 
 			if tssMsg.AvailabilityResponseMessage.Answer == commonTypes.AvailabilityResponseMessage_YES {
 				s.availableParties.add(party, 1)
-				hashNewAvailableMember = true
-			}
-		}
-
-		if hashNewAvailableMember {
-			if ok, presignIds, selectedPids := s.checkEnoughParticipants(); ok {
-				log.Info("Leader: selectedPids found")
-				return presignIds, selectedPids, nil
-			} else if s.availableParties.Length() == len(s.allParties) && s.request.IsSigning() {
-				// All parties has replied but we have not found a presign set for signing, there is no
-				// need for us to wait more.
-				selectedPids := s.availableParties.getPartyList(s.request.Threshold + 1)
-				return nil, selectedPids, nil
+				// TODO: Check if this is a new member to save one call for checkEnoughParticipants
+				if ok, presignIds, selectedPids := s.checkEnoughParticipants(); ok {
+					log.Info("Leader: selectedPids found")
+					return presignIds, selectedPids, nil
+				}
 			}
 		}
 	}
@@ -252,6 +238,8 @@ func (s *PreworkSelection) checkEnoughParticipants() (bool, []string, []*tss.Par
 			log.Info("We found a presign set: presignIds = ", presignIds, " batchSize = ", batchSize, " selectedPids = ", selectedPids)
 			// Announce this as success and return
 			return true, presignIds, selectedPids
+		} else if s.availableParties.Length() == len(s.allParties) {
+			return true, nil, s.availableParties.getPartyList(s.request.Threshold + 1)
 		} else {
 			// We cannot find enough presign, keep waiting.
 			return false, nil, nil
