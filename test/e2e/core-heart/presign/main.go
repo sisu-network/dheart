@@ -120,6 +120,7 @@ func main() {
 		panic(err)
 	}
 
+	heart.SetSisuReady(true)
 	heart.Keygen("keygenId", "ecdsa", pubkeys)
 	select {
 	case <-time.After(time.Second * 30):

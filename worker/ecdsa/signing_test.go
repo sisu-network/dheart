@@ -172,7 +172,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 
 		workerIndex := i
 		cfg := config.NewDefaultTimeoutConfig()
-		cfg.PreworkWaitTimeout = time.Second * 2
+		cfg.SelectionLeaderTimeout = time.Second * 2
 
 		worker := NewSigningWorker(
 			request,
@@ -240,12 +240,12 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 		)
 
 		cfg := config.NewDefaultTimeoutConfig()
-		cfg.PreworkWaitTimeout = time.Second * 2
+		cfg.SelectionLeaderTimeout = time.Second * 2
 
 		worker := NewSigningWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, cfg.PreworkWaitTimeout+1*time.Second, 0),
+			helper.NewTestDispatcher(outCh, cfg.SelectionLeaderTimeout+1*time.Second, 0),
 			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
 			&helper.MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
@@ -379,6 +379,7 @@ func doTestThreshold(t *testing.T) {
 
 	// Batch should have the same set of party ids.
 	pIDs := helper.GetTestPartyIds(n)
+	// presignInputs := helper.LoadKeygenSavedData(pIDs)
 
 	outCh := make(chan *common.TssMessage)
 	workers := make([]worker.Worker, n)
@@ -400,10 +401,10 @@ func doTestThreshold(t *testing.T) {
 			threshold,
 			signingMsgs,
 			[]string{"eth"},
+			// presignInputs[i],
 			nil,
 		)
 
-		// workerIndex := i
 		myPid := pIDs[i]
 
 		worker := NewSigningWorker(

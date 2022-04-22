@@ -281,6 +281,7 @@ func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error 
 
 func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey) error {
 	if h.ready.Load() != true {
+		log.Verbose("Heart not ready")
 		return ErrDheartNotReady
 	}
 
@@ -314,7 +315,6 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	}
 
 	n := len(tPubKeys)
-
 	nodes := NewNodes(tPubKeys)
 	pids := make([]*tss.PartyID, n)
 	for i, node := range nodes {

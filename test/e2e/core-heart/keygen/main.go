@@ -96,6 +96,7 @@ func main() {
 	pubkeys := getPublicKeys(n)
 
 	heart := core.NewHeart(heartConfig, mockClient)
+	heart.Start()
 	heart.SetBootstrappedKeys(pubkeys)
 
 	err = heart.SetPrivKey(hex.EncodeToString(encryptedKey), "secp256k1")
@@ -103,6 +104,7 @@ func main() {
 		panic(err)
 	}
 
+	heart.SetSisuReady(true)
 	heart.Keygen("keygenId", "ecdsa", pubkeys)
 
 	select {

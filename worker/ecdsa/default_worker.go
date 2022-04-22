@@ -3,6 +3,7 @@ package ecdsa
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"go.uber.org/atomic"
 
@@ -43,6 +44,17 @@ type WorkerCallback interface {
 	OnWorkPresignFinished(request *types.WorkRequest, selectedPids []*tss.PartyID, data []*presign.LocalPresignData)
 
 	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData)
+}
+
+type WorkerResult struct {
+	Success        bool
+	IsNodeSelected bool
+
+	Request      *types.WorkRequest
+	KeygenData   []*keygen.LocalPartySaveData
+	PresignData  []*presign.LocalPresignData
+	SigningData  []*libCommon.SignatureData
+	SelectedPids []*tss.PartyID
 }
 
 // Implements worker.Worker interface
@@ -86,13 +98,12 @@ type DefaultWorker struct {
 	preworkSelection  *PreworkSelection
 	executor          *WorkerExecutor
 	secondaryExecutor *WorkerExecutor
-	curWorkType       wTypes.WorkType
-
 	// Current job type of this worker. In most case, it's the same as jobType. However, in some case
 	// it could be different. For example, a signing work that requires presign will have curJobType
 	// value equal presign.
-	isExecutionStarted atomic.Value
-	isStopped          atomic.Value
+	curWorkType wTypes.WorkType
+
+	isStopped *atomic.Bool
 }
 
 func NewKeygenWorker(
@@ -172,6 +183,7 @@ func baseWorker(
 		preExecutionCache: preExecutionCache,
 		cfg:               cfg,
 		maxJob:            maxJob,
+		isStopped:         atomic.NewBool(false),
 	}
 }
 
@@ -191,6 +203,8 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 	cacheMsgs := w.preExecutionCache.PopAllMessages(w.workId, commonTypes.GetPreworkSelectionMsgType())
 	go w.preworkSelection.Run(cacheMsgs)
 
+	log.Info("Worker started for job ", w.request.WorkType)
+
 	return nil
 }
 
@@ -202,6 +216,7 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 	}
 
 	if result.IsNodeExcluded {
+		log.Info("I am not selected")
 		// We are not selected. Return result in the callback and do nothing.
 		w.callback.OnNodeNotSelected(w.request)
 		return
@@ -242,6 +257,29 @@ func (w *DefaultWorker) startExecutor(selectedPids []*tss.PartyID, signingInput 
 	cacheMsgs := w.preExecutionCache.PopAllMessages(w.workId, commonTypes.GetUpdateMessageType())
 	go executor.Run(cacheMsgs)
 	return executor
+}
+
+func (w *DefaultWorker) startTimeoutClock() {
+	var timeout time.Duration
+	switch w.request.WorkType {
+	case types.EcdsaKeygen:
+		timeout = w.cfg.KeygenJobTimeout
+	case types.EcdsaPresign:
+		timeout = w.cfg.PresignJobTimeout
+	case types.EcdsaSigning:
+		timeout = w.cfg.SigningJobTimeout
+	default:
+		log.Critical("Unknown work type: ", w.request.WorkType)
+		return
+	}
+
+	timeout = timeout + w.cfg.SelectionLeaderTimeout
+
+	select {
+	case <-time.After(timeout):
+		w.Stop()
+		return
+	}
 }
 
 func (w *DefaultWorker) getPidFromId(id string) *tss.PartyID {
@@ -306,7 +344,7 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 	return nil
 }
 
-func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result WorkExecutionResult) {
+func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result ExecutionResult) {
 	if result.Success {
 		switch executor.workType {
 		case types.EcdsaKeygen, types.EddsaKeygen:
@@ -338,6 +376,17 @@ func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result Wo
 }
 
 func (w *DefaultWorker) Stop() {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
+	if !w.isStopped.Load() {
+		go w.preworkSelection.Stop()
+		if w.executor != nil {
+			go w.executor.Stop()
+		} else if w.secondaryExecutor != nil {
+			go w.secondaryExecutor.Stop()
+		}
+	}
 }
 
 func (w *DefaultWorker) GetCulprits() []*tss.PartyID {
