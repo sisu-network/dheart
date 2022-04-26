@@ -100,7 +100,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 	// Do not delete
 	// Save presign data. Uncomment this line to save presign data fixtures after test (these
 	// fixtures could be used in signing test)
-	// helper.SavePresignData(n, presignOutputs, pIDs, 1)
+	// helper.SavePresignData(n, presignOutputs, pIDs, 0)
 }
 
 func TestPresign_PreExecutionTimeout(t *testing.T) {

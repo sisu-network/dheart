@@ -360,7 +360,7 @@ func verifySignature(t *testing.T, msgs []string, outputs [][]*libCommon.ECSigna
 // Runs test when we have a strict threshold < n - 1.
 // We need to run test multiple times to make sure we do not have concurrent issue.
 func TestSigning_Threshold(t *testing.T) {
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 5; i++ {
 		doTestThreshold(t)
 	}
 }
