@@ -65,7 +65,7 @@ var (
 type MockWorkerCallback struct {
 	OnWorkKeygenFinishedFunc  func(request *types.WorkRequest, data []*keygen.LocalPartySaveData)
 	OnWorkPresignFinishedFunc func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
-	OnWorkSigningFinishedFunc func(request *types.WorkRequest, data []*libCommon.SignatureData)
+	OnWorkSigningFinishedFunc func(request *types.WorkRequest, data []*libCommon.ECSignature)
 	OnNodeNotSelectedFunc     func(request *types.WorkRequest)
 	OnWorkFailedFunc          func(request *types.WorkRequest)
 	GetAvailablePresignsFunc  func(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
@@ -74,7 +74,7 @@ type MockWorkerCallback struct {
 	workerIndex     int
 	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)
 	presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
-	signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.SignatureData)
+	signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.ECSignature)
 }
 
 func (cb *MockWorkerCallback) OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
@@ -89,7 +89,7 @@ func (cb *MockWorkerCallback) OnWorkPresignFinished(request *types.WorkRequest, 
 	}
 }
 
-func (cb *MockWorkerCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+func (cb *MockWorkerCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature) {
 	if cb.OnWorkSigningFinishedFunc != nil {
 		cb.OnWorkSigningFinishedFunc(request, data)
 	}

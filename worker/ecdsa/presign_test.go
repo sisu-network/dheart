@@ -1,7 +1,6 @@
 package ecdsa
 
 import (
-	"math/big"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -87,8 +86,6 @@ func TestPresign_EndToEnd(t *testing.T) {
 
 	// Run all workers
 	runAllWorkers(workers, outCh, done)
-
-	verifyPubKey(t, n, batchSize, presignOutputs)
 
 	// Do not delete
 	// Save presign data. Uncomment this line to save presign data fixtures after test (these
@@ -274,21 +271,5 @@ func TestPresign_Threshold(t *testing.T) {
 
 	assert.Equal(t, threshold+1, len(presignOutputs), "Presign output length is not correct")
 
-	verifyPubKey(t, threshold+1, batchSize, presignOutputs)
-
 	// helper.SavePresignData(n, presignOutputs, 2)
-}
-
-func verifyPubKey(t *testing.T, n, batchSize int, presignOutputs [][]*presign.LocalPresignData) {
-	for j := 0; j < batchSize; j++ {
-		w := big.NewInt(0)
-		for i := 0; i < n; i++ {
-			w.Add(w, presignOutputs[i][j].W)
-		}
-		w.Mod(w, tss.EC().Params().N)
-
-		px, py := tss.EC().ScalarBaseMult(w.Bytes())
-		assert.Equal(t, px, presignOutputs[0][j].ECDSAPub.X())
-		assert.Equal(t, py, presignOutputs[0][j].ECDSAPub.Y())
-	}
 }

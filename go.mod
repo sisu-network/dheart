@@ -18,12 +18,12 @@ require (
 	github.com/logdna/logdna-go v1.0.2
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/sisu-network/lib v0.0.1-alpha17
-	github.com/sisu-network/tss-lib v0.1.1
+	github.com/sisu-network/tss-lib v0.1.3-0.20220426065813-663cff86e960
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
-	google.golang.org/protobuf v1.27.1
+	google.golang.org/protobuf v1.28.0
 )
 
 require (
@@ -128,7 +128,7 @@ require (
 	go.uber.org/zap v1.16.0 // indirect
 	golang.org/x/net v0.0.0-20210903162142-ad29c8ab022f // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20210903071746-97244b99971b // indirect
+	golang.org/x/sys v0.0.0-20210917161153-d61c044b1678 // indirect
 	golang.org/x/text v0.3.6 // indirect
 	google.golang.org/genproto v0.0.0-20210114201628-6edceaf6022f // indirect
 	google.golang.org/grpc v1.37.0 // indirect

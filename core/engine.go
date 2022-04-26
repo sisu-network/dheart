@@ -269,7 +269,7 @@ func (engine *defaultEngine) OnWorkPresignFinished(request *types.WorkRequest, p
 	engine.startNextWork()
 }
 
-func (engine *defaultEngine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData) {
+func (engine *defaultEngine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature) {
 	log.Info("Signing finished for workId ", request.WorkId)
 
 	signatures := make([][]byte, len(data))

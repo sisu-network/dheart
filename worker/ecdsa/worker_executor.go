@@ -30,7 +30,7 @@ type ExecutionResult struct {
 
 	KeygenOutputs  []*keygen.LocalPartySaveData
 	PresignOutputs []*presign.LocalPresignData
-	SigningOutputs []*libCommon.SignatureData
+	SigningOutputs []*libCommon.ECSignature
 }
 
 type WorkerExecutor struct {
@@ -70,7 +70,7 @@ type WorkerExecutor struct {
 
 	keygenOutputs   []*keygen.LocalPartySaveData
 	presignOutputs  []*presign.LocalPresignData
-	signingOutputs  []*libCommon.SignatureData
+	signingOutputs  []*libCommon.ECSignature
 	finalOutputLock *sync.RWMutex
 	isStopped       atomic.Bool
 
@@ -110,7 +110,7 @@ func NewWorkerExecutor(
 		finalOutputLock: &sync.RWMutex{},
 		keygenOutputs:   make([]*keygen.LocalPartySaveData, request.BatchSize),
 		presignOutputs:  make([]*presign.LocalPresignData, request.BatchSize),
-		signingOutputs:  make([]*libCommon.SignatureData, request.BatchSize),
+		signingOutputs:  make([]*libCommon.ECSignature, request.BatchSize),
 		jobOutput:       make(map[string][]tss.Message),
 		isStopped:       *atomic.NewBool(false),
 		cfg:             cfg,
@@ -329,7 +329,7 @@ func (w *WorkerExecutor) onJobKeygenFinished(job *Job, result JobResult) (Execut
 // Implements onJobPresignFinished of JobCallback.
 func (w *WorkerExecutor) onJobPresignFinished(job *Job, result JobResult) (ExecutionResult, bool) {
 	w.finalOutputLock.Lock()
-	w.presignOutputs[job.index] = &result.PresignData
+	w.presignOutputs[job.index] = result.PresignData
 	// Count the number of finished job.
 	count := 0
 	for _, item := range w.presignOutputs {
@@ -353,7 +353,7 @@ func (w *WorkerExecutor) onJobPresignFinished(job *Job, result JobResult) (Execu
 // Implements onJobSignFinished of JobCallback.
 func (w *WorkerExecutor) onJobSignFinished(job *Job, result JobResult) (ExecutionResult, bool) {
 	w.finalOutputLock.Lock()
-	w.signingOutputs[job.index] = &result.SigningData
+	w.signingOutputs[job.index] = result.SigningData
 	// Count the number of finished job.
 	count := 0
 	for _, item := range w.signingOutputs {
