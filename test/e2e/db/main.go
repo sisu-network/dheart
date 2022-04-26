@@ -69,10 +69,10 @@ func testInsertingPresignData(database db.Database) {
 	}
 	output := []*presign.LocalPresignData{
 		{
-			PartyIds: pids,
+			PartyId: "part1",
 		},
 		{
-			PartyIds: pids,
+			PartyId: "part2",
 		},
 	}
 
