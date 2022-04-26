@@ -280,11 +280,11 @@ func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
 		var batchCompleted bool
 		switch job.jobType {
 		case types.EcdsaKeygen:
-			workResult, batchCompleted = w.onJobKeygenFinished(job, result)
+			workResult, batchCompleted = w.checkKeygenResult(job, result)
 		case types.EcdsaPresign:
-			workResult, batchCompleted = w.onJobPresignFinished(job, result)
+			workResult, batchCompleted = w.checkPresignResult(job, result)
 		case types.EcdsaSigning:
-			workResult, batchCompleted = w.onJobSignFinished(job, result)
+			workResult, batchCompleted = w.checkSigningResult(job, result)
 		}
 
 		if batchCompleted {
@@ -300,9 +300,9 @@ func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
 	}
 }
 
-// Implements onJobKeygenFinished of JobCallback. This function is called from a job after key
+// Implements checkKeygenResult of JobCallback. This function is called from a job after key
 // generation finishes.
-func (w *WorkerExecutor) onJobKeygenFinished(job *Job, result JobResult) (ExecutionResult, bool) {
+func (w *WorkerExecutor) checkKeygenResult(job *Job, result JobResult) (ExecutionResult, bool) {
 	w.finalOutputLock.Lock()
 	w.keygenOutputs[job.index] = &result.KeygenData
 	// Count the number of finished job.
@@ -326,8 +326,8 @@ func (w *WorkerExecutor) onJobKeygenFinished(job *Job, result JobResult) (Execut
 	return ExecutionResult{}, false
 }
 
-// Implements onJobPresignFinished of JobCallback.
-func (w *WorkerExecutor) onJobPresignFinished(job *Job, result JobResult) (ExecutionResult, bool) {
+// Implements checkPresignResult of JobCallback.
+func (w *WorkerExecutor) checkPresignResult(job *Job, result JobResult) (ExecutionResult, bool) {
 	w.finalOutputLock.Lock()
 	w.presignOutputs[job.index] = result.PresignData
 	// Count the number of finished job.
@@ -350,8 +350,8 @@ func (w *WorkerExecutor) onJobPresignFinished(job *Job, result JobResult) (Execu
 	return ExecutionResult{}, false
 }
 
-// Implements onJobSignFinished of JobCallback.
-func (w *WorkerExecutor) onJobSignFinished(job *Job, result JobResult) (ExecutionResult, bool) {
+// Implements checkSigningResult of JobCallback.
+func (w *WorkerExecutor) checkSigningResult(job *Job, result JobResult) (ExecutionResult, bool) {
 	w.finalOutputLock.Lock()
 	w.signingOutputs[job.index] = result.SigningData
 	// Count the number of finished job.
