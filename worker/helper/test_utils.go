@@ -234,6 +234,7 @@ func (m *MockDatabase) LoadPeers() []*p2ptypes.Peer {
 
 type PresignDataWrapper struct {
 	Outputs [][]*presign.LocalPresignData
+	PIDs    tss.SortedPartyIDs
 }
 
 //---/
@@ -413,9 +414,10 @@ func LoadKeygenSavedData(pids tss.SortedPartyIDs) []*keygen.LocalPartySaveData {
 	return savedData
 }
 
-func SavePresignData(n int, data [][]*presign.LocalPresignData, testIndex int) error {
+func SavePresignData(n int, data [][]*presign.LocalPresignData, pIDs tss.SortedPartyIDs, testIndex int) error {
 	wrapper := &PresignDataWrapper{
 		Outputs: data,
+		PIDs:    pIDs,
 	}
 
 	fileName := GetTestSavedFileName(TestPresignSavedDataFixtureDirFormat, TestPresignSavedDataFixtureFileFormat, testIndex)

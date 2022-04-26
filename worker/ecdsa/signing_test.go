@@ -73,9 +73,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	n := len(wrapper.Outputs)
 
 	// Batch should have the same set of party ids.
-	// pIDs := wrapper.Outputs[0][0].PartyIds
-	pIDs := tss.SortPartyIDs(make([]*tss.PartyID, 0))
-	fmt.Println("ZZZZZZZ")
+	pIDs := wrapper.PIDs
 
 	outCh := make(chan *common.TssMessage)
 	workers := make([]worker.Worker, n)
@@ -223,11 +221,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 func TestSigning_PreExecutionTimeout(t *testing.T) {
 	wrapper := helper.LoadPresignSavedData(0)
 	n := len(wrapper.Outputs)
-
-	// Batch should have the same set of party ids.
-	// pIDs := wrapper.Outputs[0][0].PartyIds
-	pIDs := tss.SortPartyIDs(make([]*tss.PartyID, 0))
-	fmt.Println("ZZZZZZZ")
+	pIDs := wrapper.PIDs
 
 	outCh := make(chan *common.TssMessage, 4)
 	workers := make([]worker.Worker, n)
@@ -280,11 +274,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 func TestSigning_ExecutionTimeout(t *testing.T) {
 	wrapper := helper.LoadPresignSavedData(0)
 	n := len(wrapper.Outputs)
-
-	// Batch should have the same set of party ids.
-	// pIDs := wrapper.Outputs[0][0].PartyIds
-	pIDs := tss.SortPartyIDs(make([]*tss.PartyID, 0))
-	fmt.Println("ZZZZZZZ")
+	pIDs := wrapper.PIDs
 
 	outCh := make(chan *common.TssMessage, 4)
 	workers := make([]worker.Worker, n)
@@ -370,7 +360,7 @@ func verifySignature(t *testing.T, msgs []string, outputs [][]*libCommon.ECSigna
 // Runs test when we have a strict threshold < n - 1.
 // We need to run test multiple times to make sure we do not have concurrent issue.
 func TestSigning_Threshold(t *testing.T) {
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 1; i++ {
 		doTestThreshold(t)
 	}
 }
@@ -384,13 +374,25 @@ func doTestThreshold(t *testing.T) {
 		t.Fatal(fmt.Errorf("Signing input is not correct!"))
 	}
 
-	// selectedPids := wrapper.Outputs[0][0].PartyIds
-	selectedPids := tss.SortPartyIDs(make([]*tss.PartyID, 0))
-	fmt.Println("ZZZZZZZ")
+	// This is pids of all parties taking part in the presign. Not all are guaranteed to be selected.
+	pIDs := wrapper.PIDs
+	presignDataMap := make(map[string]*presign.LocalPresignData)
+	selectedPids := make([]*tss.PartyID, 0)
+	for _, output := range wrapper.Outputs {
+		for _, partyId := range pIDs {
+			if output[0].PartyId == partyId.Id {
+				selectedPids = append(selectedPids, partyId)
+				presignDataMap[partyId.Id] = output[0]
+				break
+			}
+		}
+	}
 
-	// Batch should have the same set of party ids.
-	pIDs := helper.GetTestPartyIds(n)
-	// presignInputs := helper.LoadKeygenSavedData(pIDs)
+	if len(selectedPids) != threshold+1 {
+		panic("selectedPids does not match threshold + 1")
+	}
+
+	selectedPids = tss.SortPartyIDs(selectedPids)
 
 	outCh := make(chan *common.TssMessage)
 	workers := make([]worker.Worker, n)
@@ -412,7 +414,6 @@ func doTestThreshold(t *testing.T) {
 			threshold,
 			signingMsgs,
 			[]string{"eth"},
-			// presignInputs[i],
 			nil,
 		)
 
@@ -436,13 +437,7 @@ func doTestThreshold(t *testing.T) {
 				},
 
 				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
-					for i := 0; i < len(selectedPids); i++ {
-						if selectedPids[i].Id == myPid.Id {
-							return wrapper.Outputs[i]
-						}
-					}
-
-					return nil
+					return []*presign.LocalPresignData{presignDataMap[myPid.Id]}
 				},
 
 				OnNodeNotSelectedFunc: func(request *types.WorkRequest) {

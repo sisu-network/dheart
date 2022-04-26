@@ -31,6 +31,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 	log.Verbose("Running TestPresign_EndToEnd")
 	n := 4
 	batchSize := 1
+	threshold := n - 1
 
 	pIDs := helper.GetTestPartyIds(n)
 
@@ -40,20 +41,19 @@ func TestPresign_EndToEnd(t *testing.T) {
 	done := make(chan bool)
 	finishedWorkerCount := 0
 
-	presignOutputs := make([][]*presign.LocalPresignData, len(pIDs)) // n * batchSize
+	presignOutputs := make([][]*presign.LocalPresignData, 0)
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
 		request := types.NewPresignRequest(
 			"Presign0",
 			helper.CopySortedPartyIds(pIDs),
-			len(pIDs)-1,
+			threshold,
 			presignInputs[i],
 			false,
 			batchSize,
 		)
 
-		workerIndex := i
 		cfg := config.NewDefaultTimeoutConfig()
 		cfg.MonitorMessageTimeout = time.Second * 60
 
@@ -63,11 +63,21 @@ func TestPresign_EndToEnd(t *testing.T) {
 			helper.NewTestDispatcher(outCh, 0, 0),
 			helper.NewMockDatabase(),
 			&helper.MockWorkerCallback{
+				OnNodeNotSelectedFunc: func(request *types.WorkRequest) {
+					outputLock.Lock()
+					defer outputLock.Unlock()
+
+					finishedWorkerCount += 1
+					if finishedWorkerCount == n {
+						done <- true
+					}
+				},
+
 				OnWorkPresignFinishedFunc: func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					presignOutputs[workerIndex] = data
+					presignOutputs = append(presignOutputs, data)
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true
@@ -90,7 +100,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 	// Do not delete
 	// Save presign data. Uncomment this line to save presign data fixtures after test (these
 	// fixtures could be used in signing test)
-	// helper.SavePresignData(n, presignOutputs, 0)
+	// helper.SavePresignData(n, presignOutputs, pIDs, 1)
 }
 
 func TestPresign_PreExecutionTimeout(t *testing.T) {
