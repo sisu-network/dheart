@@ -43,7 +43,7 @@ type WorkerCallback interface {
 
 	OnWorkPresignFinished(request *types.WorkRequest, selectedPids []*tss.PartyID, data []*presign.LocalPresignData)
 
-	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.SignatureData)
+	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature)
 }
 
 type WorkerResult struct {
@@ -53,7 +53,7 @@ type WorkerResult struct {
 	Request      *types.WorkRequest
 	KeygenData   []*keygen.LocalPartySaveData
 	PresignData  []*presign.LocalPresignData
-	SigningData  []*libCommon.SignatureData
+	SigningData  []*libCommon.ECSignature
 	SelectedPids []*tss.PartyID
 }
 

@@ -37,8 +37,8 @@ type JobResult struct {
 	Failure JobFailure
 
 	KeygenData  keygen.LocalPartySaveData
-	PresignData presign.LocalPresignData
-	SigningData libCommon.SignatureData
+	PresignData *presign.LocalPresignData
+	SigningData *libCommon.ECSignature
 }
 
 type Job struct {
@@ -48,8 +48,8 @@ type Job struct {
 
 	outCh        chan tss.Message
 	endKeygenCh  chan keygen.LocalPartySaveData
-	endPresignCh chan presign.LocalPresignData
-	endSigningCh chan libCommon.SignatureData
+	endPresignCh chan *presign.LocalPresignData
+	endSigningCh chan *libCommon.ECSignature
 
 	party    tss.Party
 	callback JobCallback
@@ -96,9 +96,9 @@ func NewPresignJob(
 	timeOut time.Duration,
 ) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
-	endCh := make(chan presign.LocalPresignData, len(pIDs))
+	endCh := make(chan *presign.LocalPresignData, len(pIDs))
 
-	party := presign.NewLocalParty(pIDs, params, *savedData, outCh, endCh)
+	party := presign.NewLocalParty(params, *savedData, outCh, endCh)
 
 	return &Job{
 		workId:       workId,
@@ -124,10 +124,10 @@ func NewSigningJob(
 	timeOut time.Duration,
 ) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
-	endCh := make(chan libCommon.SignatureData, len(pIDs))
+	endCh := make(chan *libCommon.ECSignature, len(pIDs))
 
 	msgInt := hashToInt([]byte(msg), tss.EC())
-	party := signing.NewLocalParty(msgInt, params, signingInput, outCh, endCh)
+	party := signing.NewLocalParty(msgInt, params, *signingInput, outCh, endCh)
 
 	return &Job{
 		workId:       workId,

@@ -107,8 +107,7 @@ func TestSqlDatabase_SavePresignData(t *testing.T) {
 	}}
 	presignData := []*presign.LocalPresignData{
 		{
-			W: big.NewInt(10),
-			K: big.NewInt(10),
+			PartyId: "partyId",
 		},
 	}
 
@@ -139,12 +138,10 @@ func TestSqlDatabase_LoadPresign(t *testing.T) {
 
 	presignData := []*presign.LocalPresignData{
 		{
-			W: big.NewInt(10),
-			K: big.NewInt(10),
+			PartyId: "partyId1",
 		},
 		{
-			W: big.NewInt(10),
-			K: big.NewInt(10),
+			PartyId: "partyId2",
 		},
 	}
 
