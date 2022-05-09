@@ -3,8 +3,8 @@ package message
 import (
 	"errors"
 
-	"github.com/rs/zerolog/log"
 	wtypes "github.com/sisu-network/dheart/worker/types"
+	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/ecdsa/signing"

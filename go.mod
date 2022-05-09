@@ -18,7 +18,7 @@ require (
 	github.com/logdna/logdna-go v1.0.2
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/sisu-network/lib v0.0.1-alpha17
-	github.com/sisu-network/tss-lib v0.1.3-0.20220426191741-fb2bd9cadf8d
+	github.com/sisu-network/tss-lib v0.1.3-0.20220509210501-a0a7debd5ee7
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	go.uber.org/atomic v1.7.0
