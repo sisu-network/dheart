@@ -3,6 +3,7 @@ package message
 import (
 	"errors"
 
+	"github.com/rs/zerolog/log"
 	wtypes "github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -54,6 +55,20 @@ func GetMsgRound(content tss.MessageContent) (Round, error) {
 
 	default:
 		return 0, errors.New("unknown round")
+	}
+}
+
+func GetMessageCountByWorkType(jobType wtypes.WorkType) int {
+	switch jobType {
+	case wtypes.EcdsaKeygen:
+		return 4
+	case wtypes.EcdsaPresign:
+		return 8
+	case wtypes.EcdsaSigning:
+		return 1
+	default:
+		log.Error("Unsupported work type: ", jobType.String())
+		return 0
 	}
 }
 
