@@ -4,8 +4,10 @@ import (
 	"crypto/elliptic"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
+	"github.com/sisu-network/dheart/core/message"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
@@ -42,21 +44,23 @@ type JobResult struct {
 }
 
 type Job struct {
-	workId  string
-	jobType wTypes.WorkType
-	index   int
-
+	// Immutable data
+	workId       string
+	jobType      wTypes.WorkType
+	index        int
 	outCh        chan tss.Message
 	endKeygenCh  chan keygen.LocalPartySaveData
 	endPresignCh chan *presign.LocalPresignData
 	endSigningCh chan *libCommon.ECSignature
+	party        tss.Party
+	callback     JobCallback
+	timeOut      time.Duration
 
-	party    tss.Party
-	callback JobCallback
-
-	timeOut time.Duration
-
-	isDone *atomic.Bool
+	// Mutable data
+	finishedMsgs map[string]bool
+	finishLock   *sync.RWMutex
+	doneOutCh    *atomic.Bool
+	doneEndCh    *atomic.Bool
 }
 
 func NewKeygenJob(
@@ -73,17 +77,11 @@ func NewKeygenJob(
 
 	party := keygen.NewLocalParty(params, outCh, endCh, *localPreparams).(*keygen.LocalParty)
 
-	return &Job{
-		workId:      workId,
-		index:       index,
-		jobType:     wTypes.EcdsaKeygen,
-		party:       party,
-		outCh:       outCh,
-		endKeygenCh: endCh,
-		callback:    callback,
-		timeOut:     timeOut,
-		isDone:      atomic.NewBool(false),
-	}
+	job := baseJob(workId, index, party, wTypes.EcdsaKeygen, callback, timeOut)
+	job.outCh = outCh
+	job.endKeygenCh = endCh
+
+	return job
 }
 
 func NewPresignJob(
@@ -100,17 +98,11 @@ func NewPresignJob(
 
 	party := presign.NewLocalParty(params, *savedData, outCh, endCh)
 
-	return &Job{
-		workId:       workId,
-		index:        index,
-		jobType:      wTypes.EcdsaPresign,
-		party:        party,
-		outCh:        outCh,
-		endPresignCh: endCh,
-		callback:     callback,
-		timeOut:      timeOut,
-		isDone:       atomic.NewBool(false),
-	}
+	job := baseJob(workId, index, party, wTypes.EcdsaPresign, callback, timeOut)
+	job.outCh = outCh
+	job.endPresignCh = endCh
+
+	return job
 }
 
 func NewSigningJob(
@@ -129,16 +121,33 @@ func NewSigningJob(
 	msgInt := hashToInt([]byte(msg), tss.EC())
 	party := signing.NewLocalParty(msgInt, params, *signingInput, outCh, endCh)
 
+	job := baseJob(workId, index, party, wTypes.EcdsaSigning, callback, timeOut)
+
+	job.outCh = outCh
+	job.endSigningCh = endCh
+
+	return job
+}
+
+func baseJob(
+	workId string,
+	index int,
+	party tss.Party,
+	jobType wTypes.WorkType,
+	callback JobCallback,
+	timeOut time.Duration,
+) *Job {
 	return &Job{
 		workId:       workId,
 		index:        index,
-		jobType:      wTypes.EcdsaSigning,
 		party:        party,
-		outCh:        outCh,
-		endSigningCh: endCh,
+		jobType:      jobType,
 		callback:     callback,
 		timeOut:      timeOut,
-		isDone:       atomic.NewBool(false),
+		finishLock:   &sync.RWMutex{},
+		finishedMsgs: make(map[string]bool),
+		doneOutCh:    atomic.NewBool(false),
+		doneEndCh:    atomic.NewBool(false),
 	}
 }
 
@@ -170,55 +179,61 @@ func (job *Job) startListening() {
 	outCh := job.outCh
 	endTime := time.Now().Add(job.timeOut)
 
-	// Put listening out message channel and end result channel in two separate go routine. Both of
-	// them should run independent of each other.
-	go func() {
-		for {
-			select {
-			case <-time.After(endTime.Sub(time.Now())):
-				log.Warn("Job timeout while waiting for out message")
-				job.callback.OnJobResult(job, JobResult{
+	// Wait for one of the end channel.
+	for {
+		select {
+		case <-time.After(endTime.Sub(time.Now())):
+			if !job.isDone() {
+				log.Warn("Job timeout waiting for end channel")
+				go job.callback.OnJobResult(job, JobResult{
 					Success: false,
 					Failure: JobFailureTimeout,
 				})
-				return
+			}
 
-			case msg := <-outCh:
-				job.callback.OnJobMessage(job, msg)
+			return
+
+		case msg := <-outCh:
+			job.addOutMessage(msg)
+			job.callback.OnJobMessage(job, msg)
+
+			if job.isDone() {
+				return
+			}
+
+		case data := <-job.endKeygenCh:
+			job.doneEndCh.Store(true)
+			job.callback.OnJobResult(job, JobResult{
+				Success:    true,
+				KeygenData: data,
+			})
+
+			if job.isDone() {
+				return
+			}
+
+		case data := <-job.endPresignCh:
+			job.doneEndCh.Store(true)
+			job.callback.OnJobResult(job, JobResult{
+				Success:     true,
+				PresignData: data,
+			})
+
+			if job.isDone() {
+				return
+			}
+
+		case data := <-job.endSigningCh:
+			job.doneEndCh.Store(true)
+			job.callback.OnJobResult(job, JobResult{
+				Success:     true,
+				SigningData: data,
+			})
+
+			if job.isDone() {
+				return
 			}
 		}
-	}()
-
-	// Wait for one of the end channel.
-	select {
-	case <-time.After(endTime.Sub(time.Now())):
-		log.Warn("Job timeout waiting for end channel")
-		go job.callback.OnJobResult(job, JobResult{
-			Success: false,
-			Failure: JobFailureTimeout,
-		})
-		return
-
-	case data := <-job.endKeygenCh:
-		job.callback.OnJobResult(job, JobResult{
-			Success:    true,
-			KeygenData: data,
-		})
-		return
-
-	case data := <-job.endPresignCh:
-		job.callback.OnJobResult(job, JobResult{
-			Success:     true,
-			PresignData: data,
-		})
-		return
-
-	case data := <-job.endSigningCh:
-		job.callback.OnJobResult(job, JobResult{
-			Success:     true,
-			SigningData: data,
-		})
-		return
 	}
 }
 
@@ -228,4 +243,20 @@ func (job *Job) processMessage(msg tss.Message) *tss.Error {
 		log.Error("Failed to process message:", msg.Type(), "err = ", err)
 	}
 	return err
+}
+
+func (job *Job) addOutMessage(msg tss.Message) {
+	job.finishLock.Lock()
+	job.finishedMsgs[msg.Type()] = true
+	count := len(job.finishedMsgs)
+	job.finishLock.Unlock()
+
+	if count == message.GetMessageCountByWorkType(job.jobType) {
+		// Mark the outCh done
+		job.doneOutCh.Store(true)
+	}
+}
+
+func (job *Job) isDone() bool {
+	return job.doneEndCh.Load() && job.doneOutCh.Load()
 }

@@ -9,6 +9,25 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
+type MockJobCallback struct {
+	OnJobMessageFunc func(job *Job, msg tss.Message)
+	OnJobResultFunc  func(job *Job, result JobResult)
+}
+
+func (cb *MockJobCallback) OnJobMessage(job *Job, msg tss.Message) {
+	if cb.OnJobMessageFunc != nil {
+		cb.OnJobMessageFunc(job, msg)
+	}
+}
+
+func (cb *MockJobCallback) OnJobResult(job *Job, result JobResult) {
+	if cb.OnJobResultFunc != nil {
+		cb.OnJobResultFunc(job, result)
+	}
+}
+
+//---/
+
 func startAllWorkers(workers []worker.Worker) {
 	// Start all workers
 	wg := sync.WaitGroup{}
@@ -92,4 +111,27 @@ func flattenPidMaps(m map[string]*tss.PartyID) []*tss.PartyID {
 	}
 
 	return pids
+}
+
+func routeJobMesasge(jobs []*Job, cbs []*MockJobCallback, wg *sync.WaitGroup) {
+	n := len(jobs)
+	for i := 0; i < n; i++ {
+		cbs[i].OnJobMessageFunc = func(job *Job, msg tss.Message) {
+			for _, other := range jobs {
+				if other.party.PartyID().Id == job.party.PartyID().Id {
+					continue
+				}
+
+				if msg.IsBroadcast() {
+					go other.processMessage(msg)
+				} else if other.party.PartyID().Id == msg.GetTo()[0].Id {
+					go other.processMessage(msg)
+				}
+			}
+		}
+
+		cbs[i].OnJobResultFunc = func(job *Job, result JobResult) {
+			wg.Done()
+		}
+	}
 }
