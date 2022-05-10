@@ -10,6 +10,7 @@ type MockClient struct {
 	PostKeygenResultFunc  func(result *types.KeygenResult) error
 	PostPresignResultFunc func(result *types.PresignResult) error
 	PostKeysignResultFunc func(result *types.KeysignResult) error
+	PostReshareResultFunc func(result *types.ReshareResult) error
 }
 
 func (m *MockClient) TryDial() {
@@ -40,4 +41,13 @@ func (m *MockClient) PostPresignResult(result *types.PresignResult) error {
 	}
 
 	return nil
+}
+
+func (m *MockClient) PostReshareResult(result *types.ReshareResult) error {
+	if m.PostReshareResultFunc != nil {
+		return m.PostReshareResultFunc(result)
+	}
+
+	return nil
+
 }

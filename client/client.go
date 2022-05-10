@@ -23,6 +23,7 @@ type Client interface {
 	PostKeygenResult(result *types.KeygenResult) error
 	PostPresignResult(result *types.PresignResult) error
 	PostKeysignResult(result *types.KeysignResult) error
+	PostReshareResult(result *types.ReshareResult) error
 }
 
 // A client that connects to Sisu server
@@ -110,6 +111,19 @@ func (c *DefaultClient) PostKeysignResult(result *types.KeysignResult) error {
 	if err != nil {
 		// TODO: Retry on failure.
 		log.Error("Cannot post keysign result, err = ", err)
+		return err
+	}
+
+	return nil
+}
+
+func (c *DefaultClient) PostReshareResult(result *types.ReshareResult) error {
+	log.Debug("Sending reshare result to sisu server")
+
+	var r interface{}
+	err := c.client.CallContext(context.Background(), &r, "tss_reshareResult", result)
+	if err != nil {
+		log.Error("Cannot post reshare result, err = ", err)
 		return err
 	}
 

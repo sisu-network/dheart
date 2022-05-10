@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -148,6 +149,15 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 	}
 
 	return err
+}
+
+func (api *SingleNodeApi) Reshare(req *types.ReshareRequest) error {
+	s, _ := json.Marshal(req)
+	log.Debug("Reshare request from sisu = ", string(s))
+	return api.c.PostReshareResult(&types.ReshareResult{
+		Outcome:                    types.OutcomeSuccess,
+		NewValidatorSetPubKeyBytes: req.NewValidatorSetPubKeyBytes,
+	})
 }
 
 func (api *SingleNodeApi) SetPrivKey(encodedKey string, keyType string) error {

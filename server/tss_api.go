@@ -105,6 +105,10 @@ func (api *TssApi) KeySign(req *types.KeysignRequest, keyWrappers []types.PubKey
 	return err
 }
 
+func (api *TssApi) Reshare(req *types.ReshareRequest) error {
+	return nil
+}
+
 func (api *TssApi) BlockEnd(blockHeight int64) error {
 	return api.heart.BlockEnd(blockHeight)
 }

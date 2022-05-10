@@ -14,6 +14,7 @@ type Api interface {
 	SetPrivKey(encodedKey string, keyType string) error
 	KeyGen(keygenId string, chain string, tPubKeys []types.PubKeyWrapper) error
 	KeySign(req *types.KeysignRequest, tPubKeys []types.PubKeyWrapper) error
+	Reshare(req *types.ReshareRequest) error
 	BlockEnd(blockHeight int64) error
 	SetSisuReady(isReady bool)
 	Ping(source string)
