@@ -26,7 +26,7 @@ func TestJob_Presign(t *testing.T) {
 	for i := 0; i < n; i++ {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
-		jobs[i] = NewPresignJob("Presign0", i, pIDs, params, presignInputs[i], cbs[i], time.Second*5)
+		jobs[i] = NewPresignJob("Presign0", i, pIDs, params, presignInputs[i], cbs[i], time.Second*15)
 	}
 
 	wg := &sync.WaitGroup{}
