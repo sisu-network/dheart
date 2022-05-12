@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -105,7 +106,14 @@ func (api *TssApi) KeySign(req *types.KeysignRequest, keyWrappers []types.PubKey
 	return err
 }
 
+// Reshare mocks reshare always return success
 func (api *TssApi) Reshare(req *types.ReshareRequest) error {
+	s, _ := json.Marshal(req)
+	log.Debug("Reshare request from sisu = ", string(s))
+	api.heart.PostReshareResult(&types.ReshareResult{
+		Outcome:                    types.OutcomeSuccess,
+		NewValidatorSetPubKeyBytes: req.NewValidatorSetPubKeyBytes,
+	})
 	return nil
 }
 

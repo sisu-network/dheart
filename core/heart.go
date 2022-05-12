@@ -415,3 +415,7 @@ func (h *Heart) doPresign(blockHeight int64) {
 		}
 	}
 }
+
+func (h *Heart) PostReshareResult(result *htypes.ReshareResult) error {
+	return h.client.PostReshareResult(result)
+}
