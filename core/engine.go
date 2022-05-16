@@ -278,6 +278,10 @@ func (engine *defaultEngine) OnWorkSigningFinished(request *types.WorkRequest, d
 		signatures[i] = sig.Signature
 		if libchain.IsETHBasedChain(request.Chains[i]) {
 			signatures[i] = append(signatures[i], data[i].SignatureRecovery[0])
+			if len(signatures[i]) != 65 {
+				log.Error("ETH signature length is not 65, actual length = ", len(signatures[i]),
+					" recovery = ", int(data[i].SignatureRecovery[0]))
+			}
 		}
 	}
 
