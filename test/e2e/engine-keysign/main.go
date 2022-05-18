@@ -2,6 +2,8 @@ package main
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
+	"math/rand"
 
 	"crypto/elliptic"
 	"database/sql"
@@ -135,11 +137,60 @@ func verifySignature(pubkey *ecdsa.PublicKey, msg string, R, S *big.Int) {
 	}
 }
 
+func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, keysignch chan *htypes.KeysignResult,
+	keygenResult *htypes.KeygenResult, message []byte) {
+	workId := "keysign"
+	messages := []string{string(message)}
+	chains := []string{"eth", "eth"}
+
+	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
+	if err != nil {
+		panic(err)
+	}
+	request := types.NewSigningRequest(workId, pids, utils.GetThreshold(len(pids)), messages, chains, presignInput)
+
+	err = engine.AddRequest(request)
+	if err != nil {
+		panic(err)
+	}
+
+	var result *htypes.KeysignResult
+	select {
+	case result = <-keysignch:
+	case <-time.After(time.Second * 100):
+		panic("Signing timeout")
+	}
+
+	for i, msg := range messages {
+		x, y := elliptic.Unmarshal(tss.EC(), keygenResult.PubKeyBytes)
+		pk := ecdsa.PublicKey{
+			Curve: tss.EC(),
+			X:     x,
+			Y:     y,
+		}
+
+		sig := result.Signatures[i]
+		if len(sig) != 65 {
+			log.Info("Signature hex = ", hex.EncodeToString(sig))
+			panic(fmt.Sprintf("Signature length is not correct. actual length = %d", len(sig)))
+		}
+		sig = sig[:64]
+
+		r := sig[:32]
+		s := sig[32:]
+
+		verifySignature(&pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
+	}
+
+	log.Info("Verification succeeded!")
+}
+
 func main() {
-	var index, n int
+	var index, n, seed int
 	var isSlow bool
 	flag.IntVar(&index, "index", 0, "listening port")
 	flag.BoolVar(&isSlow, "is-slow", false, "Use it when testing message caching mechanism")
+	flag.IntVar(&seed, "seed", 0, "seed for the test")
 	flag.Parse()
 
 	n = 2
@@ -191,47 +242,10 @@ func main() {
 
 	// Keysign
 	log.Info("Doing keysign now!")
-	workId := "keysign"
-	messages := []string{"First message", "Second message"}
-	chains := []string{"eth", "eth"}
-
-	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
-	if err != nil {
-		panic(err)
+	rand.Seed(int64(seed))
+	for i := 0; i < 1; i++ {
+		msg := make([]byte, 20)
+		rand.Read(msg)
+		testKeysign(database, pids, engine, keysignch, keygenResult, msg)
 	}
-	request := types.NewSigningRequest(workId, pids, utils.GetThreshold(len(pids)), messages, chains, presignInput)
-
-	err = engine.AddRequest(request)
-	if err != nil {
-		panic(err)
-	}
-
-	var result *htypes.KeysignResult
-	select {
-	case result = <-keysignch:
-	case <-time.After(time.Second * 100):
-		panic("Signing timeout")
-	}
-
-	for i, msg := range messages {
-		x, y := elliptic.Unmarshal(tss.EC(), keygenResult.PubKeyBytes)
-		pk := ecdsa.PublicKey{
-			Curve: tss.EC(),
-			X:     x,
-			Y:     y,
-		}
-
-		sig := result.Signatures[i]
-		if len(sig) != 65 {
-			panic(fmt.Sprintf("Signature length is not correct. actual length = %d", len(sig)))
-		}
-		sig = sig[:64]
-
-		r := sig[:32]
-		s := sig[32:]
-
-		verifySignature(&pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
-	}
-
-	log.Info("Verification succeeded!")
 }

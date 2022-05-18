@@ -2,6 +2,7 @@ package ecdsa
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -292,6 +293,8 @@ func (w *DefaultWorker) getPidFromId(id string) *tss.PartyID {
 // Process incoming update message.
 func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 	var addToCache bool
+
+	fmt.Println("Processing message: ", msg.Type)
 
 	switch msg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
