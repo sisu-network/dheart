@@ -2,7 +2,6 @@ package ecdsa
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -294,8 +293,6 @@ func (w *DefaultWorker) getPidFromId(id string) *tss.PartyID {
 func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 	var addToCache bool
 
-	fmt.Println("Processing message: ", msg.Type)
-
 	switch msg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
 		w.lock.RLock()
@@ -330,6 +327,7 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 		w.lock.RLock()
 		if w.preworkSelection == nil {
 			// Add this to cache
+			log.Verbose("PreExecution is nil, adding this message to cache, msg type = ", msg.Type)
 			w.preExecutionCache.AddMessage(msg)
 			addToCache = true
 		}
