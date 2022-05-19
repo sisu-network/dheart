@@ -13,6 +13,7 @@ import (
 	"time"
 
 	thelper "github.com/sisu-network/dheart/test/e2e/helper"
+	"github.com/sisu-network/dheart/utils"
 	libchain "github.com/sisu-network/lib/chain"
 
 	"github.com/sisu-network/dheart/core"
@@ -20,7 +21,6 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	htypes "github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
@@ -110,11 +110,10 @@ func getDb(index int) db.Database {
 }
 
 func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan *htypes.KeygenResult) *htypes.KeygenResult {
-	n := len(pids)
-
 	// Add request
 	workId := "keygen0"
-	request := types.NewKeygenRequest("ecdsa", workId, pids, n-1, helper.LoadPreparams(index))
+	threshold := utils.GetThreshold(len(pids))
+	request := types.NewKeygenRequest("ecdsa", workId, pids, threshold, helper.LoadPreparams(index))
 	err := engine.AddRequest(request)
 	if err != nil {
 		panic(err)
@@ -147,7 +146,9 @@ func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, 
 	if err != nil {
 		panic(err)
 	}
-	request := types.NewSigningRequest(workId, pids, utils.GetThreshold(len(pids)), messages, chains, presignInput)
+
+	threshold := utils.GetThreshold(len(pids))
+	request := types.NewSigningRequest(workId, pids, threshold, messages, chains, presignInput)
 
 	err = engine.AddRequest(request)
 	if err != nil {
@@ -161,39 +162,50 @@ func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, 
 		panic("Signing timeout")
 	}
 
-	for i, msg := range messages {
-		x, y := elliptic.Unmarshal(tss.EC(), keygenResult.PubKeyBytes)
-		pk := ecdsa.PublicKey{
-			Curve: tss.EC(),
-			X:     x,
-			Y:     y,
-		}
-
-		sig := result.Signatures[i]
-		if len(sig) != 65 {
-			log.Info("Signature hex = ", hex.EncodeToString(sig))
-			panic(fmt.Sprintf("Signature length is not correct. actual length = %d", len(sig)))
-		}
-		sig = sig[:64]
-
-		r := sig[:32]
-		s := sig[32:]
-
-		verifySignature(&pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
+	if result == nil {
+		panic("result is nil")
 	}
 
-	log.Info("Verification succeeded!")
+	switch result.Outcome {
+	case htypes.OutcomeSuccess:
+		for i, msg := range messages {
+			x, y := elliptic.Unmarshal(tss.EC(), keygenResult.PubKeyBytes)
+			pk := ecdsa.PublicKey{
+				Curve: tss.EC(),
+				X:     x,
+				Y:     y,
+			}
+
+			sig := result.Signatures[i]
+			if len(sig) != 65 {
+				log.Info("Signature hex = ", hex.EncodeToString(sig))
+				panic(fmt.Sprintf("Signature length is not correct. actual length = %d", len(sig)))
+			}
+			sig = sig[:64]
+
+			r := sig[:32]
+			s := sig[32:]
+
+			verifySignature(&pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
+		}
+
+		log.Info("Signing succeeded!")
+
+	case htypes.OutcomeFailure:
+		panic("Failed to create signature")
+	case htypes.OutcometNotSelected:
+		log.Info("Node is not selected.")
+	}
 }
 
 func main() {
 	var index, n, seed int
 	var isSlow bool
 	flag.IntVar(&index, "index", 0, "listening port")
+	flag.IntVar(&n, "n", 2, "number of nodes in the test")
 	flag.BoolVar(&isSlow, "is-slow", false, "Use it when testing message caching mechanism")
 	flag.IntVar(&seed, "seed", 0, "seed for the test")
 	flag.Parse()
-
-	n = 2
 
 	cfg, privateKey := p2p.GetMockSecp256k1Config(n, index)
 	cm := p2p.NewConnectionManager(cfg)
@@ -242,10 +254,11 @@ func main() {
 
 	// Keysign
 	log.Info("Doing keysign now!")
-	rand.Seed(int64(seed))
-	for i := 0; i < 1; i++ {
+	rand.Seed(int64(seed + 110))
+	for i := 0; i < 10; i++ {
 		msg := make([]byte, 20)
 		rand.Read(msg)
+		log.Info("Msg hex = ", hex.EncodeToString(msg))
 		testKeysign(database, pids, engine, keysignch, keygenResult, msg)
 	}
 }
