@@ -6,7 +6,6 @@ import (
 	"math/rand"
 
 	"crypto/elliptic"
-	"database/sql"
 	"flag"
 	"fmt"
 	"math/big"
@@ -80,24 +79,10 @@ func getSortedPartyIds(n int) tss.SortedPartyIDs {
 	return tss.SortPartyIDs(partyIds, 0)
 }
 
-func resetDb(dbConfig config.DbConfig) error {
-	database, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbConfig.Username, dbConfig.Password, dbConfig.Host, dbConfig.Port, dbConfig.Schema))
-	if err != nil {
-		return err
-	}
-
-	database.Exec("DROP TABLE keygen")
-	database.Exec("DROP TABLE keysign")
-	database.Exec("DROP TABLE schema_migrations")
-
-	return nil
-}
-
 func getDb(index int) db.Database {
 	dbConfig := config.GetLocalhostDbConfig()
 	dbConfig.Schema = fmt.Sprintf("dheart%d", index)
-
-	resetDb(dbConfig)
+	dbConfig.InMemory = true
 
 	dbInstance := db.NewDatabase(&dbConfig)
 
