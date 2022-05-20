@@ -73,7 +73,7 @@ func (c *DefaultClient) PostKeygenResult(result *types.KeygenResult) error {
 	log.Debug("Sending keygen result to sisu server")
 
 	var r interface{}
-	err := c.client.CallContext(context.Background(), &r, "tss_keygenResult", result)
+	err := c.postWithRetry(context.Background(), &r, "tss_keygenResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
 		log.Error("Cannot post keygen result, err = ", err)
@@ -84,15 +84,10 @@ func (c *DefaultClient) PostKeygenResult(result *types.KeygenResult) error {
 }
 
 func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
-	// TODO: Implement presignResult call in Sisu.
-	if true {
-		return nil
-	}
-
 	log.Debug("Sending presign result to sisu server")
 
 	var r interface{}
-	err := c.client.CallContext(context.Background(), &r, "tss_presignResult", result)
+	err := c.postWithRetry(context.Background(), &r, "tss_presignResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
 		log.Error("Cannot post presign result, err = ", err)
@@ -106,7 +101,7 @@ func (c *DefaultClient) PostKeysignResult(result *types.KeysignResult) error {
 	log.Debug("Sending keysign result to sisu server")
 
 	var r interface{}
-	err := c.client.CallContext(context.Background(), &r, "tss_keysignResult", result)
+	err := c.postWithRetry(context.Background(), &r, "tss_keysignResult", result)
 	if err != nil {
 		// TODO: Retry on failure.
 		log.Error("Cannot post keysign result, err = ", err)
@@ -114,4 +109,16 @@ func (c *DefaultClient) PostKeysignResult(result *types.KeysignResult) error {
 	}
 
 	return nil
+}
+
+func (c *DefaultClient) postWithRetry(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+	var err error
+	for i := 0; i < 5; i++ {
+		err = c.client.CallContext(ctx, result, method, args)
+		if err == nil {
+			return nil
+		}
+	}
+
+	return err
 }
