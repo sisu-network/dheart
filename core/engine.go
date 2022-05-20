@@ -344,7 +344,7 @@ func (engine *defaultEngine) finishWorker(workId string) {
 // available worker, wait for one of the current worker to finish before running.
 func (engine *defaultEngine) startNextWork() {
 	engine.workLock.Lock()
-	log.Verbose(", Starting next work, worker length = ", len(engine.workers), " queue length = ", engine.requestQueue.Size())
+	log.Verbose("Starting next work, worker length = ", len(engine.workers), " queue length = ", engine.requestQueue.Size())
 
 	if len(engine.workers) >= MaxWorker {
 		engine.workLock.Unlock()
