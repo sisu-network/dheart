@@ -240,8 +240,12 @@ func main() {
 	// Keysign
 	log.Info("Doing keysign now!")
 	rand.Seed(int64(seed + 110))
-	for i := 0; i < 10; i++ {
-		msg := make([]byte, 20)
+	for i := 0; i < 100; i++ {
+		// msg := make([]byte, 20)
+		msg, err := hex.DecodeString("02cb98c95fcceffe85692359b5c5a9ed7ca45226")
+		if err != nil {
+			panic(err)
+		}
 		rand.Read(msg)
 		log.Info("Msg hex = ", hex.EncodeToString(msg))
 		testKeysign(database, pids, engine, keysignch, keygenResult, msg)

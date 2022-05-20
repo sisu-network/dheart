@@ -374,6 +374,7 @@ func (engine *defaultEngine) getWorker(workId string) worker.Worker {
 // Broadcast a message to everyone in a list.
 func (engine *defaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
 	if tssMessage.To == engine.myPid.Id {
+		log.Error("This message should not be sent to its own node")
 		return
 	}
 
@@ -386,6 +387,7 @@ func (engine *defaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *c
 	// Add this to the cache if it's an update message.
 	engine.cacheWorkMsg(signedMsg)
 
+	log.HighVerbose("Sending sign message")
 	engine.sendSignMessaged(signedMsg, pIDs)
 }
 
