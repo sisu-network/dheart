@@ -333,6 +333,9 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 		workId = utils.KeccakHash32(workId)
 		signMessages[i] = string(msg.BytesToSign)
 		chains[i] = msg.OutChain
+
+		log.Verbose("New work id ", workId, " with type ", " signing, out chain = ", msg.OutChain,
+			" out hash = ", msg.OutHash)
 	}
 
 	// TODO: Load multiple input here.

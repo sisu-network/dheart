@@ -180,7 +180,8 @@ func (engine *defaultEngine) startWork(request *types.WorkRequest) {
 
 	engine.workers[request.WorkId] = w
 	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId, nil)
-	log.Info("Starting a work with id ", request.WorkId, " with cache size ", len(cachedMsgs))
+	log.Info("Starting a work with id ", request.WorkId, " work type = ", request.WorkType,
+		" with cache size ", len(cachedMsgs))
 
 	if err := w.Start(cachedMsgs); err != nil {
 		log.Error("Cannot start work error = ", err)
@@ -343,6 +344,8 @@ func (engine *defaultEngine) finishWorker(workId string) {
 // available worker, wait for one of the current worker to finish before running.
 func (engine *defaultEngine) startNextWork() {
 	engine.workLock.Lock()
+	log.Verbose(", Starting next work, worker length = ", len(engine.workers), " queue length = ", engine.requestQueue.Size())
+
 	if len(engine.workers) >= MaxWorker {
 		engine.workLock.Unlock()
 		return
