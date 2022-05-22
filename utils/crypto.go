@@ -83,3 +83,13 @@ func GetCosmosPubKey(keyType string, keyBytes []byte) (ctypes.PubKey, error) {
 
 	return pubKey, nil
 }
+
+func PadToLengthBytesForSignature(src []byte, length int) []byte {
+	oriLen := len(src)
+	if oriLen < length {
+		for i := 0; i < length-oriLen; i++ {
+			src = append([]byte{0}, src...)
+		}
+	}
+	return src
+}
