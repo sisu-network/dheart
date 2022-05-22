@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
+
 	"math/rand"
 
 	ipfslog "github.com/ipfs/go-log"
@@ -246,7 +247,7 @@ func main() {
 	rand.Seed(int64(seed + 110))
 	for i := 0; i < 20; i++ {
 		msg := make([]byte, 20)
-		rand.Read(msg)
+		rand.Read(msg) //nolint
 		if err != nil {
 			panic(err)
 		}
