@@ -327,6 +327,7 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 		w.lock.RLock()
 		if w.preworkSelection == nil {
 			// Add this to cache
+			log.Verbose("PreExecution is nil, adding this message to cache, msg type = ", msg.Type)
 			w.preExecutionCache.AddMessage(msg)
 			addToCache = true
 		}

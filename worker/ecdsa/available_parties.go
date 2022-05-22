@@ -61,12 +61,16 @@ func (ap *AvailableParties) hasPartyId(pid string) bool {
 	return ok
 }
 
-func (ap *AvailableParties) getPartyList(n int) []*tss.PartyID {
+func (ap *AvailableParties) getPartyList(n int, excludeParty *tss.PartyID) []*tss.PartyID {
 	ap.lock.RLock()
 	defer ap.lock.RUnlock()
 
 	arr := make([]*tss.PartyID, 0, n)
 	for _, partyInfo := range ap.parties {
+		if partyInfo.partyId.Id == excludeParty.Id {
+			continue
+		}
+
 		arr = append(arr, partyInfo.partyId)
 		if len(arr) == n {
 			break

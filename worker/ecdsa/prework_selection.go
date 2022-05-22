@@ -184,7 +184,8 @@ func (s *PreworkSelection) waitForMemberResponse() ([]string, []*tss.PartyID, er
 				log.Info("Wait timeouted for signing but we got enough participants for presign.")
 				// We have enough online participants but cannot find a presign set for all of them. This
 				// still returns success and we do a presign round.
-				selectedPids := s.availableParties.getPartyList(s.request.Threshold + 1)
+				selectedPids := s.availableParties.getPartyList(s.request.Threshold, s.myPid)
+				selectedPids = append(selectedPids, s.myPid)
 				return nil, selectedPids, nil
 			}
 
@@ -239,7 +240,9 @@ func (s *PreworkSelection) checkEnoughParticipants() (bool, []string, []*tss.Par
 			// Announce this as success and return
 			return true, presignIds, selectedPids
 		} else if s.availableParties.Length() == len(s.allParties) {
-			return true, nil, s.availableParties.getPartyList(s.request.Threshold + 1)
+			selected := s.availableParties.getPartyList(s.request.Threshold, s.myPid)
+			selected = append(selected, s.myPid) // include this leader in the list of final selection
+			return true, nil, selected
 		} else {
 			// We cannot find enough presign, keep waiting.
 			return false, nil, nil
@@ -436,6 +439,7 @@ func (s *PreworkSelection) onPreExecutionRequest(tssMsg *commonTypes.TssMessage)
 	if sender != nil {
 		// TODO: Check that the sender is indeed the leader.
 		// We receive a message from a leader to check our availability. Reply "Yes".
+		log.Info("Member: Responding YES to leader's request")
 		responseMsg := common.NewAvailabilityResponseMessage(s.myPid.Id, tssMsg.From, s.request.WorkId,
 			common.AvailabilityResponseMessage_YES, 1)
 		responseMsg.AvailabilityResponseMessage.MaxJob = int32(1)

@@ -259,10 +259,14 @@ func (cm *DefaultConnectionManager) connectToPeer(peerAddr maddr.Multiaddr) erro
 func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error {
 	conn := cm.connections[pID]
 	if conn == nil {
+		log.Error("Connection to pid not found, pid = ", pID)
 		return errors.New("pID not found")
 	}
 
 	err := conn.writeToStream(msg, protocolId)
+	if err != nil {
+		log.HighVerbose("Failed writing to stream, err = ", err)
+	}
 
 	return err
 }
