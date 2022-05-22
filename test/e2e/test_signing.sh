@@ -3,9 +3,9 @@
 CUR_PATH=$(pwd)
 
 run_test() {
-  go run main.go -index 0 -seed $1 -n 3 &
-  go run main.go -index 1 -seed $1 -n 3 &
-  go run main.go -index 2 -seed $1 -n 3 &
+  go run main.go -index 0 -seed $1 -n 2 &
+  go run main.go -index 1 -seed $1 -n 2 &
+  # go run main.go -index 2 -seed $1 -n 3 &
 
   echo "Waiting for all the jobs"
 
@@ -13,7 +13,7 @@ run_test() {
   do
     wait $job || {
       code="$?"
-      ([[ $code = "127" ]] && exit 0 || exit "$code")
+      exit "$code"
       break
     }
   done
@@ -22,7 +22,7 @@ run_test() {
 
 cd 'engine-keysign'
 
-for i in {1..2}
+for i in {1..1}
 do
   # do whatever on "$i" here
   run_test $i

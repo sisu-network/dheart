@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"math/rand"
 
+	ipfslog "github.com/ipfs/go-log"
+
 	"crypto/elliptic"
 	"flag"
 	"fmt"
@@ -184,6 +186,8 @@ func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, 
 }
 
 func main() {
+	ipfslog.SetLogLevel("dheart", "debug")
+
 	var index, n, seed int
 	var isSlow bool
 	flag.IntVar(&index, "index", 0, "listening port")
@@ -240,13 +244,12 @@ func main() {
 	// Keysign
 	log.Info("Doing keysign now!")
 	rand.Seed(int64(seed + 110))
-	for i := 0; i < 100; i++ {
-		// msg := make([]byte, 20)
-		msg, err := hex.DecodeString("02cb98c95fcceffe85692359b5c5a9ed7ca45226")
+	for i := 0; i < 20; i++ {
+		msg := make([]byte, 20)
+		rand.Read(msg)
 		if err != nil {
 			panic(err)
 		}
-		rand.Read(msg)
 		log.Info("Msg hex = ", hex.EncodeToString(msg))
 		testKeysign(database, pids, engine, keysignch, keygenResult, msg)
 	}
