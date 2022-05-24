@@ -12,6 +12,7 @@ type DbConfig struct {
 	Username string `toml:"username"`
 	Password string `toml:"password"`
 	Schema   string `toml:"schema"`
+	InMemory bool   `toml:"in-memory"` // Should only used in tests
 }
 
 type HeartConfig struct {

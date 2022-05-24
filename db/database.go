@@ -5,13 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/golang-migrate/migrate"
-	"github.com/golang-migrate/migrate/database/mysql"
-	_ "github.com/golang-migrate/migrate/source/file"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/mysql"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/sisu-network/dheart/core/config"
 	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	"github.com/sisu-network/dheart/utils"
@@ -79,7 +84,7 @@ func NewDatabase(config *config.DbConfig) Database {
 
 func (d *SqlDatabase) Connect() error {
 	host := d.config.Host
-	if host == "" {
+	if host == "" && !d.config.InMemory {
 		return fmt.Errorf("DB host cannot be empty")
 	}
 
@@ -91,32 +96,36 @@ func (d *SqlDatabase) Connect() error {
 
 	var err error
 	var database *sql.DB
-	// TODO: This is a temporary fix to run local docker. The correct fix is to redo the entire
-	// life cycle of Sisu and dheart.
-	for i := 0; i < 5; i++ {
-		// Connect to the db with retry
-		log.Verbose("Attempt number ", i+1)
-		database, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/", username, password, host, d.config.Port))
-		if err == nil {
-			break
+	if !d.config.InMemory {
+		for i := 0; i < 5; i++ {
+			// Connect to the db with retry
+			log.Verbose("Attempt number ", i+1)
+			database, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/", username, password, host, d.config.Port))
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Second * 3)
 		}
-		time.Sleep(time.Second * 3)
+
+		if err != nil {
+			log.Error("All DB connection retry failed")
+			return err
+		}
+
+		_, err = database.Exec("CREATE DATABASE IF NOT EXISTS " + schema)
+		if err != nil {
+			return err
+		}
+		database.Close()
 	}
 
-	if err != nil {
-		log.Error("All DB connection retry failed")
-		return err
-	}
-
-	_, err = database.Exec("CREATE DATABASE IF NOT EXISTS " + schema)
-	if err != nil {
-		return err
-	}
-	database.Close()
-
-	database, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", username, password, host, d.config.Port, schema))
-	if err != nil {
-		return err
+	if d.config.InMemory {
+		database, err = sql.Open("sqlite3", ":memory:")
+	} else {
+		database, err = sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", username, password, host, d.config.Port, schema))
+		if err != nil {
+			return err
+		}
 	}
 
 	d.db = database
@@ -124,7 +133,8 @@ func (d *SqlDatabase) Connect() error {
 	return nil
 }
 
-func (d *SqlDatabase) DoMigration() error {
+// doSqlMigration does sql migration in external database using "golang-migrate/migrate" lib.
+func (d *SqlDatabase) doSqlMigration() error {
 	driver, err := mysql.WithInstance(d.db, &mysql.Config{})
 	if err != nil {
 		return err
@@ -154,6 +164,46 @@ func (d *SqlDatabase) DoMigration() error {
 	return nil
 }
 
+// inMemoryMigration does sql migration for in-memory db. We manually do migration instead of using
+// "golang-migrate/migrate" lib because there are some query in "golang-migrate/migrate" not
+// supported by sqlite3 in-memory (like SELECT DATABASE() or SELECT GET_LOCK()).
+func (d *SqlDatabase) inMemoryMigration() error {
+	migrationDir, err := MigrationsTempDir()
+	if err != nil {
+		return fmt.Errorf("failed to create temporary directory for migrations: %w", err)
+	}
+	defer os.RemoveAll(migrationDir)
+
+	files, err := ioutil.ReadDir(migrationDir)
+	if err != nil {
+		return err
+	}
+
+	migrationFiles := make([]string, 0)
+	for _, f := range files {
+		if strings.HasSuffix(f.Name(), ".up.sql") {
+			migrationFiles = append(migrationFiles, f.Name())
+		}
+	}
+
+	// Read query from the migration files and execute.
+	sort.Strings(migrationFiles)
+	for _, f := range migrationFiles {
+		dat, err := os.ReadFile(filepath.Join(migrationDir, f))
+		if err != nil {
+			return err
+		}
+		query := string(dat)
+
+		_, err = d.db.Exec(query)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (d *SqlDatabase) Init() error {
 	err := d.Connect()
 	if err != nil {
@@ -161,7 +211,12 @@ func (d *SqlDatabase) Init() error {
 		return err
 	}
 
-	err = d.DoMigration()
+	if d.config.InMemory {
+		err = d.inMemoryMigration()
+	} else {
+		err = d.doSqlMigration()
+	}
+
 	if err != nil {
 		log.Error("Cannot do migration. Err =", err)
 		return err

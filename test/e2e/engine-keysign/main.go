@@ -2,15 +2,20 @@ package main
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
+
+	"math/rand"
+
+	ipfslog "github.com/ipfs/go-log"
 
 	"crypto/elliptic"
-	"database/sql"
 	"flag"
 	"fmt"
 	"math/big"
 	"time"
 
 	thelper "github.com/sisu-network/dheart/test/e2e/helper"
+	"github.com/sisu-network/dheart/utils"
 	libchain "github.com/sisu-network/lib/chain"
 
 	"github.com/sisu-network/dheart/core"
@@ -18,7 +23,6 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	htypes "github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
@@ -78,24 +82,10 @@ func getSortedPartyIds(n int) tss.SortedPartyIDs {
 	return tss.SortPartyIDs(partyIds, 0)
 }
 
-func resetDb(dbConfig config.DbConfig) error {
-	database, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbConfig.Username, dbConfig.Password, dbConfig.Host, dbConfig.Port, dbConfig.Schema))
-	if err != nil {
-		return err
-	}
-
-	database.Exec("DROP TABLE keygen")
-	database.Exec("DROP TABLE keysign")
-	database.Exec("DROP TABLE schema_migrations")
-
-	return nil
-}
-
 func getDb(index int) db.Database {
 	dbConfig := config.GetLocalhostDbConfig()
 	dbConfig.Schema = fmt.Sprintf("dheart%d", index)
-
-	resetDb(dbConfig)
+	dbConfig.InMemory = true
 
 	dbInstance := db.NewDatabase(&dbConfig)
 
@@ -108,11 +98,10 @@ func getDb(index int) db.Database {
 }
 
 func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan *htypes.KeygenResult) *htypes.KeygenResult {
-	n := len(pids)
-
 	// Add request
 	workId := "keygen0"
-	request := types.NewKeygenRequest("ecdsa", workId, pids, n-1, helper.LoadPreparams(index))
+	threshold := utils.GetThreshold(len(pids))
+	request := types.NewKeygenRequest("ecdsa", workId, pids, threshold, helper.LoadPreparams(index))
 	err := engine.AddRequest(request)
 	if err != nil {
 		panic(err)
@@ -135,14 +124,78 @@ func verifySignature(pubkey *ecdsa.PublicKey, msg string, R, S *big.Int) {
 	}
 }
 
+func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, keysignch chan *htypes.KeysignResult,
+	keygenResult *htypes.KeygenResult, message []byte) {
+	workId := "keysign"
+	messages := []string{string(message)}
+	chains := []string{"eth", "eth"}
+
+	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
+	if err != nil {
+		panic(err)
+	}
+
+	threshold := utils.GetThreshold(len(pids))
+	request := types.NewSigningRequest(workId, pids, threshold, messages, chains, presignInput)
+
+	err = engine.AddRequest(request)
+	if err != nil {
+		panic(err)
+	}
+
+	var result *htypes.KeysignResult
+	select {
+	case result = <-keysignch:
+	case <-time.After(time.Second * 100):
+		panic("Signing timeout")
+	}
+
+	if result == nil {
+		panic("result is nil")
+	}
+
+	switch result.Outcome {
+	case htypes.OutcomeSuccess:
+		for i, msg := range messages {
+			x, y := elliptic.Unmarshal(tss.EC(), keygenResult.PubKeyBytes)
+			pk := ecdsa.PublicKey{
+				Curve: tss.EC(),
+				X:     x,
+				Y:     y,
+			}
+
+			sig := result.Signatures[i]
+			if len(sig) != 65 {
+				log.Info("Signature hex = ", hex.EncodeToString(sig))
+				panic(fmt.Sprintf("Signature length is not correct. actual length = %d", len(sig)))
+			}
+			sig = sig[:64]
+
+			r := sig[:32]
+			s := sig[32:]
+
+			verifySignature(&pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
+		}
+
+		log.Info("Signing succeeded!")
+
+	case htypes.OutcomeFailure:
+		panic("Failed to create signature")
+	case htypes.OutcometNotSelected:
+		log.Info("Node is not selected.")
+	}
+}
+
 func main() {
-	var index, n int
+	ipfslog.SetLogLevel("dheart", "debug")
+
+	var index, n, seed int
 	var isSlow bool
 	flag.IntVar(&index, "index", 0, "listening port")
+	flag.IntVar(&n, "n", 2, "number of nodes in the test")
 	flag.BoolVar(&isSlow, "is-slow", false, "Use it when testing message caching mechanism")
+	flag.IntVar(&seed, "seed", 0, "seed for the test")
 	flag.Parse()
-
-	n = 2
 
 	cfg, privateKey := p2p.GetMockSecp256k1Config(n, index)
 	cm := p2p.NewConnectionManager(cfg)
@@ -191,47 +244,14 @@ func main() {
 
 	// Keysign
 	log.Info("Doing keysign now!")
-	workId := "keysign"
-	messages := []string{"First message", "Second message"}
-	chains := []string{"eth", "eth"}
-
-	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
-	if err != nil {
-		panic(err)
-	}
-	request := types.NewSigningRequest(workId, pids, utils.GetThreshold(len(pids)), messages, chains, presignInput)
-
-	err = engine.AddRequest(request)
-	if err != nil {
-		panic(err)
-	}
-
-	var result *htypes.KeysignResult
-	select {
-	case result = <-keysignch:
-	case <-time.After(time.Second * 100):
-		panic("Signing timeout")
-	}
-
-	for i, msg := range messages {
-		x, y := elliptic.Unmarshal(tss.EC(), keygenResult.PubKeyBytes)
-		pk := ecdsa.PublicKey{
-			Curve: tss.EC(),
-			X:     x,
-			Y:     y,
+	rand.Seed(int64(seed + 110))
+	for i := 0; i < 20; i++ {
+		msg := make([]byte, 20)
+		rand.Read(msg) //nolint
+		if err != nil {
+			panic(err)
 		}
-
-		sig := result.Signatures[i]
-		if len(sig) != 65 {
-			panic(fmt.Sprintf("Signature length is not correct. actual length = %d", len(sig)))
-		}
-		sig = sig[:64]
-
-		r := sig[:32]
-		s := sig[32:]
-
-		verifySignature(&pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
+		log.Info("Msg hex = ", hex.EncodeToString(msg))
+		testKeysign(database, pids, engine, keysignch, keygenResult, msg)
 	}
-
-	log.Info("Verification succeeded!")
 }

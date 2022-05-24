@@ -24,6 +24,7 @@ import (
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
 	commonTypes "github.com/sisu-network/dheart/types/common"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/ecdsa"
 	"github.com/sisu-network/dheart/worker/types"
@@ -275,16 +276,25 @@ func (engine *defaultEngine) OnWorkSigningFinished(request *types.WorkRequest, d
 	log.Info("Signing finished for workId ", request.WorkId)
 
 	signatures := make([][]byte, len(data))
-
 	for i, sig := range data {
-		signatures[i] = sig.Signature
+		r := sig.R
+		s := sig.S
+
+		if libchain.IsETHBasedChain(request.Chains[0]) {
+			bitSizeInBytes := tss.EC().Params().BitSize / 8
+			r = utils.PadToLengthBytesForSignature(sig.R, bitSizeInBytes)
+			s = utils.PadToLengthBytesForSignature(sig.S, bitSizeInBytes)
+		}
+
+		signatures[i] = append(r, s...)
 		if libchain.IsETHBasedChain(request.Chains[i]) {
-			signatures[i] = append(signatures[i], data[i].SignatureRecovery[0])
-			if len(signatures[i]) != 65 {
+			if len(signatures[i]) != 64 {
 				log.Error("ETH signature length is not 65, actual length = ", len(signatures[i]),
 					" msg = ", hex.EncodeToString([]byte(request.Messages[i])),
 					" recovery = ", int(data[i].SignatureRecovery[0]))
 			}
+
+			signatures[i] = append(signatures[i], data[i].SignatureRecovery[0])
 		}
 	}
 
@@ -377,6 +387,7 @@ func (engine *defaultEngine) getWorker(workId string) worker.Worker {
 // Broadcast a message to everyone in a list.
 func (engine *defaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
 	if tssMessage.To == engine.myPid.Id {
+		log.Error("This message should not be sent to its own node")
 		return
 	}
 
@@ -389,6 +400,7 @@ func (engine *defaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *c
 	// Add this to the cache if it's an update message.
 	engine.cacheWorkMsg(signedMsg)
 
+	log.HighVerbose("Broadcasting signed message")
 	engine.sendSignMessaged(signedMsg, pIDs)
 }
 
@@ -407,6 +419,7 @@ func (engine *defaultEngine) UnicastMessage(dest *tss.PartyID, tssMessage *commo
 	// Add this to the cache if it's an update message.
 	engine.cacheWorkMsg(signedMsg)
 
+	log.HighVerbose("Unicasting signed message")
 	engine.sendSignMessaged(signedMsg, []*tss.PartyID{dest})
 }
 
