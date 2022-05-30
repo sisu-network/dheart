@@ -20,7 +20,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.13
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/sisu-network/lib v0.0.1-alpha9.0.20220520234329-f6cc4c3ff26e
-	github.com/sisu-network/tss-lib v0.1.3-0.20220509210501-a0a7debd5ee7
+	github.com/sisu-network/tss-lib v0.1.3-0.20220530071656-324614845079
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	go.uber.org/atomic v1.7.0
