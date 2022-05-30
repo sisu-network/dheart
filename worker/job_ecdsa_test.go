@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestJob_Presign(t *testing.T) {
+func TestEcJob_Presign(t *testing.T) {
 	n := 4
 	threshold := 1
 	jobs := make([]*Job, n)
@@ -25,7 +25,7 @@ func TestJob_Presign(t *testing.T) {
 	for i := 0; i < n; i++ {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
-		jobs[i] = NewPresignJob("Presign0", i, pIDs, params, presignInputs[i], cbs[i], time.Second*15)
+		jobs[i] = NewEcPresignJob("Presign0", i, pIDs, params, presignInputs[i], cbs[i], time.Second*15)
 	}
 
 	wg := &sync.WaitGroup{}

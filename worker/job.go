@@ -11,9 +11,11 @@ import (
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
-	"github.com/sisu-network/tss-lib/ecdsa/signing"
+	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
+	ecpresign "github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
+	edkeygen "github.com/sisu-network/tss-lib/eddsa/keygen"
+	edsigning "github.com/sisu-network/tss-lib/eddsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 	"go.uber.org/atomic"
 
@@ -38,23 +40,32 @@ type JobResult struct {
 	Success bool
 	Failure JobFailure
 
-	KeygenData  keygen.LocalPartySaveData
-	PresignData *presign.LocalPresignData
-	SigningData *libCommon.ECSignature
+	EcKeygen  eckeygen.LocalPartySaveData
+	EcPresign *ecpresign.LocalPresignData
+	EcSigning *libCommon.ECSignature
+
+	EdKeygen  edkeygen.LocalPartySaveData
+	EdSigning *edsigning.SignatureData
 }
 
 type Job struct {
 	// Immutable data
-	workId       string
-	jobType      wTypes.WorkType
-	index        int
-	outCh        chan tss.Message
-	endKeygenCh  chan keygen.LocalPartySaveData
-	endPresignCh chan *presign.LocalPresignData
-	endSigningCh chan *libCommon.ECSignature
-	party        tss.Party
-	callback     JobCallback
-	timeOut      time.Duration
+	workId   string
+	jobType  wTypes.WorkType
+	index    int
+	outCh    chan tss.Message
+	party    tss.Party
+	callback JobCallback
+	timeOut  time.Duration
+
+	// Ecdsa
+	ecEndKeygenCh  chan eckeygen.LocalPartySaveData
+	ecEndPresignCh chan *ecpresign.LocalPresignData
+	ecEndSigningCh chan *libCommon.ECSignature
+
+	// Eddsa
+	edEndKeygenCh  chan edkeygen.LocalPartySaveData
+	edEndSigningCh chan *edsigning.SignatureData
 
 	// Mutable data
 	finishedMsgs map[string]bool
@@ -63,55 +74,53 @@ type Job struct {
 	doneEndCh    *atomic.Bool
 }
 
-func NewKeygenJob(
+func NewEcKeygenJob(
 	workId string,
 	index int,
 	pIDs tss.SortedPartyIDs,
 	params *tss.Parameters,
-	localPreparams *keygen.LocalPreParams,
+	localPreparams *eckeygen.LocalPreParams,
 	callback JobCallback,
 	timeOut time.Duration,
 ) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
-	endCh := make(chan keygen.LocalPartySaveData, len(pIDs))
+	endCh := make(chan eckeygen.LocalPartySaveData, len(pIDs))
 
-	party := keygen.NewLocalParty(params, outCh, endCh, *localPreparams).(*keygen.LocalParty)
+	party := eckeygen.NewLocalParty(params, outCh, endCh, *localPreparams)
 
-	job := baseJob(workId, index, party, wTypes.EcdsaKeygen, callback, timeOut)
-	job.outCh = outCh
-	job.endKeygenCh = endCh
+	job := baseJob(workId, index, party, wTypes.EcdsaKeygen, callback, outCh, timeOut)
+	job.ecEndKeygenCh = endCh
 
 	return job
 }
 
-func NewPresignJob(
+func NewEcPresignJob(
 	workId string,
 	index int,
 	pIDs tss.SortedPartyIDs,
 	params *tss.Parameters,
-	savedData *keygen.LocalPartySaveData,
+	savedData *eckeygen.LocalPartySaveData,
 	callback JobCallback,
 	timeOut time.Duration,
 ) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
-	endCh := make(chan *presign.LocalPresignData, len(pIDs))
+	endCh := make(chan *ecpresign.LocalPresignData, len(pIDs))
 
-	party := presign.NewLocalParty(params, *savedData, outCh, endCh)
+	party := ecpresign.NewLocalParty(params, *savedData, outCh, endCh)
 
-	job := baseJob(workId, index, party, wTypes.EcdsaPresign, callback, timeOut)
-	job.outCh = outCh
-	job.endPresignCh = endCh
+	job := baseJob(workId, index, party, wTypes.EcdsaPresign, callback, outCh, timeOut)
+	job.ecEndPresignCh = endCh
 
 	return job
 }
 
-func NewSigningJob(
+func NewEcSigningJob(
 	workId string,
 	index int,
 	pIDs tss.SortedPartyIDs,
 	params *tss.Parameters,
 	msg string,
-	signingInput *presign.LocalPresignData,
+	signingInput *ecpresign.LocalPresignData,
 	callback JobCallback,
 	timeOut time.Duration,
 ) *Job {
@@ -119,12 +128,50 @@ func NewSigningJob(
 	endCh := make(chan *libCommon.ECSignature, len(pIDs))
 
 	msgInt := hashToInt([]byte(msg), tss.EC())
-	party := signing.NewLocalParty(msgInt, params, *signingInput, outCh, endCh)
+	party := ecsigning.NewLocalParty(msgInt, params, *signingInput, outCh, endCh)
 
-	job := baseJob(workId, index, party, wTypes.EcdsaSigning, callback, timeOut)
+	job := baseJob(workId, index, party, wTypes.EcdsaSigning, callback, outCh, timeOut)
+	job.ecEndSigningCh = endCh
 
-	job.outCh = outCh
-	job.endSigningCh = endCh
+	return job
+}
+
+func NewEdKeygenJob(
+	workId string,
+	index int,
+	pIDs tss.SortedPartyIDs,
+	params *tss.Parameters,
+	callback JobCallback,
+	timeOut time.Duration,
+) *Job {
+
+	outCh := make(chan tss.Message, len(pIDs))
+	endCh := make(chan edkeygen.LocalPartySaveData, len(pIDs))
+	party := edkeygen.NewLocalParty(params, outCh, endCh)
+
+	job := baseJob(workId, index, party, wTypes.EddsaKeygen, callback, outCh, timeOut)
+	job.edEndKeygenCh = endCh
+
+	return job
+}
+
+func NewEdSigningJob(
+	workId string,
+	index int,
+	pIDs tss.SortedPartyIDs,
+	params *tss.Parameters,
+	msg []byte,
+	signingInput edkeygen.LocalPartySaveData,
+	callback JobCallback,
+	timeOut time.Duration,
+) *Job {
+	outCh := make(chan tss.Message, len(pIDs))
+	endCh := make(chan *edsigning.SignatureData, len(pIDs))
+
+	party := edsigning.NewLocalParty(new(big.Int).SetBytes(msg), params, signingInput, outCh, endCh)
+
+	job := baseJob(workId, index, party, wTypes.EddsaKeygen, callback, outCh, timeOut)
+	job.edEndSigningCh = endCh
 
 	return job
 }
@@ -135,6 +182,7 @@ func baseJob(
 	party tss.Party,
 	jobType wTypes.WorkType,
 	callback JobCallback,
+	outCh chan tss.Message,
 	timeOut time.Duration,
 ) *Job {
 	return &Job{
@@ -143,6 +191,7 @@ func baseJob(
 		party:        party,
 		jobType:      jobType,
 		callback:     callback,
+		outCh:        outCh,
 		timeOut:      timeOut,
 		finishLock:   &sync.RWMutex{},
 		finishedMsgs: make(map[string]bool),
@@ -201,33 +250,55 @@ func (job *Job) startListening() {
 				return
 			}
 
-		case data := <-job.endKeygenCh:
+		case data := <-job.ecEndKeygenCh:
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{
-				Success:    true,
-				KeygenData: data,
+				Success:  true,
+				EcKeygen: data,
 			})
 
 			if job.isDone() {
 				return
 			}
 
-		case data := <-job.endPresignCh:
+		case data := <-job.ecEndPresignCh:
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{
-				Success:     true,
-				PresignData: data,
+				Success:   true,
+				EcPresign: data,
 			})
 
 			if job.isDone() {
 				return
 			}
 
-		case data := <-job.endSigningCh:
+		case data := <-job.ecEndSigningCh:
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{
-				Success:     true,
-				SigningData: data,
+				Success:   true,
+				EcSigning: data,
+			})
+
+			if job.isDone() {
+				return
+			}
+
+		case data := <-job.edEndKeygenCh:
+			job.doneEndCh.Store(true)
+			job.callback.OnJobResult(job, JobResult{
+				Success:  true,
+				EdKeygen: data,
+			})
+
+			if job.isDone() {
+				return
+			}
+
+		case data := <-job.edEndSigningCh:
+			job.doneEndCh.Store(true)
+			job.callback.OnJobResult(job, JobResult{
+				Success:   true,
+				EdSigning: data,
 			})
 
 			if job.isDone() {

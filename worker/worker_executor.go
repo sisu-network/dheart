@@ -151,14 +151,14 @@ func (w *WorkerExecutor) Init() (err error) {
 	for i := range jobs {
 		switch w.workType {
 		case wTypes.EcdsaKeygen:
-			jobs[i] = NewKeygenJob(workId, i, w.pIDs, params, w.keygenInput, w, w.cfg.KeygenJobTimeout)
+			jobs[i] = NewEcKeygenJob(workId, i, w.pIDs, params, w.keygenInput, w, w.cfg.KeygenJobTimeout)
 
 		case wTypes.EcdsaPresign:
 			w.presignInput = w.request.PresignInput
-			jobs[i] = NewPresignJob(workId, i, w.pIDs, params, w.presignInput, w, w.cfg.PresignJobTimeout)
+			jobs[i] = NewEcPresignJob(workId, i, w.pIDs, params, w.presignInput, w, w.cfg.PresignJobTimeout)
 
 		case wTypes.EcdsaSigning:
-			jobs[i] = NewSigningJob(workId, i, w.pIDs, params, w.request.Messages[i], w.signingInput[i], w, w.cfg.SigningJobTimeout)
+			jobs[i] = NewEcSigningJob(workId, i, w.pIDs, params, w.request.Messages[i], w.signingInput[i], w, w.cfg.SigningJobTimeout)
 
 		default:
 			// If job type is not correct, kill the whole worker.
@@ -304,7 +304,7 @@ func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
 // generation finishes.
 func (w *WorkerExecutor) checkKeygenResult(job *Job, result JobResult) (ExecutionResult, bool) {
 	w.finalOutputLock.Lock()
-	w.keygenOutputs[job.index] = &result.KeygenData
+	w.keygenOutputs[job.index] = &result.EcKeygen
 	// Count the number of finished job.
 	count := 0
 	for _, item := range w.keygenOutputs {
@@ -329,7 +329,7 @@ func (w *WorkerExecutor) checkKeygenResult(job *Job, result JobResult) (Executio
 // Implements checkPresignResult of JobCallback.
 func (w *WorkerExecutor) checkPresignResult(job *Job, result JobResult) (ExecutionResult, bool) {
 	w.finalOutputLock.Lock()
-	w.presignOutputs[job.index] = result.PresignData
+	w.presignOutputs[job.index] = result.EcPresign
 	// Count the number of finished job.
 	count := 0
 	for _, item := range w.presignOutputs {
@@ -353,7 +353,7 @@ func (w *WorkerExecutor) checkPresignResult(job *Job, result JobResult) (Executi
 // Implements checkSigningResult of JobCallback.
 func (w *WorkerExecutor) checkSigningResult(job *Job, result JobResult) (ExecutionResult, bool) {
 	w.finalOutputLock.Lock()
-	w.signingOutputs[job.index] = result.SigningData
+	w.signingOutputs[job.index] = result.EcSigning
 	// Count the number of finished job.
 	count := 0
 	for _, item := range w.signingOutputs {
