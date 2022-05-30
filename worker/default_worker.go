@@ -15,8 +15,6 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/worker/interfaces"
 	"github.com/sisu-network/dheart/worker/types"
-	libCommon "github.com/sisu-network/tss-lib/common"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 
@@ -24,17 +22,6 @@ import (
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	wTypes "github.com/sisu-network/dheart/worker/types"
 )
-
-type WorkerResult struct {
-	Success        bool
-	IsNodeSelected bool
-
-	Request      *types.WorkRequest
-	KeygenData   []*keygen.LocalPartySaveData
-	PresignData  []*presign.LocalPresignData
-	SigningData  []*libCommon.ECSignature
-	SelectedPids []*tss.PartyID
-}
 
 // Implements worker.Worker interface
 type DefaultWorker struct {

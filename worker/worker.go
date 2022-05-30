@@ -5,8 +5,8 @@ import (
 
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/types"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
+	ecpresign "github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -35,15 +35,29 @@ type WorkerCallback interface {
 	// party ids should match the pids params passed into the function.
 	GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
 
-	GetPresignOutputs(presignIds []string) []*presign.LocalPresignData
+	GetPresignOutputs(presignIds []string) []*ecpresign.LocalPresignData
 
 	OnNodeNotSelected(request *types.WorkRequest)
 
 	OnWorkFailed(request *types.WorkRequest)
 
-	OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData)
+	OnWorkKeygenFinished(request *types.WorkRequest, data []*eckeygen.LocalPartySaveData)
 
-	OnWorkPresignFinished(request *types.WorkRequest, selectedPids []*tss.PartyID, data []*presign.LocalPresignData)
+	OnWorkPresignFinished(request *types.WorkRequest, selectedPids []*tss.PartyID, data []*ecpresign.LocalPresignData)
 
 	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature)
+}
+
+type WorkerResult struct {
+	Success        bool
+	IsNodeSelected bool
+	Request        *types.WorkRequest
+	SelectedPids   []*tss.PartyID
+
+	// Ecdsa
+	EcKeygenData  []*eckeygen.LocalPartySaveData
+	EcPresignData []*ecpresign.LocalPresignData
+	EcSigningData []*libCommon.ECSignature
+
+	// Eddsa
 }

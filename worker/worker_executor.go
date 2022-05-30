@@ -18,8 +18,8 @@ import (
 	wTypes "github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
+	ecpresign "github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 	"go.uber.org/atomic"
 )
@@ -28,8 +28,8 @@ type ExecutionResult struct {
 	Success bool
 	Request *types.WorkRequest
 
-	KeygenOutputs  []*keygen.LocalPartySaveData
-	PresignOutputs []*presign.LocalPresignData
+	KeygenOutputs  []*eckeygen.LocalPartySaveData
+	PresignOutputs []*ecpresign.LocalPresignData
 	SigningOutputs []*libCommon.ECSignature
 }
 
@@ -47,10 +47,10 @@ type WorkerExecutor struct {
 	db         db.Database
 	cfg        config.TimeoutConfig
 
-	// Input
-	keygenInput  *keygen.LocalPreParams
-	presignInput *keygen.LocalPartySaveData // output from keygen. This field is used for presign.
-	signingInput []*presign.LocalPresignData
+	// ECDSA Input
+	keygenInput  *eckeygen.LocalPreParams
+	presignInput *eckeygen.LocalPartySaveData // output from keygen. This field is used for presign.
+	signingInput []*ecpresign.LocalPresignData
 
 	callback func(*WorkerExecutor, ExecutionResult)
 
@@ -68,8 +68,8 @@ type WorkerExecutor struct {
 	jobOutput     map[string][]tss.Message
 	jobOutputLock *sync.RWMutex
 
-	keygenOutputs   []*keygen.LocalPartySaveData
-	presignOutputs  []*presign.LocalPresignData
+	keygenOutputs   []*eckeygen.LocalPartySaveData
+	presignOutputs  []*ecpresign.LocalPresignData
 	signingOutputs  []*libCommon.ECSignature
 	finalOutputLock *sync.RWMutex
 	isStopped       atomic.Bool
@@ -86,7 +86,7 @@ func NewWorkerExecutor(
 	pids []*tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
-	signingInput []*presign.LocalPresignData,
+	signingInput []*ecpresign.LocalPresignData,
 	callback func(*WorkerExecutor, ExecutionResult),
 	cfg config.TimeoutConfig,
 ) *WorkerExecutor {
@@ -108,8 +108,8 @@ func NewWorkerExecutor(
 		jobsLock:        &sync.RWMutex{},
 		jobOutputLock:   &sync.RWMutex{},
 		finalOutputLock: &sync.RWMutex{},
-		keygenOutputs:   make([]*keygen.LocalPartySaveData, request.BatchSize),
-		presignOutputs:  make([]*presign.LocalPresignData, request.BatchSize),
+		keygenOutputs:   make([]*eckeygen.LocalPartySaveData, request.BatchSize),
+		presignOutputs:  make([]*ecpresign.LocalPresignData, request.BatchSize),
 		signingOutputs:  make([]*libCommon.ECSignature, request.BatchSize),
 		jobOutput:       make(map[string][]tss.Message),
 		isStopped:       *atomic.NewBool(false),
