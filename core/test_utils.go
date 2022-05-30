@@ -12,7 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/sisu-network/dheart/p2p"
 	p2ptypes "github.com/sisu-network/dheart/p2p/types"
-	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 )
@@ -69,7 +69,7 @@ func getEngineTestData(n int) ([]ctypes.PrivKey, []*Node, tss.SortedPartyIDs, []
 
 	// Generate private key.
 	for i := 0; i < n; i++ {
-		secret, err := hex.DecodeString(helper.PRIVATE_KEY_HEX[i])
+		secret, err := hex.DecodeString(worker.PRIVATE_KEY_HEX[i])
 		if err != nil {
 			panic(err)
 		}
@@ -110,7 +110,7 @@ func getEngineTestData(n int) ([]ctypes.PrivKey, []*Node, tss.SortedPartyIDs, []
 		}
 	}
 
-	return keys, nodes, sorted, helper.LoadKeygenSavedData(sorted)
+	return keys, nodes, sorted, worker.LoadKeygenSavedData(sorted)
 }
 
 func getPartyIdsFromStrings(pids []string) []*tss.PartyID {

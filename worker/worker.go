@@ -41,11 +41,7 @@ type WorkerCallback interface {
 
 	OnWorkFailed(request *types.WorkRequest)
 
-	OnWorkKeygenFinished(request *types.WorkRequest, data []*eckeygen.LocalPartySaveData)
-
-	OnWorkPresignFinished(request *types.WorkRequest, selectedPids []*tss.PartyID, data []*ecpresign.LocalPresignData)
-
-	OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature)
+	OnWorkerResult(request *types.WorkRequest, result *WorkerResult)
 }
 
 type WorkerResult struct {

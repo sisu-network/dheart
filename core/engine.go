@@ -484,3 +484,16 @@ func (engine *defaultEngine) GetPresignOutputs(presignIds []string) []*presign.L
 
 	return loaded
 }
+
+func (engine *defaultEngine) OnWorkerResult(request *types.WorkRequest, result *worker.WorkerResult) {
+	switch request.WorkType {
+	case types.EcdsaKeygen:
+		engine.onWorkKeygenFinished(request, result.EcKeygenData)
+	case types.EcdsaPresign:
+		engine.onWorkPresignFinished(request, result.SelectedPids, result.EcPresignData)
+	case types.EcdsaSigning:
+		engine.onWorkSigningFinished(request, result.EcSigningData)
+	default:
+		log.Error("OnWorkerResult: Unknown work type ", request.WorkType)
+	}
+}

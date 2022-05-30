@@ -2,12 +2,11 @@ package components
 
 import (
 	"github.com/sisu-network/dheart/db"
-	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 )
 
 func GetMokDbForAvailManager(presignPids, pids []string) db.Database {
-	return &helper.MockDatabase{
+	return &db.MockDatabase{
 		GetAvailablePresignShortFormFunc: func() ([]string, []string, error) {
 			return presignPids, pids, nil
 		},

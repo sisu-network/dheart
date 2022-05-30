@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/require"
 )
@@ -16,8 +15,8 @@ func TestJob_Presign(t *testing.T) {
 	jobs := make([]*Job, n)
 	cbs := make([]*MockJobCallback, n)
 
-	pIDs := helper.GetTestPartyIds(n)
-	presignInputs := helper.LoadKeygenSavedData(pIDs)
+	pIDs := GetTestPartyIds(n)
+	presignInputs := LoadKeygenSavedData(pIDs)
 
 	for i := 0; i < n; i++ {
 		cbs[i] = &MockJobCallback{}

@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/sisu-network/dheart/core/config"
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
@@ -24,7 +24,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	threshold := 1
 	batchSize := 1
 
-	pIDs := helper.GetTestPartyIds(totalParticipants)
+	pIDs := GetTestPartyIds(totalParticipants)
 
 	outCh := make(chan *common.TssMessage)
 
@@ -37,12 +37,12 @@ func TestKeygenEndToEnd(t *testing.T) {
 
 	// Generates n workers
 	for i := 0; i < totalParticipants; i++ {
-		preparams := helper.LoadPreparams(i)
+		preparams := LoadPreparams(i)
 
 		request := &types.WorkRequest{
 			WorkId:      "Keygen0",
 			WorkType:    types.EcdsaKeygen,
-			AllParties:  helper.CopySortedPartyIds(pIDs),
+			AllParties:  CopySortedPartyIds(pIDs),
 			BatchSize:   batchSize,
 			KeygenInput: preparams,
 			Threshold:   threshold,
@@ -56,14 +56,14 @@ func TestKeygenEndToEnd(t *testing.T) {
 		workers[i] = NewKeygenWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0, 0),
-			helper.NewMockDatabase(),
-			&helper.MockWorkerCallback{
-				OnWorkKeygenFinishedFunc: func(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
+			NewTestDispatcher(outCh, 0, 0),
+			db.NewMockDatabase(),
+			&MockWorkerCallback{
+				OnWorkerResultFunc: func(request *types.WorkRequest, result *WorkerResult) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					finalOutput[workerIndex] = data
+					finalOutput[workerIndex] = result.EcKeygenData
 					finishedWorkerCount += 1
 
 					if finishedWorkerCount == totalParticipants {
@@ -104,7 +104,7 @@ func TestKeygenTimeout(t *testing.T) {
 	threshold := 1
 	batchSize := 1
 
-	pIDs := helper.GetTestPartyIds(totalParticipants)
+	pIDs := GetTestPartyIds(totalParticipants)
 
 	outCh := make(chan *common.TssMessage)
 
@@ -115,12 +115,12 @@ func TestKeygenTimeout(t *testing.T) {
 
 	// Generates n workers
 	for i := 0; i < totalParticipants; i++ {
-		preparams := helper.LoadPreparams(i)
+		preparams := LoadPreparams(i)
 
 		request := &types.WorkRequest{
 			WorkId:      "Keygen0",
 			WorkType:    types.EcdsaKeygen,
-			AllParties:  helper.CopySortedPartyIds(pIDs),
+			AllParties:  CopySortedPartyIds(pIDs),
 			BatchSize:   batchSize,
 			KeygenInput: preparams,
 			Threshold:   threshold,
@@ -134,9 +134,9 @@ func TestKeygenTimeout(t *testing.T) {
 		workers[i] = NewKeygenWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0, 2*time.Second),
-			helper.NewMockDatabase(),
-			&helper.MockWorkerCallback{
+			NewTestDispatcher(outCh, 0, 2*time.Second),
+			db.NewMockDatabase(),
+			&MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
@@ -169,7 +169,7 @@ func generateTestPreparams(n int) {
 			panic(err)
 		}
 
-		err = helper.SaveTestPreparams(i, bz)
+		err = SaveTestPreparams(i, bz)
 		if err != nil {
 			panic(err)
 		}

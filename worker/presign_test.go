@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/sisu-network/dheart/core/config"
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
-	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,9 +31,9 @@ func TestPresign_EndToEnd(t *testing.T) {
 	batchSize := 1
 	threshold := n - 1
 
-	pIDs := helper.GetTestPartyIds(n)
+	pIDs := GetTestPartyIds(n)
 
-	presignInputs := helper.LoadKeygenSavedData(pIDs)
+	presignInputs := LoadKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
 	workers := make([]Worker, n)
 	done := make(chan bool)
@@ -46,7 +45,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := types.NewPresignRequest(
 			"Presign0",
-			helper.CopySortedPartyIds(pIDs),
+			CopySortedPartyIds(pIDs),
 			threshold,
 			presignInputs[i],
 			false,
@@ -59,24 +58,24 @@ func TestPresign_EndToEnd(t *testing.T) {
 		worker := NewPresignWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0, 0),
-			helper.NewMockDatabase(),
-			&helper.MockWorkerCallback{
-				OnNodeNotSelectedFunc: func(request *types.WorkRequest) {
+			NewTestDispatcher(outCh, 0, 0),
+			db.NewMockDatabase(),
+			&MockWorkerCallback{
+				OnWorkerResultFunc: func(request *types.WorkRequest, result *WorkerResult) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
+					presignOutputs = append(presignOutputs, result.EcPresignData)
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true
 					}
 				},
 
-				OnWorkPresignFinishedFunc: func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+				OnNodeNotSelectedFunc: func(request *types.WorkRequest) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					presignOutputs = append(presignOutputs, data)
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true
@@ -99,15 +98,15 @@ func TestPresign_EndToEnd(t *testing.T) {
 	// Do not delete
 	// Save presign data. Uncomment this line to save presign data fixtures after test (these
 	// fixtures could be used in signing test)
-	// helper.SavePresignData(n, presignOutputs, pIDs, 0)
+	// SavePresignData(n, presignOutputs, pIDs, 0)
 }
 
 func TestPresign_PreExecutionTimeout(t *testing.T) {
 	log.Verbose("Running TestPresign_PreExecutionTimeout")
 	n := 4
 	batchSize := 1
-	pIDs := helper.GetTestPartyIds(n)
-	presignInputs := helper.LoadKeygenSavedData(pIDs)
+	pIDs := GetTestPartyIds(n)
+	presignInputs := LoadKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
 	workers := make([]Worker, n)
 	done := make(chan bool)
@@ -117,7 +116,7 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := types.NewPresignRequest(
 			"Presign0",
-			helper.CopySortedPartyIds(pIDs),
+			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
 			presignInputs[i],
 			false,
@@ -130,9 +129,9 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 		worker := NewPresignWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, cfg.SelectionLeaderTimeout+1*time.Second, 0),
-			helper.NewMockDatabase(),
-			&helper.MockWorkerCallback{
+			NewTestDispatcher(outCh, cfg.SelectionLeaderTimeout+1*time.Second, 0),
+			db.NewMockDatabase(),
+			&MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
 					if n := atomic.AddUint32(&numFailedWorkers, 1); n == 4 {
 						done <- true
@@ -159,8 +158,8 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 	log.Verbose("Running TestPresign_ExecutionTimeout")
 	n := 4
 	batchSize := 1
-	pIDs := helper.GetTestPartyIds(n)
-	presignInputs := helper.LoadKeygenSavedData(pIDs)
+	pIDs := GetTestPartyIds(n)
+	presignInputs := LoadKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
 	workers := make([]Worker, n)
 	done := make(chan bool)
@@ -170,7 +169,7 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := types.NewPresignRequest(
 			"Presign0",
-			helper.CopySortedPartyIds(pIDs),
+			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
 			presignInputs[i],
 			false,
@@ -183,9 +182,9 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 		worker := NewPresignWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0, 2*time.Second),
-			helper.NewMockDatabase(),
-			&helper.MockWorkerCallback{
+			NewTestDispatcher(outCh, 0, 2*time.Second),
+			db.NewMockDatabase(),
+			&MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
 					if n := atomic.AddUint32(&numFailedWorkers, 1); n == 4 {
 						done <- true
@@ -215,9 +214,9 @@ func TestPresign_Threshold(t *testing.T) {
 	threshold := 2
 	batchSize := 1
 
-	pIDs := helper.GetTestPartyIds(n)
+	pIDs := GetTestPartyIds(n)
 
-	presignInputs := helper.LoadKeygenSavedData(pIDs)
+	presignInputs := LoadKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
 	workers := make([]Worker, n)
 	done := make(chan bool)
@@ -229,7 +228,7 @@ func TestPresign_Threshold(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := types.NewPresignRequest(
 			"Presign0",
-			helper.CopySortedPartyIds(pIDs),
+			CopySortedPartyIds(pIDs),
 			threshold,
 			presignInputs[i],
 			false,
@@ -242,19 +241,20 @@ func TestPresign_Threshold(t *testing.T) {
 		worker := NewPresignWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0, 0),
-			helper.NewMockDatabase(),
-			&helper.MockWorkerCallback{
-				OnWorkPresignFinishedFunc: func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
+			NewTestDispatcher(outCh, 0, 0),
+			db.NewMockDatabase(),
+			&MockWorkerCallback{
+				OnWorkerResultFunc: func(request *types.WorkRequest, result *WorkerResult) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					presignOutputs = append(presignOutputs, data)
+					presignOutputs = append(presignOutputs, result.EcPresignData)
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true
 					}
 				},
+
 				OnNodeNotSelectedFunc: func(request *types.WorkRequest) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
@@ -280,5 +280,5 @@ func TestPresign_Threshold(t *testing.T) {
 
 	assert.Equal(t, threshold+1, len(presignOutputs), "Presign output length is not correct")
 
-	// helper.SavePresignData(n, presignOutputs, 2)
+	// SavePresignData(n, presignOutputs, 2)
 }

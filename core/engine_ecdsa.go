@@ -16,7 +16,7 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-func (engine *defaultEngine) OnWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
+func (engine *defaultEngine) onWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
 	log.Info("Keygen finished for type ", request.KeygenType)
 	// Save to database
 	if err := engine.db.SaveKeygenData(request.KeygenType, request.WorkId, request.AllParties, output); err != nil {
@@ -47,7 +47,7 @@ func (engine *defaultEngine) OnWorkKeygenFinished(request *types.WorkRequest, ou
 	engine.startNextWork()
 }
 
-func (engine *defaultEngine) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID,
+func (engine *defaultEngine) onWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID,
 	data []*presign.LocalPresignData) {
 	log.Info("Presign finished, request.WorkId = ", request.WorkId)
 
@@ -63,7 +63,7 @@ func (engine *defaultEngine) OnWorkPresignFinished(request *types.WorkRequest, p
 	engine.startNextWork()
 }
 
-func (engine *defaultEngine) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature) {
+func (engine *defaultEngine) onWorkSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature) {
 	log.Info("Signing finished for workId ", request.WorkId)
 
 	signatures := make([][]byte, len(data))

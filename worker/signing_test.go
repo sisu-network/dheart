@@ -17,7 +17,6 @@ import (
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
@@ -42,7 +41,7 @@ func mockDbForSigning(pids []*tss.PartyID, WorkId string, batchSize int) db.Data
 		pidStrings[i] = pidString
 	}
 
-	return &helper.MockDatabase{
+	return &db.MockDatabase{
 		GetAvailablePresignShortFormFunc: func() ([]string, []string, error) {
 			return presignIds, pidStrings, nil
 		},
@@ -68,7 +67,7 @@ func generateEthTx() *etypes.Transaction {
 }
 
 func TestSigningEndToEnd(t *testing.T) {
-	wrapper := helper.LoadPresignSavedData(0)
+	wrapper := LoadPresignSavedData(0)
 	n := len(wrapper.Outputs)
 
 	// Batch should have the same set of party ids.
@@ -90,7 +89,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := types.NewSigningRequest(
 			"Signing0",
-			helper.CopySortedPartyIds(pIDs),
+			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
 			signingMsgs,
 			[]string{"eth"},
@@ -102,14 +101,14 @@ func TestSigningEndToEnd(t *testing.T) {
 		worker := NewSigningWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0, 0),
+			NewTestDispatcher(outCh, 0, 0),
 			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
-			&helper.MockWorkerCallback{
-				OnWorkSigningFinishedFunc: func(request *types.WorkRequest, data []*libCommon.ECSignature) {
+			&MockWorkerCallback{
+				OnWorkerResultFunc: func(request *types.WorkRequest, result *WorkerResult) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					outputs[workerIndex] = data
+					outputs[workerIndex] = result.EcSigningData
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true
@@ -149,8 +148,8 @@ func TestSigning_PresignAndSign(t *testing.T) {
 	n := 4
 
 	// Batch should have the same set of party ids.
-	pIDs := helper.GetTestPartyIds(n)
-	presignInputs := helper.LoadKeygenSavedData(pIDs)
+	pIDs := GetTestPartyIds(n)
+	presignInputs := LoadKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
 	workers := make([]Worker, n)
 	done := make(chan bool)
@@ -163,7 +162,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := types.NewSigningRequest(
 			"Signing0",
-			helper.CopySortedPartyIds(pIDs),
+			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
 			signingMsgs,
 			[]string{"eth"},
@@ -177,14 +176,14 @@ func TestSigning_PresignAndSign(t *testing.T) {
 		worker := NewSigningWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0, 0),
+			NewTestDispatcher(outCh, 0, 0),
 			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
-			&helper.MockWorkerCallback{
-				OnWorkSigningFinishedFunc: func(request *types.WorkRequest, data []*libCommon.ECSignature) {
+			&MockWorkerCallback{
+				OnWorkerResultFunc: func(request *types.WorkRequest, result *WorkerResult) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					outputs[workerIndex] = data
+					outputs[workerIndex] = result.EcSigningData
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true
@@ -218,7 +217,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 }
 
 func TestSigning_PreExecutionTimeout(t *testing.T) {
-	wrapper := helper.LoadPresignSavedData(0)
+	wrapper := LoadPresignSavedData(0)
 	n := len(wrapper.Outputs)
 	pIDs := wrapper.PIDs
 
@@ -231,7 +230,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := types.NewSigningRequest(
 			"Signing0",
-			helper.CopySortedPartyIds(pIDs),
+			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
 			[]string{signingMsg},
 			[]string{"eth"},
@@ -244,9 +243,9 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 		worker := NewSigningWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, cfg.SelectionLeaderTimeout+1*time.Second, 0),
+			NewTestDispatcher(outCh, cfg.SelectionLeaderTimeout+1*time.Second, 0),
 			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
-			&helper.MockWorkerCallback{
+			&MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
 					if n := atomic.AddUint32(&numFailedWorkers, 1); n == 4 {
 						done <- true
@@ -271,7 +270,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 }
 
 func TestSigning_ExecutionTimeout(t *testing.T) {
-	wrapper := helper.LoadPresignSavedData(0)
+	wrapper := LoadPresignSavedData(0)
 	n := len(wrapper.Outputs)
 	pIDs := wrapper.PIDs
 
@@ -284,7 +283,7 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := types.NewSigningRequest(
 			"Signing0",
-			helper.CopySortedPartyIds(pIDs),
+			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
 			[]string{signingMsg},
 			[]string{"eth"},
@@ -298,9 +297,9 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 		worker := NewSigningWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0, 2*time.Second+1),
+			NewTestDispatcher(outCh, 0, 2*time.Second+1),
 			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
-			&helper.MockWorkerCallback{
+			&MockWorkerCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest) {
 					if n := atomic.AddUint32(&numFailedWorkers, 1); n == 4 {
 						done <- true
@@ -366,7 +365,7 @@ func TestSigning_Threshold(t *testing.T) {
 
 func doTestThreshold(t *testing.T) {
 	n := 4
-	wrapper := helper.LoadPresignSavedData(2)
+	wrapper := LoadPresignSavedData(2)
 	threshold := 2
 
 	if len(wrapper.Outputs) != threshold+1 {
@@ -409,7 +408,7 @@ func doTestThreshold(t *testing.T) {
 	for i := 0; i < n; i++ {
 		request := types.NewSigningRequest(
 			"Signing0",
-			helper.CopySortedPartyIds(pIDs),
+			CopySortedPartyIds(pIDs),
 			threshold,
 			signingMsgs,
 			[]string{"eth"},
@@ -421,14 +420,14 @@ func doTestThreshold(t *testing.T) {
 		worker := NewSigningWorker(
 			request,
 			pIDs[i],
-			helper.NewTestDispatcher(outCh, 0, 0),
+			NewTestDispatcher(outCh, 0, 0),
 			mockDbForSigning(pIDs, request.WorkId, request.BatchSize),
-			&helper.MockWorkerCallback{
-				OnWorkSigningFinishedFunc: func(request *types.WorkRequest, data []*libCommon.ECSignature) {
+			&MockWorkerCallback{
+				OnWorkerResultFunc: func(request *types.WorkRequest, result *WorkerResult) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					outputs = append(outputs, data)
+					outputs = append(outputs, result.EcSigningData)
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true

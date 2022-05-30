@@ -1,9 +1,7 @@
-package helper
+package worker
 
 import (
 	"encoding/hex"
-
-	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 
 	"encoding/json"
 	"fmt"
@@ -13,32 +11,28 @@ import (
 	"runtime"
 	"time"
 
-	htypes "github.com/sisu-network/dheart/types"
-
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
-	dtypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/lib/log"
-	libCommon "github.com/sisu-network/tss-lib/common"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
-	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/types"
+	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
 const (
-	TestPreparamsFixtureDirFormat  = "%s/../../data/_ecdsa_preparams_fixtures"
+	TestPreparamsFixtureDirFormat  = "%s/../data/_ecdsa_preparams_fixtures"
 	TestPreparamsFixtureFileFormat = "preparams_data_%d.json"
 
-	TestKeygenSavedDataFixtureDirFormat  = "%s/../../data/_ecdsa_keygen_saved_data_fixtures"
+	TestKeygenSavedDataFixtureDirFormat  = "%s/../data/_ecdsa_keygen_saved_data_fixtures"
 	TestKeygenSavedDataFixtureFileFormat = "keygen_saved_data_%d.json"
 
-	TestPresignSavedDataFixtureDirFormat  = "%s/../../data/_ecdsa_presign_saved_data_fixtures"
+	TestPresignSavedDataFixtureDirFormat  = "%s/../data/_ecdsa_presign_saved_data_fixtures"
 	TestPresignSavedDataFixtureFileFormat = "presign_saved_data_%d.json"
 )
 
@@ -63,13 +57,12 @@ var (
 )
 
 type MockWorkerCallback struct {
-	OnWorkKeygenFinishedFunc  func(request *types.WorkRequest, data []*keygen.LocalPartySaveData)
-	OnWorkPresignFinishedFunc func(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
-	OnWorkSigningFinishedFunc func(request *types.WorkRequest, data []*libCommon.ECSignature)
-	OnNodeNotSelectedFunc     func(request *types.WorkRequest)
-	OnWorkFailedFunc          func(request *types.WorkRequest)
-	GetAvailablePresignsFunc  func(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
-	GetPresignOutputsFunc     func(presignIds []string) []*presign.LocalPresignData
+	OnWorkerResultFunc func(request *types.WorkRequest, result *WorkerResult)
+
+	OnNodeNotSelectedFunc    func(request *types.WorkRequest)
+	OnWorkFailedFunc         func(request *types.WorkRequest)
+	GetAvailablePresignsFunc func(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
+	GetPresignOutputsFunc    func(presignIds []string) []*presign.LocalPresignData
 
 	workerIndex     int
 	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)
@@ -77,21 +70,9 @@ type MockWorkerCallback struct {
 	signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.ECSignature)
 }
 
-func (cb *MockWorkerCallback) OnWorkKeygenFinished(request *types.WorkRequest, data []*keygen.LocalPartySaveData) {
-	if cb.OnWorkKeygenFinishedFunc != nil {
-		cb.OnWorkKeygenFinishedFunc(request, data)
-	}
-}
-
-func (cb *MockWorkerCallback) OnWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData) {
-	if cb.OnWorkPresignFinishedFunc != nil {
-		cb.OnWorkPresignFinishedFunc(request, pids, data)
-	}
-}
-
-func (cb *MockWorkerCallback) OnWorkSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature) {
-	if cb.OnWorkSigningFinishedFunc != nil {
-		cb.OnWorkSigningFinishedFunc(request, data)
+func (cb *MockWorkerCallback) OnWorkerResult(request *types.WorkRequest, result *WorkerResult) {
+	if cb.OnWorkerResultFunc != nil {
+		cb.OnWorkerResultFunc(request, result)
 	}
 }
 
@@ -120,113 +101,6 @@ func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*presign.
 		return cb.GetPresignOutputsFunc(presignIds)
 	}
 
-	return nil
-}
-
-//---/
-
-type MockEngineCallback struct {
-	OnWorkKeygenFinishedFunc  func(result *dtypes.KeygenResult)
-	OnWorkPresignFinishedFunc func(result *dtypes.PresignResult)
-	OnWorkSigningFinishedFunc func(request *types.WorkRequest, result *htypes.KeysignResult)
-	OnWorkFailedFunc          func(request *types.WorkRequest, culprits []*tss.PartyID)
-}
-
-func (cb *MockEngineCallback) OnWorkKeygenFinished(result *dtypes.KeygenResult) {
-	if cb.OnWorkKeygenFinishedFunc != nil {
-		cb.OnWorkKeygenFinishedFunc(result)
-	}
-}
-
-func (cb *MockEngineCallback) OnWorkPresignFinished(result *dtypes.PresignResult) {
-	if cb.OnWorkPresignFinishedFunc != nil {
-		cb.OnWorkPresignFinishedFunc(result)
-	}
-}
-
-func (cb *MockEngineCallback) OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult) {
-	if cb.OnWorkSigningFinishedFunc != nil {
-		cb.OnWorkSigningFinishedFunc(request, result)
-	}
-}
-
-func (cb *MockEngineCallback) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {
-	if cb.OnWorkFailedFunc != nil {
-		cb.OnWorkFailedFunc(request, culprits)
-	}
-}
-
-func (cb *MockEngineCallback) OnNodeNotSelected(workId string) {
-	// Do nothing.
-}
-
-//---/
-
-type MockDatabase struct {
-	// TODO: remove this unused variable
-	signingInput []*presign.LocalPresignData
-
-	GetAvailablePresignShortFormFunc func() ([]string, []string, error)
-	LoadPresignFunc                  func(presignIds []string) ([]*presign.LocalPresignData, error)
-}
-
-func NewMockDatabase() db.Database {
-	return &MockDatabase{}
-}
-
-func (m *MockDatabase) Init() error {
-	return nil
-}
-
-func (m *MockDatabase) SavePreparams(preparams *keygen.LocalPreParams) error {
-	return nil
-}
-
-func (m *MockDatabase) LoadPreparams() (*keygen.LocalPreParams, error) {
-	return nil, nil
-}
-
-func (m *MockDatabase) SaveKeygenData(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
-	return nil
-}
-
-func (m *MockDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
-	return nil
-}
-
-func (m *MockDatabase) GetAvailablePresignShortForm() ([]string, []string, error) {
-	if m.GetAvailablePresignShortFormFunc != nil {
-		return m.GetAvailablePresignShortFormFunc()
-	}
-
-	return []string{}, []string{}, nil
-}
-
-func (m *MockDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error) {
-	if m.LoadPresignFunc != nil {
-		return m.LoadPresignFunc(presignIds)
-	}
-
-	return nil, nil
-}
-
-func (m *MockDatabase) LoadPresignStatus(presignIds []string) ([]string, error) {
-	return nil, nil
-}
-
-func (m *MockDatabase) LoadKeygenData(chain string) (*keygen.LocalPartySaveData, error) {
-	return nil, nil
-}
-
-func (m *MockDatabase) UpdatePresignStatus(presignIds []string) error {
-	return nil
-}
-
-func (m *MockDatabase) SavePeers([]*p2ptypes.Peer) error {
-	return nil
-}
-
-func (m *MockDatabase) LoadPeers() []*p2ptypes.Peer {
 	return nil
 }
 

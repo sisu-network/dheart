@@ -315,7 +315,9 @@ func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result Ex
 	if result.Success {
 		switch executor.workType {
 		case types.EcdsaKeygen, types.EddsaKeygen:
-			w.callback.OnWorkKeygenFinished(w.request, result.KeygenOutputs)
+			w.callback.OnWorkerResult(w.request, &WorkerResult{
+				EcKeygenData: result.KeygenOutputs,
+			})
 
 		case types.EcdsaPresign:
 			if w.request.IsSigning() {
@@ -331,11 +333,16 @@ func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result Ex
 				w.executor = w.startExecutor(executor.pIDs, result.PresignOutputs)
 				w.lock.Unlock()
 			} else {
-				w.callback.OnWorkPresignFinished(w.request, executor.pIDs, result.PresignOutputs)
+				w.callback.OnWorkerResult(w.request, &WorkerResult{
+					SelectedPids:  executor.pIDs,
+					EcPresignData: result.PresignOutputs,
+				})
 			}
 
 		case types.EcdsaSigning, types.EddsaSigning:
-			w.callback.OnWorkSigningFinished(w.request, result.SigningOutputs)
+			w.callback.OnWorkerResult(w.request, &WorkerResult{
+				EcSigningData: result.SigningOutputs,
+			})
 		}
 	} else {
 		w.callback.OnWorkFailed(w.request)

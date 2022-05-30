@@ -11,7 +11,7 @@ import (
 	"github.com/sisu-network/dheart/core/config"
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
@@ -152,7 +152,7 @@ func TestEngineDelayStart(t *testing.T) {
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
 			components.GetMokDbForAvailManager(presignIds, pidStrings),
-			&helper.MockEngineCallback{
+			&MockEngineCallback{
 				OnWorkPresignFinishedFunc: cb,
 			},
 			privKeys[i],
@@ -163,7 +163,7 @@ func TestEngineDelayStart(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
+		request := types.NewPresignRequest(workId, worker.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
 
 		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simulate that different workers can start at different times.
@@ -208,7 +208,7 @@ func TestEngineSendDuplicateMessage(t *testing.T) {
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
 			components.GetMokDbForAvailManager(presignIds, pidStrings),
-			&helper.MockEngineCallback{
+			&MockEngineCallback{
 				OnWorkPresignFinishedFunc: cb,
 			},
 			privKeys[i],
@@ -219,7 +219,7 @@ func TestEngineSendDuplicateMessage(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
+		request := types.NewPresignRequest(workId, worker.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
 
 		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simulate that different workers can start at different times.
@@ -256,7 +256,7 @@ func TestEngineJobTimeout(t *testing.T) {
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
 			components.GetMokDbForAvailManager(presignIds, pidStrings),
-			&helper.MockEngineCallback{
+			&MockEngineCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest, culprits []*tss.PartyID) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
@@ -275,7 +275,7 @@ func TestEngineJobTimeout(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
+		request := types.NewPresignRequest(workId, worker.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
 
 		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
 			// Delay starting each engine to simulate that different workers can start at different times.
@@ -321,7 +321,7 @@ func TestEngine_MissingMessages(t *testing.T) {
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
 			components.GetMokDbForAvailManager(presignIds, pidStrings),
-			&helper.MockEngineCallback{
+			&MockEngineCallback{
 				OnWorkPresignFinishedFunc: cb,
 			},
 			privKeys[i],
@@ -332,7 +332,7 @@ func TestEngine_MissingMessages(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
+		request := types.NewPresignRequest(workId, worker.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
 
 		go func(engine Engine, request *types.WorkRequest) {
 			engine.AddRequest(request)
