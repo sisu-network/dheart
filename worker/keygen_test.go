@@ -1,4 +1,4 @@
-package ecdsa
+package worker
 
 import (
 	"encoding/json"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
@@ -30,7 +29,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	outCh := make(chan *common.TssMessage)
 
 	done := make(chan bool)
-	workers := make([]worker.Worker, totalParticipants)
+	workers := make([]Worker, totalParticipants)
 	finishedWorkerCount := 0
 
 	finalOutput := make([][]*keygen.LocalPartySaveData, len(pIDs)) // n * batchSize
@@ -110,7 +109,7 @@ func TestKeygenTimeout(t *testing.T) {
 	outCh := make(chan *common.TssMessage)
 
 	done := make(chan bool)
-	workers := make([]worker.Worker, totalParticipants)
+	workers := make([]Worker, totalParticipants)
 	outputLock := &sync.Mutex{}
 	failedWorkCounts := 0
 

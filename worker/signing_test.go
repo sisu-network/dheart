@@ -1,4 +1,4 @@
-package ecdsa
+package worker
 
 import (
 	"bytes"
@@ -17,7 +17,6 @@ import (
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
@@ -76,7 +75,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	pIDs := wrapper.PIDs
 
 	outCh := make(chan *common.TssMessage)
-	workers := make([]worker.Worker, n)
+	workers := make([]Worker, n)
 	done := make(chan bool)
 	finishedWorkerCount := 0
 	ethTx := generateEthTx()
@@ -153,7 +152,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 	pIDs := helper.GetTestPartyIds(n)
 	presignInputs := helper.LoadKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
-	workers := make([]worker.Worker, n)
+	workers := make([]Worker, n)
 	done := make(chan bool)
 	finishedWorkerCount := 0
 	signingMsgs := []string{"This is a test", "another message"}
@@ -224,7 +223,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 	pIDs := wrapper.PIDs
 
 	outCh := make(chan *common.TssMessage, 4)
-	workers := make([]worker.Worker, n)
+	workers := make([]Worker, n)
 	done := make(chan bool)
 	signingMsg := "This is a test"
 	var numFailedWorkers uint32
@@ -277,7 +276,7 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 	pIDs := wrapper.PIDs
 
 	outCh := make(chan *common.TssMessage, 4)
-	workers := make([]worker.Worker, n)
+	workers := make([]Worker, n)
 	done := make(chan bool)
 	signingMsg := "This is a test"
 	var numFailedWorkers uint32
@@ -395,7 +394,7 @@ func doTestThreshold(t *testing.T) {
 	selectedPids = tss.SortPartyIDs(selectedPids)
 
 	outCh := make(chan *common.TssMessage)
-	workers := make([]worker.Worker, n)
+	workers := make([]Worker, n)
 	done := make(chan bool)
 	finishedWorkerCount := 0
 	ethTx := generateEthTx()

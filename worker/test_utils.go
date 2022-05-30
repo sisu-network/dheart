@@ -1,11 +1,10 @@
-package ecdsa
+package worker
 
 import (
 	"sync"
 	"time"
 
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -28,12 +27,12 @@ func (cb *MockJobCallback) OnJobResult(job *Job, result JobResult) {
 
 //---/
 
-func startAllWorkers(workers []worker.Worker) {
+func startAllWorkers(workers []Worker) {
 	// Start all workers
 	wg := sync.WaitGroup{}
 	wg.Add(len(workers))
 	for i := 0; i < len(workers); i++ {
-		go func(w worker.Worker) {
+		go func(w Worker) {
 			wg.Done()
 			if err := w.Start(make([]*common.TssMessage, 0)); err != nil {
 				panic(err)
@@ -45,7 +44,7 @@ func startAllWorkers(workers []worker.Worker) {
 }
 
 // debug function to get worker index from its id
-func getWorkerIndex(workers []worker.Worker, id string) int {
+func getWorkerIndex(workers []Worker, id string) int {
 	for i, w := range workers {
 		if w.GetPartyId() == id {
 			return i
@@ -55,7 +54,7 @@ func getWorkerIndex(workers []worker.Worker, id string) int {
 	return -1
 }
 
-func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, done chan bool) {
+func runAllWorkers(workers []Worker, outCh chan *common.TssMessage, done chan bool) {
 	for {
 		select {
 		case <-done:
@@ -93,8 +92,8 @@ func runAllWorkers(workers []worker.Worker, outCh chan *common.TssMessage, done 
 	}
 }
 
-func processMsgWithPanicOnFail(w worker.Worker, tssMsg *common.TssMessage) {
-	go func(w worker.Worker, tssMsg *common.TssMessage) {
+func processMsgWithPanicOnFail(w Worker, tssMsg *common.TssMessage) {
+	go func(w Worker, tssMsg *common.TssMessage) {
 		if err := w.ProcessNewMessage(tssMsg); err != nil {
 			panic(err)
 		}

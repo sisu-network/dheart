@@ -1,4 +1,4 @@
-package ecdsa
+package worker
 
 import (
 	"sync"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
@@ -37,7 +36,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 
 	presignInputs := helper.LoadKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
-	workers := make([]worker.Worker, n)
+	workers := make([]Worker, n)
 	done := make(chan bool)
 	finishedWorkerCount := 0
 
@@ -110,7 +109,7 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 	pIDs := helper.GetTestPartyIds(n)
 	presignInputs := helper.LoadKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
-	workers := make([]worker.Worker, n)
+	workers := make([]Worker, n)
 	done := make(chan bool)
 
 	var numFailedWorkers uint32
@@ -163,7 +162,7 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 	pIDs := helper.GetTestPartyIds(n)
 	presignInputs := helper.LoadKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
-	workers := make([]worker.Worker, n)
+	workers := make([]Worker, n)
 	done := make(chan bool)
 
 	var numFailedWorkers uint32
@@ -220,7 +219,7 @@ func TestPresign_Threshold(t *testing.T) {
 
 	presignInputs := helper.LoadKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
-	workers := make([]worker.Worker, n)
+	workers := make([]Worker, n)
 	done := make(chan bool)
 	finishedWorkerCount := 0
 

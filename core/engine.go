@@ -26,7 +26,6 @@ import (
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker"
-	"github.com/sisu-network/dheart/worker/ecdsa"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
@@ -165,15 +164,15 @@ func (engine *defaultEngine) startWork(request *types.WorkRequest) {
 	// Create a new worker.
 	switch request.WorkType {
 	case types.EcdsaKeygen:
-		w = ecdsa.NewKeygenWorker(request, workPartyId, engine, engine.db, engine,
+		w = worker.NewKeygenWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config)
 
 	case types.EcdsaPresign:
-		w = ecdsa.NewPresignWorker(request, workPartyId, engine, engine.db, engine,
+		w = worker.NewPresignWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config, MaxBatchSize)
 
 	case types.EcdsaSigning:
-		w = ecdsa.NewSigningWorker(request, workPartyId, engine, engine.db, engine,
+		w = worker.NewSigningWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config, MaxBatchSize, engine.presignsManager)
 	}
 

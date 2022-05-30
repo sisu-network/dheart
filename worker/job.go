@@ -1,4 +1,4 @@
-package ecdsa
+package worker
 
 import (
 	"crypto/elliptic"
