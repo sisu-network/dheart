@@ -20,7 +20,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.13
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/sisu-network/lib v0.0.1-alpha9.0.20220520234329-f6cc4c3ff26e
-	github.com/sisu-network/tss-lib v0.1.3-0.20220530071656-324614845079
+	github.com/sisu-network/tss-lib v0.1.3-0.20220530235702-00381b2247df
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	go.uber.org/atomic v1.7.0
@@ -138,7 +138,7 @@ require (
 )
 
 replace (
-	google.golang.org/grpc => google.golang.org/grpc v1.33.2
-	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	github.com/agl/ed25519 => github.com/binance-chain/edwards25519 v0.0.0-20200305024217-f36fc4b53d43
+	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
+	google.golang.org/grpc => google.golang.org/grpc v1.33.2
 )

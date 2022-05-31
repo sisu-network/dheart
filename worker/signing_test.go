@@ -149,7 +149,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 
 	// Batch should have the same set of party ids.
 	pIDs := GetTestPartyIds(n)
-	presignInputs := LoadKeygenSavedData(pIDs)
+	presignInputs := LoadEcKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
 	workers := make([]Worker, n)
 	done := make(chan bool)

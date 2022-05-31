@@ -195,20 +195,20 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 	clientRequest := h.keysignRequests[request.WorkId]
 
 	switch request.WorkType {
-	case types.EcdsaKeygen, types.EddsaKeygen:
+	case types.EcKeygen, types.EdKeygen:
 		result := htypes.KeygenResult{
 			KeyType:  request.KeygenType,
 			Outcome:  htypes.OutcomeFailure,
 			Culprits: culprits,
 		}
 		h.client.PostKeygenResult(&result)
-	case types.EcdsaPresign, types.EddsaPresign:
+	case types.EcPresign, types.EdPresign:
 		result := htypes.PresignResult{
 			Outcome:  htypes.OutcomeFailure,
 			Culprits: culprits,
 		}
 		h.client.PostPresignResult(&result)
-	case types.EcdsaSigning, types.EddsaSigning:
+	case types.EcSigning, types.EdSigning:
 		result := htypes.KeysignResult{
 			Request:  clientRequest,
 			Outcome:  htypes.OutcomeFailure,

@@ -16,7 +16,7 @@ func TestEcJob_Presign(t *testing.T) {
 	cbs := make([]*MockJobCallback, n)
 
 	pIDs := GetTestPartyIds(n)
-	presignInputs := LoadKeygenSavedData(pIDs)
+	presignInputs := LoadEcKeygenSavedData(pIDs)
 
 	for i := 0; i < n; i++ {
 		cbs[i] = &MockJobCallback{}

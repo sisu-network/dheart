@@ -15,43 +15,50 @@ import (
 type Round int
 
 const (
-	Keygen1 Round = iota + 1
-	Keygen2
-	Keygen3
-	Presign1
-	Presign2
-	Presign3
-	Presign4
-	Presign5
-	Presign6
-	Presign7
-	Sign1
+	EcKeygen1 Round = iota + 1
+	EcKeygen2
+	EcKeygen3
+	EcPresign1
+	EcPresign2
+	EcPresign3
+	EcPresign4
+	EcPresign5
+	EcPresign6
+	EcPresign7
+	EcSigning1
+
+	// Eddsa
+	EdKeygen1
+	EdKeygen2
+	EdSigning1
+	EdSigning2
+	EdSigning3
 )
 
 func GetMsgRound(content tss.MessageContent) (Round, error) {
 	switch content.(type) {
 	case *keygen.KGRound1Message:
-		return Keygen1, nil
+		return EcKeygen1, nil
 	case *keygen.KGRound2Message1, *keygen.KGRound2Message2:
-		return Keygen2, nil
+		return EcKeygen2, nil
 	case *keygen.KGRound3Message:
-		return Keygen3, nil
+		return EcKeygen3, nil
 	case *presign.PresignRound1Message1, *presign.PresignRound1Message2:
-		return Presign1, nil
+		return EcPresign1, nil
 	case *presign.PresignRound2Message:
-		return Presign2, nil
+		return EcPresign2, nil
 	case *presign.PresignRound3Message:
-		return Presign3, nil
+		return EcPresign3, nil
 	case *presign.PresignRound4Message:
-		return Presign4, nil
+		return EcPresign4, nil
 	case *presign.PresignRound5Message:
-		return Presign5, nil
+		return EcPresign5, nil
 	case *presign.PresignRound6Message:
-		return Presign6, nil
+		return EcPresign6, nil
 	case *presign.PresignRound7Message:
-		return Presign7, nil
+		return EcPresign7, nil
 	case *signing.SignRound1Message:
-		return Sign1, nil
+		return EcSigning1, nil
 
 	default:
 		return 0, errors.New("unknown round")
@@ -60,12 +67,16 @@ func GetMsgRound(content tss.MessageContent) (Round, error) {
 
 func GetMessageCountByWorkType(jobType wtypes.WorkType) int {
 	switch jobType {
-	case wtypes.EcdsaKeygen:
+	case wtypes.EcKeygen:
 		return 4
-	case wtypes.EcdsaPresign:
+	case wtypes.EcPresign:
 		return 8
-	case wtypes.EcdsaSigning:
+	case wtypes.EcSigning:
 		return 1
+	case wtypes.EdKeygen:
+		return 3
+	case wtypes.EdSigning:
+		return 3
 	default:
 		log.Error("Unsupported work type: ", jobType.String())
 		return 0
@@ -74,14 +85,14 @@ func GetMessageCountByWorkType(jobType wtypes.WorkType) int {
 
 func GetMessagesByWorkType(jobType wtypes.WorkType) []string {
 	switch jobType {
-	case wtypes.EcdsaKeygen:
+	case wtypes.EcKeygen:
 		return []string{
 			string(proto.MessageName(&keygen.KGRound1Message{})),
 			string(proto.MessageName(&keygen.KGRound2Message1{})),
 			string(proto.MessageName(&keygen.KGRound2Message2{})),
 			string(proto.MessageName(&keygen.KGRound3Message{})),
 		}
-	case wtypes.EcdsaPresign:
+	case wtypes.EcPresign:
 		return []string{
 
 			string(proto.MessageName(&presign.PresignRound1Message1{})),
@@ -93,7 +104,7 @@ func GetMessagesByWorkType(jobType wtypes.WorkType) []string {
 			string(proto.MessageName(&presign.PresignRound6Message{})),
 			string(proto.MessageName(&presign.PresignRound7Message{})),
 		}
-	case wtypes.EcdsaSigning:
+	case wtypes.EcSigning:
 		return []string{
 			string(proto.MessageName(&signing.SignRound1Message{})),
 		}

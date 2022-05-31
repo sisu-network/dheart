@@ -13,9 +13,9 @@ import (
 func GetPresignWorkId(workType types.WorkType, nodes []*Node) string {
 	var prefix string
 	switch workType {
-	case types.EcdsaPresign:
+	case types.EcPresign:
 		prefix = "ecdsa_presign"
-	case types.EddsaPresign:
+	case types.EdPresign:
 		prefix = "eddsa_presign"
 	default:
 		log.Critical("Invalid presign work type")
@@ -35,9 +35,9 @@ func GetPresignWorkId(workType types.WorkType, nodes []*Node) string {
 func GetKeysignWorkId(workType types.WorkType, txs [][]byte, block int64, chain string) string {
 	var prefix string
 	switch workType {
-	case types.EcdsaSigning:
+	case types.EcSigning:
 		prefix = "ecdsa_signing"
-	case types.EddsaSigning:
+	case types.EdSigning:
 		prefix = "eddsa_signing"
 	default:
 		log.Critical("Invalid keygen work type, workType =", workType)

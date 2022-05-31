@@ -155,15 +155,15 @@ func (engine *defaultEngine) startWork(request *types.WorkRequest) {
 
 	// Create a new worker.
 	switch request.WorkType {
-	case types.EcdsaKeygen:
+	case types.EcKeygen:
 		w = worker.NewKeygenWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config)
 
-	case types.EcdsaPresign:
+	case types.EcPresign:
 		w = worker.NewPresignWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config, MaxBatchSize)
 
-	case types.EcdsaSigning:
+	case types.EcSigning:
 		w = worker.NewSigningWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config, MaxBatchSize, engine.presignsManager)
 	}
@@ -436,16 +436,16 @@ func (engine *defaultEngine) GetActiveWorkerCount() int {
 // OnNodeNotSelected is called when this node is not selected by the leader in the election round.
 func (engine *defaultEngine) OnNodeNotSelected(request *types.WorkRequest) {
 	switch request.WorkType {
-	case types.EcdsaKeygen:
+	case types.EcKeygen:
 		// This should not happen as in keygen all nodes should be selected.
 
-	case types.EcdsaPresign:
+	case types.EcPresign:
 		result := &htypes.PresignResult{
 			Outcome: htypes.OutcometNotSelected,
 		}
 		engine.callback.OnWorkPresignFinished(result)
 
-	case types.EcdsaSigning:
+	case types.EcSigning:
 		result := &htypes.KeysignResult{
 			Outcome: htypes.OutcometNotSelected,
 		}
@@ -487,11 +487,11 @@ func (engine *defaultEngine) GetPresignOutputs(presignIds []string) []*presign.L
 
 func (engine *defaultEngine) OnWorkerResult(request *types.WorkRequest, result *worker.WorkerResult) {
 	switch request.WorkType {
-	case types.EcdsaKeygen:
+	case types.EcKeygen:
 		engine.onWorkKeygenFinished(request, result.EcKeygenData)
-	case types.EcdsaPresign:
+	case types.EcPresign:
 		engine.onWorkPresignFinished(request, result.SelectedPids, result.EcPresignData)
-	case types.EcdsaSigning:
+	case types.EcSigning:
 		engine.onWorkSigningFinished(request, result.EcSigningData)
 	default:
 		log.Error("OnWorkerResult: Unknown work type ", request.WorkType)

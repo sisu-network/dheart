@@ -20,8 +20,9 @@ import (
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
+	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecpresign "github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -62,11 +63,11 @@ type MockWorkerCallback struct {
 	OnNodeNotSelectedFunc    func(request *types.WorkRequest)
 	OnWorkFailedFunc         func(request *types.WorkRequest)
 	GetAvailablePresignsFunc func(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
-	GetPresignOutputsFunc    func(presignIds []string) []*presign.LocalPresignData
+	GetPresignOutputsFunc    func(presignIds []string) []*ecpresign.LocalPresignData
 
 	workerIndex     int
-	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*keygen.LocalPartySaveData)
-	presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*presign.LocalPresignData)
+	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*eckeygen.LocalPartySaveData)
+	presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*ecpresign.LocalPresignData)
 	signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.ECSignature)
 }
 
@@ -96,7 +97,7 @@ func (cb *MockWorkerCallback) GetAvailablePresigns(count int, n int, allPids map
 	return nil, nil
 }
 
-func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {
+func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*ecpresign.LocalPresignData {
 	if cb.GetPresignOutputsFunc != nil {
 		return cb.GetPresignOutputsFunc(presignIds)
 	}
@@ -218,14 +219,14 @@ func SaveTestPreparams(index int, bz []byte) error {
 	return ioutil.WriteFile(fileName, bz, 0600)
 }
 
-func LoadPreparams(index int) *keygen.LocalPreParams {
+func LoadPreparams(index int) *eckeygen.LocalPreParams {
 	fileName := GetTestSavedFileName(TestPreparamsFixtureDirFormat, TestPreparamsFixtureFileFormat, index)
 	bz, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		panic(err)
 	}
 
-	preparams := &keygen.LocalPreParams{}
+	preparams := &eckeygen.LocalPreParams{}
 	err = json.Unmarshal(bz, preparams)
 	if err != nil {
 		panic(err)
@@ -234,9 +235,9 @@ func LoadPreparams(index int) *keygen.LocalPreParams {
 	return preparams
 }
 
-func SaveKeygenOutput(data [][]*keygen.LocalPartySaveData) error {
+func SaveKeygenOutput(data [][]*eckeygen.LocalPartySaveData) error {
 	// We just have to save batch 0 of the outputs
-	outputs := make([]*keygen.LocalPartySaveData, len(data))
+	outputs := make([]*eckeygen.LocalPartySaveData, len(data))
 	for i := range outputs {
 		outputs[i] = data[i][0]
 	}
@@ -257,9 +258,9 @@ func SaveKeygenOutput(data [][]*keygen.LocalPartySaveData) error {
 	return nil
 }
 
-// LoadKeygenSavedData loads saved data for a sorted list of party ids.
-func LoadKeygenSavedData(pids tss.SortedPartyIDs) []*keygen.LocalPartySaveData {
-	savedData := make([]*keygen.LocalPartySaveData, 0)
+// LoadEcKeygenSavedData loads saved data for a sorted list of party ids.
+func LoadEcKeygenSavedData(pids tss.SortedPartyIDs) []*eckeygen.LocalPartySaveData {
+	savedData := make([]*eckeygen.LocalPartySaveData, 0)
 
 	for i := 0; i < len(PRIVATE_KEY_HEX); i++ {
 		fileName := GetTestSavedFileName(TestKeygenSavedDataFixtureDirFormat, TestKeygenSavedDataFixtureFileFormat, i)
@@ -269,7 +270,7 @@ func LoadKeygenSavedData(pids tss.SortedPartyIDs) []*keygen.LocalPartySaveData {
 			panic(err)
 		}
 
-		data := &keygen.LocalPartySaveData{}
+		data := &eckeygen.LocalPartySaveData{}
 		if err := json.Unmarshal(bz, data); err != nil {
 			panic(err)
 		}

@@ -118,7 +118,7 @@ func NewWorkerExecutor(
 }
 
 func (w *WorkerExecutor) Init() (err error) {
-	if w.workType == wTypes.EcdsaKeygen {
+	if w.workType == wTypes.EcKeygen {
 		if w.request.KeygenInput == nil {
 			err = w.loadPreparams()
 		} else {
@@ -150,14 +150,14 @@ func (w *WorkerExecutor) Init() (err error) {
 	// Creates all jobs
 	for i := range jobs {
 		switch w.workType {
-		case wTypes.EcdsaKeygen:
+		case wTypes.EcKeygen:
 			jobs[i] = NewEcKeygenJob(workId, i, w.pIDs, params, w.keygenInput, w, w.cfg.KeygenJobTimeout)
 
-		case wTypes.EcdsaPresign:
+		case wTypes.EcPresign:
 			w.presignInput = w.request.PresignInput
 			jobs[i] = NewEcPresignJob(workId, i, w.pIDs, params, w.presignInput, w, w.cfg.PresignJobTimeout)
 
-		case wTypes.EcdsaSigning:
+		case wTypes.EcSigning:
 			jobs[i] = NewEcSigningJob(workId, i, w.pIDs, params, w.request.Messages[i], w.signingInput[i], w, w.cfg.SigningJobTimeout)
 
 		default:
@@ -279,11 +279,11 @@ func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
 		var workResult ExecutionResult
 		var batchCompleted bool
 		switch job.jobType {
-		case types.EcdsaKeygen:
+		case types.EcKeygen:
 			workResult, batchCompleted = w.checkKeygenResult(job, result)
-		case types.EcdsaPresign:
+		case types.EcPresign:
 			workResult, batchCompleted = w.checkPresignResult(job, result)
-		case types.EcdsaSigning:
+		case types.EcSigning:
 			workResult, batchCompleted = w.checkSigningResult(job, result)
 		}
 

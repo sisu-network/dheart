@@ -110,7 +110,7 @@ func getEngineTestData(n int) ([]ctypes.PrivKey, []*Node, tss.SortedPartyIDs, []
 		}
 	}
 
-	return keys, nodes, sorted, worker.LoadKeygenSavedData(sorted)
+	return keys, nodes, sorted, worker.LoadEcKeygenSavedData(sorted)
 }
 
 func getPartyIdsFromStrings(pids []string) []*tss.PartyID {

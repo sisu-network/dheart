@@ -33,7 +33,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 
 	pIDs := GetTestPartyIds(n)
 
-	presignInputs := LoadKeygenSavedData(pIDs)
+	presignInputs := LoadEcKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
 	workers := make([]Worker, n)
 	done := make(chan bool)
@@ -106,7 +106,7 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 	n := 4
 	batchSize := 1
 	pIDs := GetTestPartyIds(n)
-	presignInputs := LoadKeygenSavedData(pIDs)
+	presignInputs := LoadEcKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
 	workers := make([]Worker, n)
 	done := make(chan bool)
@@ -159,7 +159,7 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 	n := 4
 	batchSize := 1
 	pIDs := GetTestPartyIds(n)
-	presignInputs := LoadKeygenSavedData(pIDs)
+	presignInputs := LoadEcKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
 	workers := make([]Worker, n)
 	done := make(chan bool)
@@ -216,7 +216,7 @@ func TestPresign_Threshold(t *testing.T) {
 
 	pIDs := GetTestPartyIds(n)
 
-	presignInputs := LoadKeygenSavedData(pIDs)
+	presignInputs := LoadEcKeygenSavedData(pIDs)
 	outCh := make(chan *common.TssMessage)
 	workers := make([]Worker, n)
 	done := make(chan bool)

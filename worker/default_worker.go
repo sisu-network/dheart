@@ -82,7 +82,7 @@ func NewKeygenWorker(
 ) Worker {
 	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, 1)
 
-	w.jobType = wTypes.EcdsaKeygen
+	w.jobType = wTypes.EcKeygen
 
 	return w
 }
@@ -98,7 +98,7 @@ func NewPresignWorker(
 ) Worker {
 	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, maxJob)
 
-	w.jobType = wTypes.EcdsaPresign
+	w.jobType = wTypes.EcPresign
 
 	return w
 }
@@ -116,7 +116,7 @@ func NewSigningWorker(
 	// TODO: The request.Pids
 	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, maxJob)
 
-	w.jobType = wTypes.EcdsaSigning
+	w.jobType = wTypes.EcSigning
 	w.presignsManager = presignsManager
 
 	return w
@@ -210,7 +210,7 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 		// an appropriate presign ids to fit them all. In this case, we need to do presign first.
 		// In this case work type != request.WorkType
 		log.Info("Doing presign for a signing work")
-		w.curWorkType = wTypes.EcdsaPresign
+		w.curWorkType = wTypes.EcPresign
 		w.secondaryExecutor = w.startExecutor(sortedPids, nil)
 	}
 }
@@ -228,11 +228,11 @@ func (w *DefaultWorker) startExecutor(selectedPids []*tss.PartyID, signingInput 
 func (w *DefaultWorker) startTimeoutClock() {
 	var timeout time.Duration
 	switch w.request.WorkType {
-	case types.EcdsaKeygen:
+	case types.EcKeygen:
 		timeout = w.cfg.KeygenJobTimeout
-	case types.EcdsaPresign:
+	case types.EcPresign:
 		timeout = w.cfg.PresignJobTimeout
-	case types.EcdsaSigning:
+	case types.EcSigning:
 		timeout = w.cfg.SigningJobTimeout
 	default:
 		log.Critical("Unknown work type: ", w.request.WorkType)
@@ -314,12 +314,12 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result ExecutionResult) {
 	if result.Success {
 		switch executor.workType {
-		case types.EcdsaKeygen, types.EddsaKeygen:
+		case types.EcKeygen, types.EdKeygen:
 			w.callback.OnWorkerResult(w.request, &WorkerResult{
 				EcKeygenData: result.KeygenOutputs,
 			})
 
-		case types.EcdsaPresign:
+		case types.EcPresign:
 			if w.request.IsSigning() {
 				// Load signing input from db.
 				presignStrings := make([]string, len(executor.pIDs))
@@ -329,7 +329,7 @@ func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result Ex
 
 				// This is the finished presign phase of the signing task. Continue with the signing phase.
 				w.lock.Lock()
-				w.curWorkType = types.EcdsaSigning
+				w.curWorkType = types.EcSigning
 				w.executor = w.startExecutor(executor.pIDs, result.PresignOutputs)
 				w.lock.Unlock()
 			} else {
@@ -339,7 +339,7 @@ func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result Ex
 				})
 			}
 
-		case types.EcdsaSigning, types.EddsaSigning:
+		case types.EcSigning, types.EdSigning:
 			w.callback.OnWorkerResult(w.request, &WorkerResult{
 				EcSigningData: result.SigningOutputs,
 			})

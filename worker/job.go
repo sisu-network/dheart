@@ -88,7 +88,7 @@ func NewEcKeygenJob(
 
 	party := eckeygen.NewLocalParty(params, outCh, endCh, *localPreparams)
 
-	job := baseJob(workId, index, party, wTypes.EcdsaKeygen, callback, outCh, timeOut)
+	job := baseJob(workId, index, party, wTypes.EcKeygen, callback, outCh, timeOut)
 	job.ecEndKeygenCh = endCh
 
 	return job
@@ -108,7 +108,7 @@ func NewEcPresignJob(
 
 	party := ecpresign.NewLocalParty(params, *savedData, outCh, endCh)
 
-	job := baseJob(workId, index, party, wTypes.EcdsaPresign, callback, outCh, timeOut)
+	job := baseJob(workId, index, party, wTypes.EcPresign, callback, outCh, timeOut)
 	job.ecEndPresignCh = endCh
 
 	return job
@@ -130,7 +130,7 @@ func NewEcSigningJob(
 	msgInt := hashToInt([]byte(msg), tss.EC())
 	party := ecsigning.NewLocalParty(msgInt, params, *signingInput, outCh, endCh)
 
-	job := baseJob(workId, index, party, wTypes.EcdsaSigning, callback, outCh, timeOut)
+	job := baseJob(workId, index, party, wTypes.EcSigning, callback, outCh, timeOut)
 	job.ecEndSigningCh = endCh
 
 	return job
@@ -149,7 +149,7 @@ func NewEdKeygenJob(
 	endCh := make(chan edkeygen.LocalPartySaveData, len(pIDs))
 	party := edkeygen.NewLocalParty(params, outCh, endCh)
 
-	job := baseJob(workId, index, party, wTypes.EddsaKeygen, callback, outCh, timeOut)
+	job := baseJob(workId, index, party, wTypes.EdKeygen, callback, outCh, timeOut)
 	job.edEndKeygenCh = endCh
 
 	return job
@@ -170,7 +170,7 @@ func NewEdSigningJob(
 
 	party := edsigning.NewLocalParty(new(big.Int).SetBytes(msg), params, signingInput, outCh, endCh)
 
-	job := baseJob(workId, index, party, wTypes.EddsaKeygen, callback, outCh, timeOut)
+	job := baseJob(workId, index, party, wTypes.EdKeygen, callback, outCh, timeOut)
 	job.edEndSigningCh = endCh
 
 	return job

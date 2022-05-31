@@ -41,7 +41,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 
 		request := &types.WorkRequest{
 			WorkId:      "Keygen0",
-			WorkType:    types.EcdsaKeygen,
+			WorkType:    types.EcKeygen,
 			AllParties:  CopySortedPartyIds(pIDs),
 			BatchSize:   batchSize,
 			KeygenInput: preparams,
@@ -119,7 +119,7 @@ func TestKeygenTimeout(t *testing.T) {
 
 		request := &types.WorkRequest{
 			WorkId:      "Keygen0",
-			WorkType:    types.EcdsaKeygen,
+			WorkType:    types.EcKeygen,
 			AllParties:  CopySortedPartyIds(pIDs),
 			BatchSize:   batchSize,
 			KeygenInput: preparams,
