@@ -2,10 +2,12 @@ package worker
 
 import (
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/tss-lib/tss"
+	"github.com/stretchr/testify/require"
 )
 
 type MockJobCallback struct {
@@ -129,8 +131,66 @@ func routeJobMesasge(jobs []*Job, cbs []*MockJobCallback, wg *sync.WaitGroup) {
 			}
 		}
 
+		f := cbs[i].OnJobResultFunc
+
 		cbs[i].OnJobResultFunc = func(job *Job, result JobResult) {
 			wg.Done()
+
+			if f != nil {
+				f(job, result)
+			}
+		}
+	}
+}
+
+func runJobs(t *testing.T, jobs []*Job, cbs []*MockJobCallback, checkJobSuccess bool) {
+	n := len(jobs)
+	oks := make([]bool, n)
+	if checkJobSuccess {
+		for i := range cbs {
+			index := i
+			cbs[index].OnJobResultFunc = func(job *Job, result JobResult) {
+				oks[index] = result.Success
+			}
+		}
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(n)
+
+	routeJobMesasge(jobs, cbs, wg)
+
+	for _, job := range jobs {
+		err := job.Start()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	wg.Wait()
+
+	for i := 0; i < 10; i++ {
+		allDone := true
+		for _, job := range jobs {
+			if !job.isDone() {
+				allDone = false
+				break
+			}
+		}
+		if allDone {
+			break
+		}
+
+		time.Sleep(time.Millisecond * 100)
+	}
+
+	for _, job := range jobs {
+		require.True(t, job.isDone(), "Both endCh and outCh should be done.")
+	}
+
+	if checkJobSuccess {
+		for _, ok := range oks {
+			require.True(t, ok, "Job should complete successfully")
 		}
 	}
 }
