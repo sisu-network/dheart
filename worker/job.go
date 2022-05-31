@@ -127,7 +127,7 @@ func NewEcSigningJob(
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan *libCommon.ECSignature, len(pIDs))
 
-	msgInt := hashToInt([]byte(msg), tss.EC())
+	msgInt := hashToInt([]byte(msg), tss.EC(tss.EcdsaScheme))
 	party := ecsigning.NewLocalParty(msgInt, params, *signingInput, outCh, endCh)
 
 	job := baseJob(workId, index, party, wTypes.EcSigning, callback, outCh, timeOut)

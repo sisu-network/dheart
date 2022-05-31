@@ -16,6 +16,7 @@ import (
 
 	thelper "github.com/sisu-network/dheart/test/e2e/helper"
 	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/dheart/worker"
 	libchain "github.com/sisu-network/lib/chain"
 
 	"github.com/sisu-network/dheart/core"
@@ -23,7 +24,6 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	htypes "github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
@@ -101,7 +101,7 @@ func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan
 	// Add request
 	workId := "keygen0"
 	threshold := utils.GetThreshold(len(pids))
-	request := types.NewKeygenRequest("ecdsa", workId, pids, threshold, helper.LoadPreparams(index))
+	request := types.NewKeygenRequest("ecdsa", workId, pids, threshold, worker.LoadPreparams(index))
 	err := engine.AddRequest(request)
 	if err != nil {
 		panic(err)
@@ -157,9 +157,9 @@ func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, 
 	switch result.Outcome {
 	case htypes.OutcomeSuccess:
 		for i, msg := range messages {
-			x, y := elliptic.Unmarshal(tss.EC(), keygenResult.PubKeyBytes)
+			x, y := elliptic.Unmarshal(tss.EC(tss.EcdsaScheme), keygenResult.PubKeyBytes)
 			pk := ecdsa.PublicKey{
-				Curve: tss.EC(),
+				Curve: tss.EC(tss.EcdsaScheme),
 				X:     x,
 				Y:     y,
 			}

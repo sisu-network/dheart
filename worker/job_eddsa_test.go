@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/dcrec/edwards/v2"
-
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/require"
 )
@@ -16,8 +14,6 @@ func TestEdJob_Keygen(t *testing.T) {
 	threshold := 1
 	jobs := make([]*Job, n)
 	cbs := make([]*MockJobCallback, n)
-
-	tss.SetCurve(edwards.Edwards())
 
 	pIDs := GetTestPartyIds(n)
 

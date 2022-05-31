@@ -25,7 +25,7 @@ func (engine *defaultEngine) onWorkKeygenFinished(request *types.WorkRequest, ou
 
 	pkX, pkY := output[0].ECDSAPub.X(), output[0].ECDSAPub.Y()
 	publicKeyECDSA := cryptoec.PublicKey{
-		Curve: tss.EC(),
+		Curve: tss.EC(tss.EcdsaScheme),
 		X:     pkX,
 		Y:     pkY,
 	}
@@ -72,7 +72,7 @@ func (engine *defaultEngine) onWorkSigningFinished(request *types.WorkRequest, d
 		s := sig.S
 
 		if libchain.IsETHBasedChain(request.Chains[0]) {
-			bitSizeInBytes := tss.EC().Params().BitSize / 8
+			bitSizeInBytes := tss.EC(tss.EcdsaScheme).Params().BitSize / 8
 			r = utils.PadToLengthBytesForSignature(sig.R, bitSizeInBytes)
 			s = utils.PadToLengthBytesForSignature(sig.S, bitSizeInBytes)
 		}

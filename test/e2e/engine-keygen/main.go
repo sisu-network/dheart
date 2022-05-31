@@ -7,10 +7,11 @@ import (
 
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/core/config"
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	thelper "github.com/sisu-network/dheart/test/e2e/helper"
 	htypes "github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
@@ -98,7 +99,7 @@ func main() {
 	// Create new engine
 	outCh := make(chan *htypes.KeygenResult)
 	cb := NewEngineCallback(outCh, nil, nil)
-	engine := core.NewEngine(nodes[index], cm, helper.NewMockDatabase(), cb, allKeys[index], config.NewDefaultTimeoutConfig())
+	engine := core.NewEngine(nodes[index], cm, db.NewMockDatabase(), cb, allKeys[index], config.NewDefaultTimeoutConfig())
 	cm.AddListener(p2p.TSSProtocolID, engine)
 
 	// Add nodes
@@ -110,7 +111,7 @@ func main() {
 
 	// Add request
 	workId := "keygen0"
-	request := types.NewKeygenRequest("ecdsa", workId, pids, n-1, helper.LoadPreparams(index))
+	request := types.NewKeygenRequest("ecdsa", workId, pids, n-1, worker.LoadPreparams(index))
 	err = engine.AddRequest(request)
 	if err != nil {
 		panic(err)

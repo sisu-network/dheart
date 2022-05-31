@@ -345,7 +345,7 @@ func verifySignature(t *testing.T, msgs []string, outputs [][]*libCommon.ECSigna
 
 			// Verify that the signature is valid
 			pk := ecdsa.PublicKey{
-				Curve: tss.EC(),
+				Curve: tss.EC(tss.EcdsaScheme),
 				X:     pubX,
 				Y:     pubY,
 			}
@@ -499,7 +499,7 @@ func verifyEthSignature(t *testing.T, hash []byte, output *libCommon.ECSignature
 	}
 
 	publicKeyECDSA := ecdsa.PublicKey{
-		Curve: tss.EC(),
+		Curve: tss.EC(tss.EcdsaScheme),
 		X:     presignData.ECDSAPub.X(),
 		Y:     presignData.ECDSAPub.Y(),
 	}
