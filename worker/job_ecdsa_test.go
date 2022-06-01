@@ -23,7 +23,7 @@ func TestEcJob_Keygen(t *testing.T) {
 	for i := 0; i < n; i++ {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
-		preparams := LoadPreparams(i)
+		preparams := LoadEcPreparams(i)
 		jobs[i] = NewEcKeygenJob("Keygen0", i, pIDs, params, preparams, cbs[i], time.Second*15)
 	}
 
@@ -63,7 +63,7 @@ func TestEcJob_Signing(t *testing.T) {
 		cbs[i] = &MockJobCallback{}
 	}
 
-	savedPresigns := LoadPresignSavedData(0)
+	savedPresigns := LoadEcPresignSavedData(0)
 	pIDs := savedPresigns.PIDs
 
 	for i := 0; i < n; i++ {

@@ -67,7 +67,7 @@ func generateEthTx() *etypes.Transaction {
 }
 
 func TestSigningEndToEnd(t *testing.T) {
-	wrapper := LoadPresignSavedData(0)
+	wrapper := LoadEcPresignSavedData(0)
 	n := len(wrapper.Outputs)
 
 	// Batch should have the same set of party ids.
@@ -217,7 +217,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 }
 
 func TestSigning_PreExecutionTimeout(t *testing.T) {
-	wrapper := LoadPresignSavedData(0)
+	wrapper := LoadEcPresignSavedData(0)
 	n := len(wrapper.Outputs)
 	pIDs := wrapper.PIDs
 
@@ -270,7 +270,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 }
 
 func TestSigning_ExecutionTimeout(t *testing.T) {
-	wrapper := LoadPresignSavedData(0)
+	wrapper := LoadEcPresignSavedData(0)
 	n := len(wrapper.Outputs)
 	pIDs := wrapper.PIDs
 
@@ -365,7 +365,7 @@ func TestSigning_Threshold(t *testing.T) {
 
 func doTestThreshold(t *testing.T) {
 	n := 4
-	wrapper := LoadPresignSavedData(2)
+	wrapper := LoadEcPresignSavedData(2)
 	threshold := 2
 
 	if len(wrapper.Outputs) != threshold+1 {

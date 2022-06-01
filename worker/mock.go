@@ -23,18 +23,24 @@ import (
 	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	ecpresign "github.com/sisu-network/tss-lib/ecdsa/presign"
+	edkeygen "github.com/sisu-network/tss-lib/eddsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
 const (
-	TestPreparamsFixtureDirFormat  = "%s/../data/_ecdsa_preparams_fixtures"
-	TestPreparamsFixtureFileFormat = "preparams_data_%d.json"
+	// Ecdsa
+	TestEcPreparamsFixtureDirFormat  = "%s/../data/_ecdsa_preparams_fixtures"
+	TestEcPreparamsFixtureFileFormat = "preparams_data_%d.json"
 
-	TestKeygenSavedDataFixtureDirFormat  = "%s/../data/_ecdsa_keygen_saved_data_fixtures"
-	TestKeygenSavedDataFixtureFileFormat = "keygen_saved_data_%d.json"
+	TestEcKeygenSavedDataFixtureDirFormat  = "%s/../data/_ecdsa_keygen_saved_data_fixtures"
+	TestEcKeygenSavedDataFixtureFileFormat = "keygen_saved_data_%d.json"
 
-	TestPresignSavedDataFixtureDirFormat  = "%s/../data/_ecdsa_presign_saved_data_fixtures"
-	TestPresignSavedDataFixtureFileFormat = "presign_saved_data_%d.json"
+	TestEcPresignSavedDataFixtureDirFormat  = "%s/../data/_ecdsa_presign_saved_data_fixtures"
+	TestEcPresignSavedDataFixtureFileFormat = "presign_saved_data_%d.json"
+
+	// Eddsa
+	TestEdKeygenSavedDataFixtureDirFormat  = "%s/../data/_eddsa_keygen_saved_data_fixtures"
+	TestEdKeygenSavedDataFixtureFileFormat = "keygen_saved_data_%d.json"
 )
 
 var (
@@ -215,12 +221,12 @@ func GetTestSavedFileName(dirFormat, fileFormat string, index int) string {
 // --- /
 
 func SaveTestPreparams(index int, bz []byte) error {
-	fileName := GetTestSavedFileName(TestPreparamsFixtureDirFormat, TestPreparamsFixtureFileFormat, index)
+	fileName := GetTestSavedFileName(TestEcPreparamsFixtureDirFormat, TestEcPreparamsFixtureFileFormat, index)
 	return ioutil.WriteFile(fileName, bz, 0600)
 }
 
-func LoadPreparams(index int) *eckeygen.LocalPreParams {
-	fileName := GetTestSavedFileName(TestPreparamsFixtureDirFormat, TestPreparamsFixtureFileFormat, index)
+func LoadEcPreparams(index int) *eckeygen.LocalPreParams {
+	fileName := GetTestSavedFileName(TestEcPreparamsFixtureDirFormat, TestEcPreparamsFixtureFileFormat, index)
 	bz, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		panic(err)
@@ -235,7 +241,7 @@ func LoadPreparams(index int) *eckeygen.LocalPreParams {
 	return preparams
 }
 
-func SaveKeygenOutput(data [][]*eckeygen.LocalPartySaveData) error {
+func SaveEcKeygenOutput(data [][]*eckeygen.LocalPartySaveData) error {
 	// We just have to save batch 0 of the outputs
 	outputs := make([]*eckeygen.LocalPartySaveData, len(data))
 	for i := range outputs {
@@ -243,7 +249,7 @@ func SaveKeygenOutput(data [][]*eckeygen.LocalPartySaveData) error {
 	}
 
 	for i, output := range outputs {
-		fileName := GetTestSavedFileName(TestKeygenSavedDataFixtureDirFormat, TestKeygenSavedDataFixtureFileFormat, i)
+		fileName := GetTestSavedFileName(TestEcKeygenSavedDataFixtureDirFormat, TestEcKeygenSavedDataFixtureFileFormat, i)
 
 		bz, err := json.Marshal(output)
 		if err != nil {
@@ -263,7 +269,7 @@ func LoadEcKeygenSavedData(pids tss.SortedPartyIDs) []*eckeygen.LocalPartySaveDa
 	savedData := make([]*eckeygen.LocalPartySaveData, 0)
 
 	for i := 0; i < len(PRIVATE_KEY_HEX); i++ {
-		fileName := GetTestSavedFileName(TestKeygenSavedDataFixtureDirFormat, TestKeygenSavedDataFixtureFileFormat, i)
+		fileName := GetTestSavedFileName(TestEcKeygenSavedDataFixtureDirFormat, TestEcKeygenSavedDataFixtureFileFormat, i)
 
 		bz, err := ioutil.ReadFile(fileName)
 		if err != nil {
@@ -289,13 +295,13 @@ func LoadEcKeygenSavedData(pids tss.SortedPartyIDs) []*eckeygen.LocalPartySaveDa
 	return savedData
 }
 
-func SavePresignData(n int, data [][]*presign.LocalPresignData, pIDs tss.SortedPartyIDs, testIndex int) error {
+func SaveEcPresignData(n int, data [][]*presign.LocalPresignData, pIDs tss.SortedPartyIDs, testIndex int) error {
 	wrapper := &PresignDataWrapper{
 		Outputs: data,
 		PIDs:    pIDs,
 	}
 
-	fileName := GetTestSavedFileName(TestPresignSavedDataFixtureDirFormat, TestPresignSavedDataFixtureFileFormat, testIndex)
+	fileName := GetTestSavedFileName(TestEcPresignSavedDataFixtureDirFormat, TestEcPresignSavedDataFixtureFileFormat, testIndex)
 
 	bz, err := json.Marshal(wrapper)
 	if err != nil {
@@ -309,8 +315,8 @@ func SavePresignData(n int, data [][]*presign.LocalPresignData, pIDs tss.SortedP
 	return nil
 }
 
-func LoadPresignSavedData(testIndex int) *PresignDataWrapper {
-	fileName := GetTestSavedFileName(TestPresignSavedDataFixtureDirFormat, TestPresignSavedDataFixtureFileFormat, testIndex)
+func LoadEcPresignSavedData(testIndex int) *PresignDataWrapper {
+	fileName := GetTestSavedFileName(TestEcPresignSavedDataFixtureDirFormat, TestEcPresignSavedDataFixtureFileFormat, testIndex)
 	bz, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		panic(err)
@@ -323,4 +329,59 @@ func LoadPresignSavedData(testIndex int) *PresignDataWrapper {
 	}
 
 	return wrapper
+}
+
+///// Eddsa
+
+func SaveEdKeygenOutput(data []*edkeygen.LocalPartySaveData) error {
+	// We just have to save batch 0 of the outputs
+	outputs := make([]*edkeygen.LocalPartySaveData, len(data))
+	for i := range outputs {
+		outputs[i] = data[i]
+	}
+
+	for i, output := range outputs {
+		fileName := GetTestSavedFileName(TestEdKeygenSavedDataFixtureDirFormat, TestEdKeygenSavedDataFixtureFileFormat, i)
+
+		bz, err := json.Marshal(output)
+		if err != nil {
+			panic(err)
+		}
+
+		if err := ioutil.WriteFile(fileName, bz, 0600); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func LoadEdKeygenSavedData(pids tss.SortedPartyIDs) []*edkeygen.LocalPartySaveData {
+	savedData := make([]*edkeygen.LocalPartySaveData, 0)
+
+	for i := 0; i < len(pids); i++ {
+		fileName := GetTestSavedFileName(TestEdKeygenSavedDataFixtureDirFormat, TestEdKeygenSavedDataFixtureFileFormat, i)
+
+		bz, err := ioutil.ReadFile(fileName)
+		if err != nil {
+			panic(err)
+		}
+
+		data := &edkeygen.LocalPartySaveData{}
+		if err := json.Unmarshal(bz, data); err != nil {
+			panic(err)
+		}
+
+		for _, pid := range pids {
+			if pid.KeyInt().Cmp(data.ShareID) == 0 {
+				savedData = append(savedData, data)
+			}
+		}
+	}
+
+	if len(savedData) != len(pids) {
+		panic(fmt.Sprint("LocalSavedData array does not match ", len(savedData), len(pids)))
+	}
+
+	return savedData
 }

@@ -101,7 +101,7 @@ func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan
 	// Add request
 	workId := "keygen0"
 	threshold := utils.GetThreshold(len(pids))
-	request := types.NewKeygenRequest("ecdsa", workId, pids, threshold, worker.LoadPreparams(index))
+	request := types.NewKeygenRequest("ecdsa", workId, pids, threshold, worker.LoadEcPreparams(index))
 	err := engine.AddRequest(request)
 	if err != nil {
 		panic(err)

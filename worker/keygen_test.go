@@ -37,7 +37,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 
 	// Generates n workers
 	for i := 0; i < totalParticipants; i++ {
-		preparams := LoadPreparams(i)
+		preparams := LoadEcPreparams(i)
 
 		request := &types.WorkRequest{
 			WorkId:      "Keygen0",
@@ -115,7 +115,7 @@ func TestKeygenTimeout(t *testing.T) {
 
 	// Generates n workers
 	for i := 0; i < totalParticipants; i++ {
-		preparams := LoadPreparams(i)
+		preparams := LoadEcPreparams(i)
 
 		request := &types.WorkRequest{
 			WorkId:      "Keygen0",
