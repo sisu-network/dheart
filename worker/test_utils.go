@@ -134,11 +134,11 @@ func routeJobMesasge(jobs []*Job, cbs []*MockJobCallback, wg *sync.WaitGroup) {
 		f := cbs[i].OnJobResultFunc
 
 		cbs[i].OnJobResultFunc = func(job *Job, result JobResult) {
-			wg.Done()
-
 			if f != nil {
 				f(job, result)
 			}
+
+			wg.Done()
 		}
 	}
 }
