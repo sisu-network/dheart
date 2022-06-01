@@ -66,7 +66,7 @@ func generateEthTx() *etypes.Transaction {
 	return tx
 }
 
-func TestSigningEndToEnd(t *testing.T) {
+func TestEcWorkerSigning_EndToEnd(t *testing.T) {
 	wrapper := LoadEcPresignSavedData(0)
 	n := len(wrapper.Outputs)
 
@@ -144,7 +144,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	verifyEthSignature(t, hashBytes, outputs[0][0], wrapper.Outputs[0][0])
 }
 
-func TestSigning_PresignAndSign(t *testing.T) {
+func TestEcWorkerSigning_PresignAndSign(t *testing.T) {
 	n := 4
 
 	// Batch should have the same set of party ids.
@@ -216,7 +216,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 	verifySignature(t, signingMsgs, outputs, nil, nil)
 }
 
-func TestSigning_PreExecutionTimeout(t *testing.T) {
+func TestEcWorkerSigning_PreExecutionTimeout(t *testing.T) {
 	wrapper := LoadEcPresignSavedData(0)
 	n := len(wrapper.Outputs)
 	pIDs := wrapper.PIDs
@@ -269,7 +269,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 	assert.EqualValues(t, 4, numFailedWorkers)
 }
 
-func TestSigning_ExecutionTimeout(t *testing.T) {
+func TestEcWorkerSigning_ExecutionTimeout(t *testing.T) {
 	wrapper := LoadEcPresignSavedData(0)
 	n := len(wrapper.Outputs)
 	pIDs := wrapper.PIDs
@@ -357,7 +357,7 @@ func verifySignature(t *testing.T, msgs []string, outputs [][]*libCommon.ECSigna
 
 // Runs test when we have a strict threshold < n - 1.
 // We need to run test multiple times to make sure we do not have concurrent issue.
-func TestSigning_Threshold(t *testing.T) {
+func TestEcWorkerSigning_Threshold(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		doTestThreshold(t)
 	}

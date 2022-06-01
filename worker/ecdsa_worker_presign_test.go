@@ -25,7 +25,7 @@ import (
 // 	fmt.Printf("END: ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
 // }
 
-func TestPresign_EndToEnd(t *testing.T) {
+func TestEcWorkerPresign_EndToEnd(t *testing.T) {
 	log.Verbose("Running TestPresign_EndToEnd")
 	n := 4
 	batchSize := 1
@@ -101,7 +101,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 	// SavePresignData(n, presignOutputs, pIDs, 0)
 }
 
-func TestPresign_PreExecutionTimeout(t *testing.T) {
+func TestEcWorkerPresign_PreExecutionTimeout(t *testing.T) {
 	log.Verbose("Running TestPresign_PreExecutionTimeout")
 	n := 4
 	batchSize := 1
@@ -154,7 +154,7 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 	assert.EqualValues(t, 4, numFailedWorkers)
 }
 
-func TestPresign_ExecutionTimeout(t *testing.T) {
+func TestEcWorkerPresign_ExecutionTimeout(t *testing.T) {
 	log.Verbose("Running TestPresign_ExecutionTimeout")
 	n := 4
 	batchSize := 1
@@ -208,7 +208,7 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 }
 
 // Runs test when we have a strict threshold < n - 1.
-func TestPresign_Threshold(t *testing.T) {
+func TestEcWorkerPresign_Threshold(t *testing.T) {
 	log.Verbose("Running TestPresign_Threshold")
 	n := 4
 	threshold := 2

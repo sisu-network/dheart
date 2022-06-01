@@ -18,7 +18,7 @@ import (
 
 //--- Miscellaneous helpers functions -- /
 
-func TestKeygenEndToEnd(t *testing.T) {
+func TestEcWorkKeygen_EndToEnd(t *testing.T) {
 	log.Verbose("Running TestKeygenEndToEnd test")
 	totalParticipants := 6
 	threshold := 1
@@ -98,7 +98,7 @@ func TestKeygenEndToEnd(t *testing.T) {
 	// assert.NoError(t, helper.SaveKeygenOutput(finalOutput))
 }
 
-func TestKeygenTimeout(t *testing.T) {
+func TestEcWorkKeygen_Timeout(t *testing.T) {
 	log.Verbose("Running TestKeygenTimeout test")
 	totalParticipants := 6
 	threshold := 1
