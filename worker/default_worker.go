@@ -188,6 +188,14 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 		return
 	}
 
+	if w.request.IsEcdsa() {
+		w.startEcExecution(result)
+	} else {
+		w.startEdExecution(result)
+	}
+}
+
+func (w *DefaultWorker) startEcExecution(result SelectionResult) {
 	sortedPids := tss.SortPartyIDs(result.SelectedPids)
 
 	// We need to load the set of presigns data
@@ -204,25 +212,44 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 		len(result.PresignIds) > 0) {
 		// In this case, work type = request.WorkType
 		w.curWorkType = w.request.WorkType
-		w.executor = w.startExecutor(sortedPids, signingInput)
+		w.executor = w.getEcExecutor(sortedPids, signingInput)
+		w.runExecutor(w.executor)
 	} else {
 		// This is the case when the request is a signing work, has enough participants but cannot find
 		// an appropriate presign ids to fit them all. In this case, we need to do presign first.
 		// In this case work type != request.WorkType
 		log.Info("Doing presign for a signing work")
 		w.curWorkType = wTypes.EcPresign
-		w.secondaryExecutor = w.startExecutor(sortedPids, nil)
+		w.secondaryExecutor = w.getEcExecutor(sortedPids, nil)
+		w.runExecutor(w.secondaryExecutor)
 	}
 }
 
-func (w *DefaultWorker) startExecutor(selectedPids []*tss.PartyID, signingInput []*presign.LocalPresignData) *WorkerExecutor {
-	executor := NewWorkerExecutor(w.request, w.curWorkType, w.myPid, selectedPids, w.dispatcher,
+func (w *DefaultWorker) startEdExecution(result SelectionResult) {
+	sortedPids := tss.SortPartyIDs(result.SelectedPids)
+
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
+	w.curWorkType = w.request.WorkType
+	w.executor = w.getEdExecutor(sortedPids)
+}
+
+func (w *DefaultWorker) getEcExecutor(selectedPids []*tss.PartyID, signingInput []*presign.LocalPresignData) *WorkerExecutor {
+	return NewWorkerExecutor(w.request, w.curWorkType, w.myPid, selectedPids, w.dispatcher,
 		w.db, signingInput, w.onJobExecutionResult, w.cfg)
+}
+
+func (w *DefaultWorker) getEdExecutor(selectedPids []*tss.PartyID) *WorkerExecutor {
+	return NewWorkerExecutor(w.request, w.curWorkType, w.myPid, selectedPids, w.dispatcher,
+		w.db, nil, w.onJobExecutionResult, w.cfg)
+}
+
+func (w *DefaultWorker) runExecutor(executor *WorkerExecutor) {
 	executor.Init()
 
 	cacheMsgs := w.preExecutionCache.PopAllMessages(w.workId, commonTypes.GetUpdateMessageType())
 	go executor.Run(cacheMsgs)
-	return executor
 }
 
 func (w *DefaultWorker) startTimeoutClock() {
@@ -330,7 +357,8 @@ func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result Ex
 				// This is the finished presign phase of the signing task. Continue with the signing phase.
 				w.lock.Lock()
 				w.curWorkType = types.EcSigning
-				w.executor = w.startExecutor(executor.pIDs, result.PresignOutputs)
+				w.executor = w.getEcExecutor(executor.pIDs, result.PresignOutputs)
+				w.runExecutor(w.executor)
 				w.lock.Unlock()
 			} else {
 				w.callback.OnWorkerResult(w.request, &WorkerResult{

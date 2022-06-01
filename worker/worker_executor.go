@@ -48,9 +48,9 @@ type WorkerExecutor struct {
 	cfg        config.TimeoutConfig
 
 	// ECDSA Input
-	keygenInput  *eckeygen.LocalPreParams
-	presignInput *eckeygen.LocalPartySaveData // output from keygen. This field is used for presign.
-	signingInput []*ecpresign.LocalPresignData
+	ecKeygenInput  *eckeygen.LocalPreParams
+	ecPresignInput *eckeygen.LocalPartySaveData // output from keygen. This field is used for presign.
+	ecSigningInput []*ecpresign.LocalPresignData
 
 	callback func(*WorkerExecutor, ExecutionResult)
 
@@ -86,7 +86,7 @@ func NewWorkerExecutor(
 	pids []*tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
-	signingInput []*ecpresign.LocalPresignData,
+	ecSigningInput []*ecpresign.LocalPresignData,
 	callback func(*WorkerExecutor, ExecutionResult),
 	cfg config.TimeoutConfig,
 ) *WorkerExecutor {
@@ -104,7 +104,7 @@ func NewWorkerExecutor(
 		dispatcher:      dispatcher,
 		db:              db,
 		callback:        callback,
-		signingInput:    signingInput,
+		ecSigningInput:  ecSigningInput,
 		jobsLock:        &sync.RWMutex{},
 		jobOutputLock:   &sync.RWMutex{},
 		finalOutputLock: &sync.RWMutex{},
@@ -119,10 +119,10 @@ func NewWorkerExecutor(
 
 func (w *WorkerExecutor) Init() (err error) {
 	if w.workType == wTypes.EcKeygen {
-		if w.request.KeygenInput == nil {
+		if w.request.EcKeygenInput == nil {
 			err = w.loadPreparams()
 		} else {
-			w.keygenInput = w.request.KeygenInput
+			w.ecKeygenInput = w.request.EcKeygenInput
 		}
 	}
 
@@ -150,15 +150,23 @@ func (w *WorkerExecutor) Init() (err error) {
 	// Creates all jobs
 	for i := range jobs {
 		switch w.workType {
+		// Ecdsa
 		case wTypes.EcKeygen:
-			jobs[i] = NewEcKeygenJob(workId, i, w.pIDs, params, w.keygenInput, w, w.cfg.KeygenJobTimeout)
+			jobs[i] = NewEcKeygenJob(workId, i, w.pIDs, params, w.ecKeygenInput, w, w.cfg.KeygenJobTimeout)
 
 		case wTypes.EcPresign:
-			w.presignInput = w.request.PresignInput
-			jobs[i] = NewEcPresignJob(workId, i, w.pIDs, params, w.presignInput, w, w.cfg.PresignJobTimeout)
+			w.ecPresignInput = w.request.EcPresignInput
+			jobs[i] = NewEcPresignJob(workId, i, w.pIDs, params, w.ecPresignInput, w, w.cfg.PresignJobTimeout)
 
 		case wTypes.EcSigning:
-			jobs[i] = NewEcSigningJob(workId, i, w.pIDs, params, w.request.Messages[i], w.signingInput[i], w, w.cfg.SigningJobTimeout)
+			jobs[i] = NewEcSigningJob(workId, i, w.pIDs, params, w.request.Messages[i], w.ecSigningInput[i], w, w.cfg.SigningJobTimeout)
+
+		// Eddsa
+		case wTypes.EdKeygen:
+			jobs[i] = NewEdKeygenJob(workId, i, w.pIDs, params, w, w.cfg.KeygenJobTimeout)
+
+		case wTypes.EdSigning:
+			jobs[i] = NewEdSigningJob(workId, i, w.pIDs, params, []byte(w.request.Messages[i]), *w.request.EdSigningInput, w, w.cfg.SigningJobTimeout)
 
 		default:
 			// If job type is not correct, kill the whole worker.
@@ -213,7 +221,7 @@ func (w *WorkerExecutor) loadPreparams() error {
 	preparams, err := w.db.LoadPreparams()
 	if err == nil {
 		log.Info("Preparams found")
-		w.keygenInput = preparams
+		w.ecKeygenInput = preparams
 	} else {
 		log.Error("Failed to get preparams, err =", err)
 		return err

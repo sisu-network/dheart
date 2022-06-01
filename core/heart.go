@@ -202,7 +202,7 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 			Culprits: culprits,
 		}
 		h.client.PostKeygenResult(&result)
-	case types.EcPresign, types.EdPresign:
+	case types.EcPresign:
 		result := htypes.PresignResult{
 			Outcome:  htypes.OutcomeFailure,
 			Culprits: culprits,
@@ -300,7 +300,7 @@ func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey
 
 	h.engine.AddNodes(nodes)
 
-	request := types.NewKeygenRequest(keyType, workId, sorted, utils.GetThreshold(n), nil)
+	request := types.NewEcKeygenRequest(keyType, workId, sorted, utils.GetThreshold(n), nil)
 
 	return h.engine.AddRequest(request)
 }
@@ -340,7 +340,7 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	if err != nil {
 		return err
 	}
-	workRequest := types.NewSigningRequest(
+	workRequest := types.NewEcSigningRequest(
 		workId,
 		sorted,
 		utils.GetThreshold(sorted.Len()),
@@ -408,7 +408,7 @@ func (h *Heart) doPresign(blockHeight int64) {
 		workId := "presign_" + keygenType + "_" + strconv.FormatInt(blockHeight, 10)
 		log.Info("Presign workId = ", workId)
 
-		presignRequest := types.NewPresignRequest(workId, sorted, utils.GetThreshold(len(sorted)), presignInput, false, MaxBatchSize)
+		presignRequest := types.NewEcPresignRequest(workId, sorted, utils.GetThreshold(len(sorted)), presignInput, false, MaxBatchSize)
 		err = h.engine.AddRequest(presignRequest)
 		if err != nil {
 			log.Error("Failed to add presign request to engine, err = ", err)

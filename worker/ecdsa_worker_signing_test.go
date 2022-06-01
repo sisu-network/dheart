@@ -87,7 +87,7 @@ func TestSigningEndToEnd(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := types.NewSigningRequest(
+		request := types.NewEcSigningRequest(
 			"Signing0",
 			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
@@ -160,7 +160,7 @@ func TestSigning_PresignAndSign(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := types.NewSigningRequest(
+		request := types.NewEcSigningRequest(
 			"Signing0",
 			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
@@ -228,7 +228,7 @@ func TestSigning_PreExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := types.NewSigningRequest(
+		request := types.NewEcSigningRequest(
 			"Signing0",
 			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
@@ -281,7 +281,7 @@ func TestSigning_ExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := types.NewSigningRequest(
+		request := types.NewEcSigningRequest(
 			"Signing0",
 			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
@@ -406,7 +406,7 @@ func doTestThreshold(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := types.NewSigningRequest(
+		request := types.NewEcSigningRequest(
 			"Signing0",
 			CopySortedPartyIds(pIDs),
 			threshold,

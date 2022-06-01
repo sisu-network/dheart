@@ -40,13 +40,13 @@ func TestKeygenEndToEnd(t *testing.T) {
 		preparams := LoadEcPreparams(i)
 
 		request := &types.WorkRequest{
-			WorkId:      "Keygen0",
-			WorkType:    types.EcKeygen,
-			AllParties:  CopySortedPartyIds(pIDs),
-			BatchSize:   batchSize,
-			KeygenInput: preparams,
-			Threshold:   threshold,
-			N:           totalParticipants,
+			WorkId:        "Keygen0",
+			WorkType:      types.EcKeygen,
+			AllParties:    CopySortedPartyIds(pIDs),
+			BatchSize:     batchSize,
+			EcKeygenInput: preparams,
+			Threshold:     threshold,
+			N:             totalParticipants,
 		}
 
 		workerIndex := i
@@ -118,13 +118,13 @@ func TestKeygenTimeout(t *testing.T) {
 		preparams := LoadEcPreparams(i)
 
 		request := &types.WorkRequest{
-			WorkId:      "Keygen0",
-			WorkType:    types.EcKeygen,
-			AllParties:  CopySortedPartyIds(pIDs),
-			BatchSize:   batchSize,
-			KeygenInput: preparams,
-			Threshold:   threshold,
-			N:           totalParticipants,
+			WorkId:        "Keygen0",
+			WorkType:      types.EcKeygen,
+			AllParties:    CopySortedPartyIds(pIDs),
+			BatchSize:     batchSize,
+			EcKeygenInput: preparams,
+			Threshold:     threshold,
+			N:             totalParticipants,
 		}
 
 		cfg := config.NewDefaultTimeoutConfig()

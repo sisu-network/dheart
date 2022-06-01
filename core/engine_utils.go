@@ -15,8 +15,6 @@ func GetPresignWorkId(workType types.WorkType, nodes []*Node) string {
 	switch workType {
 	case types.EcPresign:
 		prefix = "ecdsa_presign"
-	case types.EdPresign:
-		prefix = "eddsa_presign"
 	default:
 		log.Critical("Invalid presign work type")
 		return ""

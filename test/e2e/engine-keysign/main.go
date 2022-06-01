@@ -101,7 +101,7 @@ func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan
 	// Add request
 	workId := "keygen0"
 	threshold := utils.GetThreshold(len(pids))
-	request := types.NewKeygenRequest("ecdsa", workId, pids, threshold, worker.LoadEcPreparams(index))
+	request := types.NewEcKeygenRequest("ecdsa", workId, pids, threshold, worker.LoadEcPreparams(index))
 	err := engine.AddRequest(request)
 	if err != nil {
 		panic(err)
@@ -136,7 +136,7 @@ func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, 
 	}
 
 	threshold := utils.GetThreshold(len(pids))
-	request := types.NewSigningRequest(workId, pids, threshold, messages, chains, presignInput)
+	request := types.NewEcSigningRequest(workId, pids, threshold, messages, chains, presignInput)
 
 	err = engine.AddRequest(request)
 	if err != nil {

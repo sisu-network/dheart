@@ -43,7 +43,7 @@ func TestPresign_EndToEnd(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(
+		request := types.NewEcPresignRequest(
 			"Presign0",
 			CopySortedPartyIds(pIDs),
 			threshold,
@@ -114,7 +114,7 @@ func TestPresign_PreExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(
+		request := types.NewEcPresignRequest(
 			"Presign0",
 			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
@@ -167,7 +167,7 @@ func TestPresign_ExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(
+		request := types.NewEcPresignRequest(
 			"Presign0",
 			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
@@ -226,7 +226,7 @@ func TestPresign_Threshold(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(
+		request := types.NewEcPresignRequest(
 			"Presign0",
 			CopySortedPartyIds(pIDs),
 			threshold,

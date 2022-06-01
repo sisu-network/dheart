@@ -6,6 +6,8 @@ import (
 
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
+	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
+	edkeygen "github.com/sisu-network/tss-lib/eddsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -20,58 +22,71 @@ type WorkRequest struct {
 	// Used only for keygen, presign & signing
 	KeygenType  string
 	KeygenIndex int
-	KeygenInput *keygen.LocalPreParams
 	Threshold   int
 
-	// Used for presign
-	PresignInput *keygen.LocalPartySaveData
+	// Used for ecdsa
+	EcKeygenInput  *eckeygen.LocalPreParams
+	EcPresignInput *eckeygen.LocalPartySaveData
+
+	// Eddsa
+	EdSigningInput *edkeygen.LocalPartySaveData
 
 	// Used for signing
 	Messages []string // TODO: Make this a byte array
 	Chains   []string
 }
 
-func NewKeygenRequest(keyType, workId string, PIDs tss.SortedPartyIDs, threshold int, keygenInput *keygen.LocalPreParams) *WorkRequest {
-	// Note: we only support ecdsa for now
-	n := len(PIDs)
-	request := baseRequest(EcKeygen, workId, n, PIDs, 1)
-	request.KeygenInput = keygenInput
-	request.Threshold = threshold
+func NewEcKeygenRequest(keyType, workId string, pIds tss.SortedPartyIDs, threshold int, keygenInput *keygen.LocalPreParams) *WorkRequest {
+	request := baseRequest(EcKeygen, workId, len(pIds), threshold, pIds, 1)
+	request.EcKeygenInput = keygenInput
 	request.KeygenType = keyType
 
 	return request
 }
 
-func NewPresignRequest(workId string, PIDs tss.SortedPartyIDs, threshold int, presignInputs *keygen.LocalPartySaveData, forcedPresign bool, batchSize int) *WorkRequest {
-	n := len(PIDs)
-
-	request := baseRequest(EcPresign, workId, n, PIDs, batchSize)
-	request.PresignInput = presignInputs
-	request.Threshold = threshold
+func NewEcPresignRequest(workId string, pIds tss.SortedPartyIDs, threshold int, presignInputs *keygen.LocalPartySaveData, forcedPresign bool, batchSize int) *WorkRequest {
+	request := baseRequest(EcPresign, workId, len(pIds), threshold, pIds, batchSize)
+	request.EcPresignInput = presignInputs
 	request.ForcedPresign = forcedPresign
 
 	return request
 }
 
 // the presignInputs param is optional
-func NewSigningRequest(workId string, PIDs tss.SortedPartyIDs, threshold int, messages []string, chains []string, presignInput *keygen.LocalPartySaveData) *WorkRequest {
-	n := len(PIDs)
-	request := baseRequest(EcSigning, workId, n, PIDs, len(messages))
-	request.PresignInput = presignInput
+func NewEcSigningRequest(workId string, pIds tss.SortedPartyIDs, threshold int, messages []string, chains []string, presignInput *keygen.LocalPartySaveData) *WorkRequest {
+	n := len(pIds)
+	request := baseRequest(EcSigning, workId, n, threshold, pIds, len(messages))
+	request.EcPresignInput = presignInput
 	request.Messages = messages
 	request.Chains = chains
-	request.Threshold = threshold
 
 	return request
 }
 
-func baseRequest(workType WorkType, workdId string, n int, pIDs tss.SortedPartyIDs, batchSize int) *WorkRequest {
+func NewEdKeygenRequest(keyType, workId string, pIds tss.SortedPartyIDs, threshold int) *WorkRequest {
+	request := baseRequest(EdKeygen, workId, len(pIds), threshold, pIds, 1)
+	request.KeygenType = keyType
+
+	return request
+}
+
+func NewEdSigningRequest(workId string, pIds tss.SortedPartyIDs, threshold int, messages []string, chains []string, inputs *edkeygen.LocalPartySaveData, batchSize int) *WorkRequest {
+	request := baseRequest(EdSigning, workId, len(pIds), threshold, pIds, batchSize)
+	request.EdSigningInput = inputs
+	request.Messages = messages
+	request.Chains = chains
+
+	return request
+}
+
+func baseRequest(workType WorkType, workdId string, n int, threshold int, pIDs tss.SortedPartyIDs, batchSize int) *WorkRequest {
 	return &WorkRequest{
 		AllParties: pIDs,
 		WorkType:   workType,
 		WorkId:     workdId,
 		BatchSize:  batchSize,
 		N:          n,
+		Threshold:  threshold,
 	}
 }
 
@@ -79,7 +94,7 @@ func (request *WorkRequest) Validate() error {
 	switch request.WorkType {
 	case EcKeygen:
 	case EcPresign:
-		if request.PresignInput == nil {
+		if request.EcPresignInput == nil {
 			return errors.New("Presign input could not be nil for presign task")
 		}
 	case EcSigning:
