@@ -8,7 +8,6 @@ const (
 	EcSigning
 
 	EdKeygen
-	EdPresign
 	EdSigning
 )
 
@@ -19,7 +18,6 @@ var (
 		EcSigning: "ECDSA_SIGNING",
 
 		EdKeygen:  "EDDSA_KEYGEN",
-		EdPresign: "EDDSA_PRESIGN",
 		EdSigning: "EDDSA_SIGNING",
 	}
 )
@@ -33,7 +31,7 @@ func (w WorkType) IsKeygen() bool {
 }
 
 func (w WorkType) IsPresign() bool {
-	return w == EcPresign || w == EdPresign
+	return w == EcPresign
 }
 
 func (w WorkType) IsSigning() bool {

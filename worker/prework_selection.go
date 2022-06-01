@@ -231,6 +231,10 @@ func (s *PreworkSelection) checkEnoughParticipants() (bool, []string, []*tss.Par
 		return false, nil, make([]*tss.PartyID, 0)
 	}
 
+	if s.request.IsEddsa() {
+		return true, nil, s.availableParties.getPartyList(s.request.Threshold, s.myPid)
+	}
+
 	if s.request.IsSigning() {
 		batchSize := s.request.BatchSize
 		// Check if we can find a presign list that match this of nodes.

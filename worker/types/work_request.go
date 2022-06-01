@@ -93,7 +93,6 @@ func (request *WorkRequest) Validate() error {
 		}
 
 	case EdKeygen:
-	case EdPresign:
 	case EdSigning:
 	default:
 		return errors.New("Invalid request type")
@@ -116,7 +115,7 @@ func (request *WorkRequest) GetPriority() int {
 		return 100
 	}
 
-	if request.WorkType == EcPresign || request.WorkType == EdPresign {
+	if request.WorkType == EcPresign {
 		if request.ForcedPresign {
 			// Force presign
 			return 90
@@ -141,9 +140,17 @@ func (request *WorkRequest) IsKeygen() bool {
 }
 
 func (request *WorkRequest) IsPresign() bool {
-	return request.WorkType == EcPresign || request.WorkType == EdPresign
+	return request.WorkType == EcPresign
 }
 
 func (request *WorkRequest) IsSigning() bool {
 	return request.WorkType == EcSigning || request.WorkType == EdSigning
+}
+
+func (request *WorkRequest) IsEcdsa() bool {
+	return request.WorkType == EcKeygen || request.WorkType == EcPresign || request.WorkType == EcSigning
+}
+
+func (request *WorkRequest) IsEddsa() bool {
+	return request.WorkType == EdKeygen || request.WorkType == EdSigning
 }
