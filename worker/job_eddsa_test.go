@@ -4,8 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/decred/dcrd/dcrec/edwards/v2"
 	edkeygen "github.com/sisu-network/tss-lib/eddsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEdJob_Keygen(t *testing.T) {
@@ -50,18 +53,47 @@ func TestEdJob_Signing(t *testing.T) {
 
 	pIDs := GetTestPartyIds(n)
 
+	results := make([]JobResult, n)
+
 	for i := 0; i < n; i++ {
 		index := i
 		cbs[index] = &MockJobCallback{}
+
+		cbs[index].OnJobResultFunc = func(job *Job, result JobResult) {
+			results[index] = result
+		}
 	}
 
 	keygenOutputs := LoadEdKeygenSavedData(pIDs)
 
+	msgBytes := []byte("Test")
+
 	for i := 0; i < n; i++ {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
-		jobs[i] = NewEdSigningJob("Sign0", i, pIDs, params, []byte("Test"), *keygenOutputs[i], cbs[i], time.Second*10)
+		jobs[i] = NewEdSigningJob("EdSign0", i, pIDs, params, msgBytes, *keygenOutputs[i], cbs[i], time.Second*10)
 	}
 
 	runJobs(t, jobs, cbs, true)
+
+	// Verify that all jobs produce the same signature
+	for _, result := range results {
+		require.Equal(t, result.EdSigning.Signature.Signature, results[0].EdSigning.Signature.Signature)
+	}
+
+	// Verify eddsa signature
+	pkX, pkY := keygenOutputs[0].EDDSAPub.X(), keygenOutputs[0].EDDSAPub.Y()
+	pk := edwards.PublicKey{
+		Curve: tss.EC("eddsa"),
+		X:     pkX,
+		Y:     pkY,
+	}
+
+	newSig, err := edwards.ParseSignature(results[0].EdSigning.Signature.Signature)
+	if err != nil {
+		println("new sig error, ", err.Error())
+	}
+
+	ok := edwards.Verify(&pk, msgBytes, newSig.R, newSig.S)
+	assert.True(t, ok, "eddsa verify must pass")
 }
