@@ -8,6 +8,8 @@ import (
 )
 
 func TestEcJob_Keygen(t *testing.T) {
+	t.Parallel()
+
 	n := 6
 	threshold := 1
 
@@ -24,13 +26,15 @@ func TestEcJob_Keygen(t *testing.T) {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
 		preparams := LoadEcPreparams(i)
-		jobs[i] = NewEcKeygenJob("Keygen0", i, pIDs, params, preparams, cbs[i], time.Second*15)
+		jobs[i] = NewEcKeygenJob("Keygen0", i, pIDs, params, preparams, cbs[i], time.Second*120)
 	}
 
 	runJobs(t, jobs, cbs, true)
 }
 
 func TestEcJob_Presign(t *testing.T) {
+	t.Parallel()
+
 	n := 4
 	threshold := 1
 	jobs := make([]*Job, n)
@@ -53,6 +57,8 @@ func TestEcJob_Presign(t *testing.T) {
 }
 
 func TestEcJob_Signing(t *testing.T) {
+	t.Parallel()
+
 	n := 4
 	threshold := 1
 

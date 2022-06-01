@@ -146,11 +146,17 @@ func routeJobMesasge(jobs []*Job, cbs []*MockJobCallback, wg *sync.WaitGroup) {
 func runJobs(t *testing.T, jobs []*Job, cbs []*MockJobCallback, checkJobSuccess bool) {
 	n := len(jobs)
 	oks := make([]bool, n)
+
 	if checkJobSuccess {
+		// Verify that all jobs finish successfully
 		for i := range cbs {
 			index := i
+			f := cbs[index].OnJobResultFunc
 			cbs[index].OnJobResultFunc = func(job *Job, result JobResult) {
 				oks[index] = result.Success
+				if f != nil {
+					f(job, result)
+				}
 			}
 		}
 	}

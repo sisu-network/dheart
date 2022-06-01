@@ -9,6 +9,8 @@ import (
 )
 
 func TestEdJob_Keygen(t *testing.T) {
+	t.Parallel()
+
 	n := 6
 	threshold := 1
 	jobs := make([]*Job, n)
@@ -39,6 +41,8 @@ func TestEdJob_Keygen(t *testing.T) {
 }
 
 func TestEdJob_Signing(t *testing.T) {
+	t.Parallel()
+
 	n := 6
 	threshold := 1
 	jobs := make([]*Job, n)
