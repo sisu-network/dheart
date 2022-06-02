@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,7 @@ import (
 func TestEcJob_Keygen(t *testing.T) {
 	t.Parallel()
 
-	n := 6
+	n := 15
 	threshold := 1
 
 	jobs := make([]*Job, n)
@@ -22,8 +23,14 @@ func TestEcJob_Keygen(t *testing.T) {
 
 	pIDs := GetTestPartyIds(n)
 
+	outputs := make([]*eckeygen.LocalPartySaveData, n)
+
 	for i := 0; i < n; i++ {
-		cbs[i] = &MockJobCallback{}
+		index := i
+		cbs[index] = &MockJobCallback{}
+		cbs[index].OnJobResultFunc = func(job *Job, result JobResult) {
+			outputs[index] = &result.EcKeygen
+		}
 	}
 
 	for i := 0; i < n; i++ {
@@ -34,6 +41,9 @@ func TestEcJob_Keygen(t *testing.T) {
 	}
 
 	runJobs(t, jobs, cbs, true)
+
+	// Uncomment this line to save the outputs
+	// SaveEcKeygenOutput(outputs)
 }
 
 func TestEcJob_Presign(t *testing.T) {

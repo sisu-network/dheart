@@ -241,13 +241,7 @@ func LoadEcPreparams(index int) *eckeygen.LocalPreParams {
 	return preparams
 }
 
-func SaveEcKeygenOutput(data [][]*eckeygen.LocalPartySaveData) error {
-	// We just have to save batch 0 of the outputs
-	outputs := make([]*eckeygen.LocalPartySaveData, len(data))
-	for i := range outputs {
-		outputs[i] = data[i][0]
-	}
-
+func SaveEcKeygenOutput(outputs []*eckeygen.LocalPartySaveData) error {
 	for i, output := range outputs {
 		fileName := GetTestSavedFileName(TestEcKeygenSavedDataFixtureDirFormat, TestEcKeygenSavedDataFixtureFileFormat, i)
 
