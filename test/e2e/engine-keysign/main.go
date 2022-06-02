@@ -117,8 +117,8 @@ func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan
 	return result
 }
 
-func verifySignature(pubkey *ecdsa.PublicKey, msg string, R, S *big.Int) {
-	ok := ecdsa.Verify(pubkey, []byte(msg), R, S)
+func verifySignature(pubkey *ecdsa.PublicKey, msg []byte, R, S *big.Int) {
+	ok := ecdsa.Verify(pubkey, msg, R, S)
 	if !ok {
 		panic(fmt.Sprintf("Signature verification fails for msg: %s", msg))
 	}
@@ -127,8 +127,8 @@ func verifySignature(pubkey *ecdsa.PublicKey, msg string, R, S *big.Int) {
 func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, keysignch chan *htypes.KeysignResult,
 	keygenResult *htypes.KeygenResult, message []byte) {
 	workId := "keysign"
-	messages := []string{string(message)}
-	chains := []string{"eth", "eth"}
+	messages := [][]byte{message}
+	chains := []string{"eth"}
 
 	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
 	if err != nil {

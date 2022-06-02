@@ -8,6 +8,7 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 
 	libchain "github.com/sisu-network/lib/chain"
