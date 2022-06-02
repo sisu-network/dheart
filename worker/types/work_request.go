@@ -86,6 +86,7 @@ func baseRequest(workType WorkType, workdId string, n int, threshold int, pIDs t
 func (request *WorkRequest) Validate() error {
 	switch request.WorkType {
 	case EcKeygen:
+	case EcSigning:
 	case EdKeygen:
 	case EdSigning:
 	default:

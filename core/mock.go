@@ -11,7 +11,6 @@ import (
 
 type MockEngineCallback struct {
 	OnWorkKeygenFinishedFunc  func(result *dtypes.KeygenResult)
-	OnWorkPresignFinishedFunc func(result *dtypes.PresignResult)
 	OnWorkSigningFinishedFunc func(request *types.WorkRequest, result *htypes.KeysignResult)
 	OnWorkFailedFunc          func(request *types.WorkRequest, culprits []*tss.PartyID)
 }
@@ -19,12 +18,6 @@ type MockEngineCallback struct {
 func (cb *MockEngineCallback) OnWorkKeygenFinished(result *dtypes.KeygenResult) {
 	if cb.OnWorkKeygenFinishedFunc != nil {
 		cb.OnWorkKeygenFinishedFunc(result)
-	}
-}
-
-func (cb *MockEngineCallback) OnWorkPresignFinished(result *dtypes.PresignResult) {
-	if cb.OnWorkPresignFinishedFunc != nil {
-		cb.OnWorkPresignFinishedFunc(result)
 	}
 }
 
