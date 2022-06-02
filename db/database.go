@@ -22,7 +22,7 @@ import (
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 
 	libchain "github.com/sisu-network/lib/chain"
@@ -46,10 +46,10 @@ type Database interface {
 	SaveKeygenData(keyType string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
 	LoadKeygenData(keyType string) (*keygen.LocalPartySaveData, error)
 
-	SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
+	SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*ecsigning.SignatureData_OneRoundData) error
 	GetAvailablePresignShortForm() ([]string, []string, error) // Returns presignIds, pids, error
 
-	LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error)
+	LoadPresign(presignIds []string) ([]*ecsigning.SignatureData_OneRoundData, error)
 	LoadPresignStatus(presignIds []string) ([]string, error)
 	UpdatePresignStatus(presignIds []string) error
 
@@ -330,7 +330,7 @@ func (d *SqlDatabase) LoadKeygenData(keyType string) (*keygen.LocalPartySaveData
 	return result, nil
 }
 
-func (d *SqlDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
+func (d *SqlDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*ecsigning.SignatureData_OneRoundData) error {
 	if len(presignOutputs) == 0 {
 		return nil
 	}
@@ -404,7 +404,7 @@ func (d *SqlDatabase) DeleteKeygenWork(workId string) error {
 	return err
 }
 
-func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error) {
+func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*ecsigning.SignatureData_OneRoundData, error) {
 	// 1. Construct the query
 	questions := getQueryQuestionMark(1, len(presignIds))
 
@@ -423,7 +423,7 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 	defer rows.Close()
 
 	// 2. Scan every rows and save it to loaded array
-	results := make([]*presign.LocalPresignData, 0)
+	results := make([]*ecsigning.SignatureData_OneRoundData, 0)
 	for rows.Next() {
 		var bz []byte
 		if err := rows.Scan(&bz); err != nil {
@@ -431,7 +431,7 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 			return nil, err
 		}
 
-		data := presign.LocalPresignData{}
+		data := ecsigning.SignatureData_OneRoundData{}
 		if err := json.Unmarshal(bz, &data); err != nil {
 			log.Error("Cannot unmarshall data", err)
 			return nil, err

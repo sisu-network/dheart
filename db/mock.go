@@ -3,7 +3,8 @@ package db
 import (
 	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -11,10 +12,10 @@ import (
 
 type MockDatabase struct {
 	// TODO: remove this unused variable
-	signingInput []*presign.LocalPresignData
+	ecSigningOneRound []*ecsigning.SignatureData_OneRoundData
 
 	GetAvailablePresignShortFormFunc func() ([]string, []string, error)
-	LoadPresignFunc                  func(presignIds []string) ([]*presign.LocalPresignData, error)
+	LoadPresignFunc                  func(presignIds []string) ([]*ecsigning.SignatureData_OneRoundData, error)
 }
 
 func NewMockDatabase() Database {
@@ -37,7 +38,7 @@ func (m *MockDatabase) SaveKeygenData(chain string, workId string, pids []*tss.P
 	return nil
 }
 
-func (m *MockDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
+func (m *MockDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*ecsigning.SignatureData_OneRoundData) error {
 	return nil
 }
 
@@ -49,7 +50,7 @@ func (m *MockDatabase) GetAvailablePresignShortForm() ([]string, []string, error
 	return []string{}, []string{}, nil
 }
 
-func (m *MockDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error) {
+func (m *MockDatabase) LoadPresign(presignIds []string) ([]*ecsigning.SignatureData_OneRoundData, error) {
 	if m.LoadPresignFunc != nil {
 		return m.LoadPresignFunc(presignIds)
 	}

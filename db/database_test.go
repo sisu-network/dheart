@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 
 	libchain "github.com/sisu-network/lib/chain"
@@ -105,7 +105,7 @@ func TestSqlDatabase_SavePresignData(t *testing.T) {
 			Id: "party-0",
 		},
 	}}
-	presignData := []*presign.LocalPresignData{
+	presignData := []*ecsigning.SignatureData_OneRoundData{
 		{
 			PartyId: "partyId",
 		},
@@ -136,7 +136,7 @@ func TestSqlDatabase_LoadPresign(t *testing.T) {
 		_ = db.Close()
 	})
 
-	presignData := []*presign.LocalPresignData{
+	presignData := []*ecsigning.SignatureData_OneRoundData{
 		{
 			PartyId: "partyId1",
 		},
