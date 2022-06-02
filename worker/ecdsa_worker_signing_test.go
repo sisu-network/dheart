@@ -376,7 +376,7 @@ func doTestThreshold(t *testing.T) {
 	}
 
 	// This is pids of all parties taking part in the presign. Not all are guaranteed to be selected.
-	pIDs := wrapper.PIDs
+	pIDs := CopySortedPartyIds(wrapper.PIDs)
 	presignDataMap := make(map[string]*ecsigning.SignatureData_OneRoundData)
 	selectedPids := make([]*tss.PartyID, 0)
 	for _, output := range wrapper.Outputs {
