@@ -4,7 +4,6 @@ type WorkType int32
 
 const (
 	EcKeygen WorkType = iota + 1
-	EcPresign
 	EcSigning
 
 	EdKeygen
@@ -14,7 +13,6 @@ const (
 var (
 	WorkTypeStrings = map[WorkType]string{
 		EcKeygen:  "ECDSA_KEYGEN",
-		EcPresign: "ECDSA_PRESIGN",
 		EcSigning: "ECDSA_SIGNING",
 
 		EdKeygen:  "EDDSA_KEYGEN",
@@ -28,10 +26,6 @@ func (w WorkType) String() string {
 
 func (w WorkType) IsKeygen() bool {
 	return w == EcKeygen || w == EdKeygen
-}
-
-func (w WorkType) IsPresign() bool {
-	return w == EcPresign
 }
 
 func (w WorkType) IsSigning() bool {

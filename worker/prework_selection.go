@@ -348,7 +348,7 @@ func (s *PreworkSelection) memberFinalized(msg *common.PreExecOutputMessage) {
 		}
 
 		if join {
-			if s.request.IsKeygen() || s.request.IsPresign() || (s.request.IsSigning() && len(msg.PresignIds) == 0) {
+			if s.request.IsKeygen() || (s.request.IsSigning() && len(msg.PresignIds) == 0) {
 				s.broadcastResult(SelectionResult{
 					Success:      true,
 					SelectedPids: pIDs,
@@ -394,7 +394,7 @@ func (s *PreworkSelection) validateLeaderSelection(msg *common.PreExecOutputMess
 		return false
 	}
 
-	if (s.request.IsKeygen() || s.request.IsPresign() || s.request.IsSigning()) && len(msg.Pids) < s.request.Threshold+1 {
+	if (s.request.IsKeygen() || s.request.IsSigning()) && len(msg.Pids) < s.request.Threshold+1 {
 		// Not enough pids.
 		return false
 	}

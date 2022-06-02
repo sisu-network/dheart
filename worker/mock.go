@@ -21,8 +21,7 @@ import (
 	"github.com/sisu-network/dheart/worker/types"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
-	ecpresign "github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	edkeygen "github.com/sisu-network/tss-lib/eddsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 )
@@ -69,11 +68,11 @@ type MockWorkerCallback struct {
 	OnNodeNotSelectedFunc    func(request *types.WorkRequest)
 	OnWorkFailedFunc         func(request *types.WorkRequest)
 	GetAvailablePresignsFunc func(count int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
-	GetPresignOutputsFunc    func(presignIds []string) []*ecpresign.LocalPresignData
+	GetPresignOutputsFunc    func(presignIds []string) []*ecsigning.SignatureData_OneRoundData
 
 	workerIndex     int
 	keygenCallback  func(workerIndex int, request *types.WorkRequest, data []*eckeygen.LocalPartySaveData)
-	presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*ecpresign.LocalPresignData)
+	presignCallback func(workerIndex int, request *types.WorkRequest, pids []*tss.PartyID, data []*ecsigning.SignatureData_OneRoundData)
 	signingCallback func(workerIndex int, request *types.WorkRequest, data []*libCommon.ECSignature)
 }
 
@@ -103,7 +102,7 @@ func (cb *MockWorkerCallback) GetAvailablePresigns(count int, n int, allPids map
 	return nil, nil
 }
 
-func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*ecpresign.LocalPresignData {
+func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*ecsigning.SignatureData_OneRoundData {
 	if cb.GetPresignOutputsFunc != nil {
 		return cb.GetPresignOutputsFunc(presignIds)
 	}
@@ -114,8 +113,9 @@ func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*ecpresig
 //---/
 
 type PresignDataWrapper struct {
-	Outputs [][]*presign.LocalPresignData
-	PIDs    tss.SortedPartyIDs
+	KeygenOutputs []*eckeygen.LocalPartySaveData
+	Outputs       [][]*ecsigning.SignatureData_OneRoundData
+	PIDs          tss.SortedPartyIDs
 }
 
 //---/
@@ -295,7 +295,7 @@ func LoadEcKeygenSavedData(pids tss.SortedPartyIDs) []*eckeygen.LocalPartySaveDa
 	return savedData
 }
 
-func SaveEcPresignData(n int, data [][]*presign.LocalPresignData, pIDs tss.SortedPartyIDs, testIndex int) error {
+func SaveEcPresignData(n int, data [][]*ecsigning.SignatureData_OneRoundData, pIDs tss.SortedPartyIDs, testIndex int) error {
 	wrapper := &PresignDataWrapper{
 		Outputs: data,
 		PIDs:    pIDs,

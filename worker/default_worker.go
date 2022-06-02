@@ -15,7 +15,7 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/worker/interfaces"
 	"github.com/sisu-network/dheart/worker/types"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 
 	"github.com/sisu-network/dheart/types/common"
@@ -61,9 +61,8 @@ type DefaultWorker struct {
 	// For keygen and presign works, we onnly need 1 executor. For signing work, it's possible to have
 	// 2 executors (presigning first and then signing) in case we cannot find a presign set that
 	// satisfies available nodes.
-	preworkSelection  *PreworkSelection
-	executor          *WorkerExecutor
-	secondaryExecutor *WorkerExecutor
+	preworkSelection *PreworkSelection
+	executor         *WorkerExecutor
 	// Current job type of this worker. In most case, it's the same as jobType. However, in some case
 	// it could be different. For example, a signing work that requires presign will have curJobType
 	// value equal presign.
@@ -83,22 +82,6 @@ func NewKeygenWorker(
 	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, 1)
 
 	w.jobType = wTypes.EcKeygen
-
-	return w
-}
-
-func NewPresignWorker(
-	request *types.WorkRequest,
-	myPid *tss.PartyID,
-	dispatcher interfaces.MessageDispatcher,
-	db db.Database,
-	callback WorkerCallback,
-	cfg config.TimeoutConfig,
-	maxJob int,
-) Worker {
-	w := baseWorker(request, request.AllParties, myPid, dispatcher, db, callback, cfg, maxJob)
-
-	w.jobType = wTypes.EcPresign
 
 	return w
 }
@@ -199,30 +182,18 @@ func (w *DefaultWorker) startEcExecution(result SelectionResult) {
 	sortedPids := tss.SortPartyIDs(result.SelectedPids)
 
 	// We need to load the set of presigns data
-	var signingInput []*presign.LocalPresignData
+	var ecSigningPresign []*ecsigning.SignatureData_OneRoundData
 	if w.request.IsSigning() && len(result.PresignIds) > 0 {
-		signingInput = w.callback.GetPresignOutputs(result.PresignIds)
+		ecSigningPresign = w.callback.GetPresignOutputs(result.PresignIds)
 	}
 
 	// Handle success case
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
-	if w.request.IsKeygen() || w.request.IsPresign() || (w.request.IsSigning() &&
-		len(result.PresignIds) > 0) {
-		// In this case, work type = request.WorkType
-		w.curWorkType = w.request.WorkType
-		w.executor = w.getEcExecutor(sortedPids, signingInput)
-		w.runExecutor(w.executor)
-	} else {
-		// This is the case when the request is a signing work, has enough participants but cannot find
-		// an appropriate presign ids to fit them all. In this case, we need to do presign first.
-		// In this case work type != request.WorkType
-		log.Info("Doing presign for a signing work")
-		w.curWorkType = wTypes.EcPresign
-		w.secondaryExecutor = w.getEcExecutor(sortedPids, nil)
-		w.runExecutor(w.secondaryExecutor)
-	}
+	w.curWorkType = w.request.WorkType
+	w.executor = w.getEcExecutor(sortedPids, ecSigningPresign)
+	w.runExecutor(w.executor)
 }
 
 func (w *DefaultWorker) startEdExecution(result SelectionResult) {
@@ -235,9 +206,9 @@ func (w *DefaultWorker) startEdExecution(result SelectionResult) {
 	w.executor = w.getEdExecutor(sortedPids)
 }
 
-func (w *DefaultWorker) getEcExecutor(selectedPids []*tss.PartyID, signingInput []*presign.LocalPresignData) *WorkerExecutor {
+func (w *DefaultWorker) getEcExecutor(selectedPids []*tss.PartyID, ecSigningPresign []*ecsigning.SignatureData_OneRoundData) *WorkerExecutor {
 	return NewWorkerExecutor(w.request, w.curWorkType, w.myPid, selectedPids, w.dispatcher,
-		w.db, signingInput, w.onJobExecutionResult, w.cfg)
+		w.db, ecSigningPresign, w.onJobExecutionResult, w.cfg)
 }
 
 func (w *DefaultWorker) getEdExecutor(selectedPids []*tss.PartyID) *WorkerExecutor {
@@ -257,8 +228,6 @@ func (w *DefaultWorker) startTimeoutClock() {
 	switch w.request.WorkType {
 	case types.EcKeygen:
 		timeout = w.cfg.KeygenJobTimeout
-	case types.EcPresign:
-		timeout = w.cfg.PresignJobTimeout
 	case types.EcSigning:
 		timeout = w.cfg.SigningJobTimeout
 	default:
@@ -290,30 +259,17 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 	case common.TssMessage_UPDATE_MESSAGES:
 		w.lock.RLock()
 
-		if w.executor == nil && w.secondaryExecutor == nil {
+		if w.executor == nil {
 			// We have not started execution yet.
 			w.preExecutionCache.AddMessage(msg)
 			addToCache = true
 			log.Verbose("Adding to cache 1:", w.workId, w.myPid.Id, msg.UpdateMessages[0].Round)
-		} else if w.request.IsSigning() && w.curWorkType.IsPresign() && msg.IsSigningMessage() {
-			// This is the case when we are still in the presign phase of a signing request but some other
-			// nodes finish presign early and send us a signing message. We need to cache this message
-			// for later signing execution.
-			w.preExecutionCache.AddMessage(msg)
-			addToCache = true
-
-			log.Verbose("Adding to cache 2:", w.workId, w.myPid.Id, msg.UpdateMessages[0].Round, w.executor)
 		}
 
-		// Read the correct executor.
-		curExecutor := w.executor
-		if w.request.IsSigning() && w.curWorkType.IsPresign() {
-			curExecutor = w.secondaryExecutor
-		}
 		w.lock.RUnlock()
 
-		if !addToCache && curExecutor != nil {
-			curExecutor.ProcessUpdateMessage(msg)
+		if !addToCache && w.executor != nil {
+			w.executor.ProcessUpdateMessage(msg)
 		}
 
 	case common.TssMessage_AVAILABILITY_REQUEST, common.TssMessage_AVAILABILITY_RESPONSE, common.TssMessage_PRE_EXEC_OUTPUT:
@@ -346,27 +302,6 @@ func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result Ex
 				EcKeygenData: result.KeygenOutputs,
 			})
 
-		case types.EcPresign:
-			if w.request.IsSigning() {
-				// Load signing input from db.
-				presignStrings := make([]string, len(executor.pIDs))
-				for i, pid := range executor.pIDs {
-					presignStrings[i] = pid.Id
-				}
-
-				// This is the finished presign phase of the signing task. Continue with the signing phase.
-				w.lock.Lock()
-				w.curWorkType = types.EcSigning
-				w.executor = w.getEcExecutor(executor.pIDs, result.PresignOutputs)
-				w.runExecutor(w.executor)
-				w.lock.Unlock()
-			} else {
-				w.callback.OnWorkerResult(w.request, &WorkerResult{
-					SelectedPids:  executor.pIDs,
-					EcPresignData: result.PresignOutputs,
-				})
-			}
-
 		case types.EcSigning, types.EdSigning:
 			w.callback.OnWorkerResult(w.request, &WorkerResult{
 				EcSigningData: result.SigningOutputs,
@@ -385,8 +320,6 @@ func (w *DefaultWorker) Stop() {
 		go w.preworkSelection.Stop()
 		if w.executor != nil {
 			go w.executor.Stop()
-		} else if w.secondaryExecutor != nil {
-			go w.secondaryExecutor.Stop()
 		}
 	}
 }

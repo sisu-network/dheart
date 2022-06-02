@@ -2,6 +2,7 @@ package worker
 
 import (
 	"bytes"
+
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
@@ -9,6 +10,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
 
 	ecommon "github.com/ethereum/go-ethereum/common"
 	etypes "github.com/ethereum/go-ethereum/core/types"
@@ -20,7 +23,7 @@ import (
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
 )
@@ -46,8 +49,8 @@ func mockDbForSigning(pids []*tss.PartyID, WorkId string, batchSize int) db.Data
 			return presignIds, pidStrings, nil
 		},
 
-		LoadPresignFunc: func(presignIds []string) ([]*presign.LocalPresignData, error) {
-			return make([]*presign.LocalPresignData, len(presignIds)), nil
+		LoadPresignFunc: func(presignIds []string) ([]*ecsigning.SignatureData_OneRoundData, error) {
+			return make([]*ecsigning.SignatureData_OneRoundData, len(presignIds)), nil
 		},
 	}
 }
@@ -115,7 +118,7 @@ func TestEcWorkerSigning_EndToEnd(t *testing.T) {
 					}
 				},
 
-				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
+				GetPresignOutputsFunc: func(presignIds []string) []*ecsigning.SignatureData_OneRoundData {
 					return wrapper.Outputs[workerIndex]
 				},
 			},
@@ -138,10 +141,10 @@ func TestEcWorkerSigning_EndToEnd(t *testing.T) {
 	runAllWorkers(workers, outCh, done)
 
 	// Verify signature
-	verifySignature(t, signingMsgs, outputs, wrapper.Outputs[0][0].ECDSAPub.X(), wrapper.Outputs[0][0].ECDSAPub.Y())
+	verifySignature(t, signingMsgs, outputs, wrapper.KeygenOutputs[0].ECDSAPub.X(), wrapper.KeygenOutputs[0].ECDSAPub.Y())
 
 	// Verify that this ETH transaction is correctly signed
-	verifyEthSignature(t, hashBytes, outputs[0][0], wrapper.Outputs[0][0])
+	verifyEthSignature(t, hashBytes, outputs[0][0], wrapper.Outputs[0][0], wrapper.KeygenOutputs[0])
 }
 
 func TestEcWorkerSigning_PresignAndSign(t *testing.T) {
@@ -190,7 +193,7 @@ func TestEcWorkerSigning_PresignAndSign(t *testing.T) {
 					}
 				},
 
-				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
+				GetPresignOutputsFunc: func(presignIds []string) []*ecsigning.SignatureData_OneRoundData {
 					return nil
 				},
 			},
@@ -305,7 +308,7 @@ func TestEcWorkerSigning_ExecutionTimeout(t *testing.T) {
 						done <- true
 					}
 				},
-				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
+				GetPresignOutputsFunc: func(presignIds []string) []*ecsigning.SignatureData_OneRoundData {
 					return wrapper.Outputs[workerIndex]
 				},
 			},
@@ -374,7 +377,7 @@ func doTestThreshold(t *testing.T) {
 
 	// This is pids of all parties taking part in the presign. Not all are guaranteed to be selected.
 	pIDs := wrapper.PIDs
-	presignDataMap := make(map[string]*presign.LocalPresignData)
+	presignDataMap := make(map[string]*ecsigning.SignatureData_OneRoundData)
 	selectedPids := make([]*tss.PartyID, 0)
 	for _, output := range wrapper.Outputs {
 		for _, partyId := range pIDs {
@@ -434,8 +437,8 @@ func doTestThreshold(t *testing.T) {
 					}
 				},
 
-				GetPresignOutputsFunc: func(presignIds []string) []*presign.LocalPresignData {
-					return []*presign.LocalPresignData{presignDataMap[myPid.Id]}
+				GetPresignOutputsFunc: func(presignIds []string) []*ecsigning.SignatureData_OneRoundData {
+					return []*ecsigning.SignatureData_OneRoundData{presignDataMap[myPid.Id]}
 				},
 
 				OnNodeNotSelectedFunc: func(request *types.WorkRequest) {
@@ -483,13 +486,14 @@ func doTestThreshold(t *testing.T) {
 	runAllWorkers(workers, outCh, done)
 
 	// Verify signature
-	verifySignature(t, signingMsgs, outputs, wrapper.Outputs[0][0].ECDSAPub.X(), wrapper.Outputs[0][0].ECDSAPub.Y())
+	verifySignature(t, signingMsgs, outputs, wrapper.KeygenOutputs[0].ECDSAPub.X(), wrapper.KeygenOutputs[0].ECDSAPub.Y())
 
 	// Verify that this ETH transaction is correctly signed
-	verifyEthSignature(t, hashBytes, outputs[0][0], wrapper.Outputs[0][0])
+	verifyEthSignature(t, hashBytes, outputs[0][0], wrapper.Outputs[0][0], wrapper.KeygenOutputs[0])
 }
 
-func verifyEthSignature(t *testing.T, hash []byte, output *libCommon.ECSignature, presignData *presign.LocalPresignData) {
+func verifyEthSignature(t *testing.T, hash []byte, output *libCommon.ECSignature,
+	presignData *ecsigning.SignatureData_OneRoundData, keygenOutput *eckeygen.LocalPartySaveData) {
 	signature := output.Signature
 	signature = append(signature, output.SignatureRecovery[0])
 
@@ -500,8 +504,8 @@ func verifyEthSignature(t *testing.T, hash []byte, output *libCommon.ECSignature
 
 	publicKeyECDSA := ecdsa.PublicKey{
 		Curve: tss.EC(tss.EcdsaScheme),
-		X:     presignData.ECDSAPub.X(),
-		Y:     presignData.ECDSAPub.Y(),
+		X:     keygenOutput.ECDSAPub.X(),
+		Y:     keygenOutput.ECDSAPub.Y(),
 	}
 	publicKeyBytes := crypto.FromECDSAPub(&publicKeyECDSA)
 

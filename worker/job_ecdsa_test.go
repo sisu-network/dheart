@@ -54,7 +54,7 @@ func TestEcJob_Presign(t *testing.T) {
 	for i := 0; i < n; i++ {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
-		jobs[i] = NewEcPresignJob("Presign0", i, pIDs, params, presignInputs[i], cbs[i], time.Second*30)
+		jobs[i] = NewEcSigningJob("Presign0", i, pIDs, params, "", *presignInputs[i], nil, cbs[i], time.Second*10)
 	}
 
 	runJobs(t, jobs, cbs, true)
@@ -80,13 +80,14 @@ func TestEcJob_Signing(t *testing.T) {
 
 	savedPresigns := LoadEcPresignSavedData(0)
 	pIDs := savedPresigns.PIDs
+	presignInputs := LoadEcKeygenSavedData(pIDs)
 
 	msg := "Test message"
 
 	for i := 0; i < n; i++ {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
-		jobs[i] = NewEcSigningJob("Signinng0", i, pIDs, params, msg,
+		jobs[i] = NewEcSigningJob("Signinng0", i, pIDs, params, msg, *presignInputs[i],
 			savedPresigns.Outputs[i][0], cbs[i], time.Second*15)
 	}
 
@@ -95,19 +96,23 @@ func TestEcJob_Signing(t *testing.T) {
 	// Verify that all jobs produce the same signature
 	for _, result := range results {
 		require.Equal(t, result.EcSigning.Signature, results[0].EcSigning.Signature)
-		require.Equal(t, result.EcSigning.SignatureRecovery, results[0].EcSigning.SignatureRecovery)
-		require.Equal(t, result.EcSigning.R, results[0].EcSigning.R)
-		require.Equal(t, result.EcSigning.S, results[0].EcSigning.S)
+		require.Equal(t, result.EcSigning.Signature.SignatureRecovery, results[0].EcSigning.Signature.SignatureRecovery)
+		require.Equal(t, result.EcSigning.Signature.R, results[0].EcSigning.Signature.R)
+		require.Equal(t, result.EcSigning.Signature.S, results[0].EcSigning.Signature.S)
 	}
 
 	// Verify ecdsa signature
-	presignData := savedPresigns.Outputs[0][0]
-	pkX, pkY := presignData.ECDSAPub.X(), presignData.ECDSAPub.Y()
+	pkX, pkY := presignInputs[0].ECDSAPub.X(), presignInputs[0].ECDSAPub.Y()
 	pk := ecdsa.PublicKey{
 		Curve: tss.EC("ecdsa"),
 		X:     pkX,
 		Y:     pkY,
 	}
-	ok := ecdsa.Verify(&pk, []byte(msg), new(big.Int).SetBytes(results[0].EcSigning.R), new(big.Int).SetBytes(results[0].EcSigning.S))
+	ok := ecdsa.Verify(
+		&pk,
+		[]byte(msg),
+		new(big.Int).SetBytes(results[0].EcSigning.Signature.R),
+		new(big.Int).SetBytes(results[0].EcSigning.Signature.S),
+	)
 	assert.True(t, ok, "ecdsa verify must pass")
 }

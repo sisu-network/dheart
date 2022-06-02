@@ -9,14 +9,14 @@ import (
 	"github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/lib/log"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
 type AvailablePresigns interface {
 	Load() error
 	GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
-	AddPresign(workId string, partyIds []*tss.PartyID, presignOutputs []*presign.LocalPresignData)
+	AddPresign(workId string, partyIds []*tss.PartyID, presignOutputs []*ecsigning.SignatureData_OneRoundData)
 }
 
 type defaultAvailablePresigns struct {
@@ -65,7 +65,7 @@ func (m *defaultAvailablePresigns) Load() error {
 	return nil
 }
 
-func (m *defaultAvailablePresigns) AddPresign(workId string, partyIds []*tss.PartyID, presignOutputs []*presign.LocalPresignData) {
+func (m *defaultAvailablePresigns) AddPresign(workId string, partyIds []*tss.PartyID, presignOutputs []*ecsigning.SignatureData_OneRoundData) {
 	if err := m.db.SavePresignData(workId, partyIds, presignOutputs); err != nil {
 		log.Error("error when saving presign data", err)
 

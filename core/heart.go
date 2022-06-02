@@ -180,10 +180,6 @@ func (h *Heart) OnWorkKeygenFinished(result *htypes.KeygenResult) {
 	h.client.PostKeygenResult(result)
 }
 
-func (h *Heart) OnWorkPresignFinished(result *htypes.PresignResult) {
-	h.client.PostPresignResult(result)
-}
-
 func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult) {
 	clientRequest := h.keysignRequests[request.WorkId]
 	result.Request = clientRequest
@@ -202,12 +198,7 @@ func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID
 			Culprits: culprits,
 		}
 		h.client.PostKeygenResult(&result)
-	case types.EcPresign:
-		result := htypes.PresignResult{
-			Outcome:  htypes.OutcomeFailure,
-			Culprits: culprits,
-		}
-		h.client.PostPresignResult(&result)
+
 	case types.EcSigning, types.EdSigning:
 		result := htypes.KeysignResult{
 			Request:  clientRequest,
@@ -408,7 +399,7 @@ func (h *Heart) doPresign(blockHeight int64) {
 		workId := "presign_" + keygenType + "_" + strconv.FormatInt(blockHeight, 10)
 		log.Info("Presign workId = ", workId)
 
-		presignRequest := types.NewEcPresignRequest(workId, sorted, utils.GetThreshold(len(sorted)), presignInput, false, MaxBatchSize)
+		presignRequest := types.NewEcSigningRequest(workId, sorted, utils.GetThreshold(len(sorted)), nil, nil, presignInput)
 		err = h.engine.AddRequest(presignRequest)
 		if err != nil {
 			log.Error("Failed to add presign request to engine, err = ", err)

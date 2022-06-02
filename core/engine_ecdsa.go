@@ -12,7 +12,6 @@ import (
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -43,22 +42,6 @@ func (engine *defaultEngine) onWorkKeygenFinished(request *types.WorkRequest, ou
 	}
 
 	engine.callback.OnWorkKeygenFinished(&result)
-	engine.finishWorker(request.WorkId)
-	engine.startNextWork()
-}
-
-func (engine *defaultEngine) onWorkPresignFinished(request *types.WorkRequest, pids []*tss.PartyID,
-	data []*presign.LocalPresignData) {
-	log.Info("Presign finished, request.WorkId = ", request.WorkId)
-
-	engine.presignsManager.AddPresign(request.WorkId, pids, data)
-
-	result := htypes.PresignResult{
-		Outcome: htypes.OutcomeSuccess,
-	}
-
-	engine.callback.OnWorkPresignFinished(&result)
-
 	engine.finishWorker(request.WorkId)
 	engine.startNextWork()
 }

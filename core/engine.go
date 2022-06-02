@@ -21,7 +21,7 @@ import (
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/types"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -48,8 +48,6 @@ type Engine interface {
 
 type EngineCallback interface {
 	OnWorkKeygenFinished(result *htypes.KeygenResult)
-
-	OnWorkPresignFinished(result *htypes.PresignResult)
 
 	OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult)
 
@@ -158,10 +156,6 @@ func (engine *defaultEngine) startWork(request *types.WorkRequest) {
 	case types.EcKeygen:
 		w = worker.NewKeygenWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config)
-
-	case types.EcPresign:
-		w = worker.NewPresignWorker(request, workPartyId, engine, engine.db, engine,
-			engine.config, MaxBatchSize)
 
 	case types.EcSigning:
 		w = worker.NewSigningWorker(request, workPartyId, engine, engine.db, engine,
@@ -439,12 +433,6 @@ func (engine *defaultEngine) OnNodeNotSelected(request *types.WorkRequest) {
 	case types.EcKeygen:
 		// This should not happen as in keygen all nodes should be selected.
 
-	case types.EcPresign:
-		result := &htypes.PresignResult{
-			Outcome: htypes.OutcometNotSelected,
-		}
-		engine.callback.OnWorkPresignFinished(result)
-
 	case types.EcSigning:
 		result := &htypes.KeysignResult{
 			Outcome: htypes.OutcometNotSelected,
@@ -475,11 +463,11 @@ func (engine *defaultEngine) GetAvailablePresigns(batchSize int, n int,
 	return engine.presignsManager.GetAvailablePresigns(batchSize, n, allPids)
 }
 
-func (engine *defaultEngine) GetPresignOutputs(presignIds []string) []*presign.LocalPresignData {
+func (engine *defaultEngine) GetPresignOutputs(presignIds []string) []*ecsigning.SignatureData_OneRoundData {
 	loaded, err := engine.db.LoadPresign(presignIds)
 	if err != nil {
 		log.Error("Cannot load presign, err =", err)
-		return make([]*presign.LocalPresignData, 0)
+		return make([]*ecsigning.SignatureData_OneRoundData, 0)
 	}
 
 	return loaded
@@ -489,8 +477,6 @@ func (engine *defaultEngine) OnWorkerResult(request *types.WorkRequest, result *
 	switch request.WorkType {
 	case types.EcKeygen:
 		engine.onWorkKeygenFinished(request, result.EcKeygenData)
-	case types.EcPresign:
-		engine.onWorkPresignFinished(request, result.SelectedPids, result.EcPresignData)
 	case types.EcSigning:
 		engine.onWorkSigningFinished(request, result.EcSigningData)
 	default:

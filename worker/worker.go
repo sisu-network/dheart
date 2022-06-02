@@ -6,7 +6,7 @@ import (
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/types"
 	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
-	ecpresign "github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -35,7 +35,7 @@ type WorkerCallback interface {
 	// party ids should match the pids params passed into the function.
 	GetAvailablePresigns(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
 
-	GetPresignOutputs(presignIds []string) []*ecpresign.LocalPresignData
+	GetPresignOutputs(presignIds []string) []*ecsigning.SignatureData_OneRoundData
 
 	OnNodeNotSelected(request *types.WorkRequest)
 
@@ -52,7 +52,7 @@ type WorkerResult struct {
 
 	// Ecdsa
 	EcKeygenData  []*eckeygen.LocalPartySaveData
-	EcPresignData []*ecpresign.LocalPresignData
+	EcPresignData []*ecsigning.SignatureData_OneRoundData
 	EcSigningData []*libCommon.ECSignature
 
 	// Eddsa

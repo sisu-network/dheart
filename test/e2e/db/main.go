@@ -8,7 +8,6 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
 	"github.com/sisu-network/tss-lib/tss"
 
 	libchain "github.com/sisu-network/lib/chain"
@@ -67,7 +66,7 @@ func testInsertingPresignData(database db.Database) {
 			},
 		},
 	}
-	output := []*presign.LocalPresignData{
+	output := []*ecsigning.SignatureData_OneRoundData{
 		{
 			PartyId: "part1",
 		},

@@ -6,8 +6,7 @@ import (
 	wtypes "github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
-	"github.com/sisu-network/tss-lib/ecdsa/signing"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 	"google.golang.org/protobuf/proto"
 )
@@ -18,14 +17,13 @@ const (
 	EcKeygen1 Round = iota + 1
 	EcKeygen2
 	EcKeygen3
-	EcPresign1
-	EcPresign2
-	EcPresign3
-	EcPresign4
-	EcPresign5
-	EcPresign6
-	EcPresign7
 	EcSigning1
+	EcSigning2
+	EcSigning3
+	EcSigning4
+	EcSigning5
+	EcSigning6
+	EcSigning7
 
 	// Eddsa
 	EdKeygen1
@@ -43,22 +41,20 @@ func GetMsgRound(content tss.MessageContent) (Round, error) {
 		return EcKeygen2, nil
 	case *keygen.KGRound3Message:
 		return EcKeygen3, nil
-	case *presign.PresignRound1Message1, *presign.PresignRound1Message2:
-		return EcPresign1, nil
-	case *presign.PresignRound2Message:
-		return EcPresign2, nil
-	case *presign.PresignRound3Message:
-		return EcPresign3, nil
-	case *presign.PresignRound4Message:
-		return EcPresign4, nil
-	case *presign.PresignRound5Message:
-		return EcPresign5, nil
-	case *presign.PresignRound6Message:
-		return EcPresign6, nil
-	case *presign.PresignRound7Message:
-		return EcPresign7, nil
-	case *signing.SignRound1Message:
+	case *ecsigning.SignRound1Message1, *ecsigning.SignRound1Message2:
 		return EcSigning1, nil
+	case *ecsigning.SignRound2Message:
+		return EcSigning1, nil
+	case *ecsigning.SignRound3Message:
+		return EcSigning3, nil
+	case *ecsigning.SignRound4Message:
+		return EcSigning4, nil
+	case *ecsigning.SignRound5Message:
+		return EcSigning5, nil
+	case *ecsigning.SignRound6Message:
+		return EcSigning6, nil
+	case *ecsigning.SignRound7Message:
+		return EcSigning7, nil
 
 	default:
 		return 0, errors.New("unknown round")
@@ -69,10 +65,8 @@ func GetMessageCountByWorkType(jobType wtypes.WorkType) int {
 	switch jobType {
 	case wtypes.EcKeygen:
 		return 4
-	case wtypes.EcPresign:
-		return 8
 	case wtypes.EcSigning:
-		return 1
+		return 7
 	case wtypes.EdKeygen:
 		return 3
 	case wtypes.EdSigning:
@@ -92,21 +86,17 @@ func GetMessagesByWorkType(jobType wtypes.WorkType) []string {
 			string(proto.MessageName(&keygen.KGRound2Message2{})),
 			string(proto.MessageName(&keygen.KGRound3Message{})),
 		}
-	case wtypes.EcPresign:
-		return []string{
 
-			string(proto.MessageName(&presign.PresignRound1Message1{})),
-			string(proto.MessageName(&presign.PresignRound1Message2{})),
-			string(proto.MessageName(&presign.PresignRound2Message{})),
-			string(proto.MessageName(&presign.PresignRound3Message{})),
-			string(proto.MessageName(&presign.PresignRound4Message{})),
-			string(proto.MessageName(&presign.PresignRound5Message{})),
-			string(proto.MessageName(&presign.PresignRound6Message{})),
-			string(proto.MessageName(&presign.PresignRound7Message{})),
-		}
 	case wtypes.EcSigning:
 		return []string{
-			string(proto.MessageName(&signing.SignRound1Message{})),
+			string(proto.MessageName(&ecsigning.SignRound1Message1{})),
+			string(proto.MessageName(&ecsigning.SignRound1Message2{})),
+			string(proto.MessageName(&ecsigning.SignRound2Message{})),
+			string(proto.MessageName(&ecsigning.SignRound3Message{})),
+			string(proto.MessageName(&ecsigning.SignRound4Message{})),
+			string(proto.MessageName(&ecsigning.SignRound5Message{})),
+			string(proto.MessageName(&ecsigning.SignRound6Message{})),
+			string(proto.MessageName(&ecsigning.SignRound7Message{})),
 		}
 	}
 
@@ -119,13 +109,12 @@ func IsBroadcastMessage(msgType string) bool {
 	case string(proto.MessageName(&keygen.KGRound1Message{})),
 		string(proto.MessageName(&keygen.KGRound2Message2{})),
 		string(proto.MessageName(&keygen.KGRound3Message{})),
-		string(proto.MessageName(&presign.PresignRound1Message2{})),
-		string(proto.MessageName(&presign.PresignRound3Message{})),
-		string(proto.MessageName(&presign.PresignRound4Message{})),
-		string(proto.MessageName(&presign.PresignRound5Message{})),
-		string(proto.MessageName(&presign.PresignRound6Message{})),
-		string(proto.MessageName(&presign.PresignRound7Message{})),
-		string(proto.MessageName(&signing.SignRound1Message{})):
+		string(proto.MessageName(&ecsigning.SignRound1Message2{})),
+		string(proto.MessageName(&ecsigning.SignRound3Message{})),
+		string(proto.MessageName(&ecsigning.SignRound4Message{})),
+		string(proto.MessageName(&ecsigning.SignRound5Message{})),
+		string(proto.MessageName(&ecsigning.SignRound6Message{})),
+		string(proto.MessageName(&ecsigning.SignRound7Message{})):
 
 		return true
 	default:
