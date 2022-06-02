@@ -99,7 +99,7 @@ func TestEcJob_Signing(t *testing.T) {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
 		jobs[i] = NewEcSigningJob("Signinng0", i, pIDs, params, []byte(msg), *presignInputs[i],
-			savedPresigns.Outputs[i][0], cbs[i], time.Second*15)
+			savedPresigns.Outputs[i], cbs[i], time.Second*15)
 	}
 
 	runJobs(t, jobs, cbs, true)

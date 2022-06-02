@@ -114,7 +114,7 @@ func (cb *MockWorkerCallback) GetPresignOutputs(presignIds []string) []*ecsignin
 
 type PresignDataWrapper struct {
 	KeygenOutputs []*eckeygen.LocalPartySaveData
-	Outputs       [][]*ecsigning.SignatureData_OneRoundData
+	Outputs       []*ecsigning.SignatureData_OneRoundData
 	PIDs          tss.SortedPartyIDs
 }
 
@@ -289,7 +289,7 @@ func LoadEcKeygenSavedData(pids tss.SortedPartyIDs) []*eckeygen.LocalPartySaveDa
 	return savedData
 }
 
-func SaveEcPresignData(n int, data [][]*ecsigning.SignatureData_OneRoundData, pIDs tss.SortedPartyIDs, testIndex int) error {
+func SaveEcPresignData(n int, data []*ecsigning.SignatureData_OneRoundData, pIDs tss.SortedPartyIDs, testIndex int) error {
 	wrapper := &PresignDataWrapper{
 		Outputs: data,
 		PIDs:    pIDs,

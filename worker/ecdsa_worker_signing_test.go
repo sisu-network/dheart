@@ -119,7 +119,7 @@ func TestEcWorkerSigning_EndToEnd(t *testing.T) {
 				},
 
 				GetPresignOutputsFunc: func(presignIds []string) []*ecsigning.SignatureData_OneRoundData {
-					return wrapper.Outputs[workerIndex]
+					return []*ecsigning.SignatureData_OneRoundData{wrapper.Outputs[workerIndex]}
 				},
 			},
 			config.NewDefaultTimeoutConfig(),
@@ -144,7 +144,7 @@ func TestEcWorkerSigning_EndToEnd(t *testing.T) {
 	verifySignature(t, signingMsgs, outputs, wrapper.KeygenOutputs[0].ECDSAPub.X(), wrapper.KeygenOutputs[0].ECDSAPub.Y())
 
 	// Verify that this ETH transaction is correctly signed
-	verifyEthSignature(t, hashBytes, outputs[0][0], wrapper.Outputs[0][0], wrapper.KeygenOutputs[0])
+	verifyEthSignature(t, hashBytes, outputs[0][0], wrapper.Outputs[0], wrapper.KeygenOutputs[0])
 }
 
 func TestEcWorkerSigning_PresignAndSign(t *testing.T) {
@@ -309,7 +309,7 @@ func TestEcWorkerSigning_ExecutionTimeout(t *testing.T) {
 					}
 				},
 				GetPresignOutputsFunc: func(presignIds []string) []*ecsigning.SignatureData_OneRoundData {
-					return wrapper.Outputs[workerIndex]
+					return []*ecsigning.SignatureData_OneRoundData{wrapper.Outputs[workerIndex]}
 				},
 			},
 			cfg,
@@ -381,9 +381,9 @@ func doTestThreshold(t *testing.T) {
 	selectedPids := make([]*tss.PartyID, 0)
 	for _, output := range wrapper.Outputs {
 		for _, partyId := range pIDs {
-			if output[0].PartyId == partyId.Id {
+			if output.PartyId == partyId.Id {
 				selectedPids = append(selectedPids, partyId)
-				presignDataMap[partyId.Id] = output[0]
+				presignDataMap[partyId.Id] = output
 				break
 			}
 		}
@@ -489,7 +489,7 @@ func doTestThreshold(t *testing.T) {
 	verifySignature(t, signingMsgs, outputs, wrapper.KeygenOutputs[0].ECDSAPub.X(), wrapper.KeygenOutputs[0].ECDSAPub.Y())
 
 	// Verify that this ETH transaction is correctly signed
-	verifyEthSignature(t, hashBytes, outputs[0][0], wrapper.Outputs[0][0], wrapper.KeygenOutputs[0])
+	verifyEthSignature(t, hashBytes, outputs[0][0], wrapper.Outputs[0], wrapper.KeygenOutputs[0])
 }
 
 func verifyEthSignature(t *testing.T, hash []byte, output *libCommon.ECSignature,
