@@ -258,6 +258,7 @@ func (job *Job) startListening() {
 				return
 			}
 
+		// Eddsa
 		case data := <-job.edEndKeygenCh:
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{
@@ -269,7 +270,6 @@ func (job *Job) startListening() {
 				return
 			}
 
-		// Eddsa
 		case data := <-job.edEndSigningCh:
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{

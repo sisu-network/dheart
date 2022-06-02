@@ -128,7 +128,7 @@ func (request *WorkRequest) IsSigning() bool {
 }
 
 func (request *WorkRequest) IsEcPresign() bool {
-	return request.WorkType == EcSigning || request.Messages[0] == nil
+	return request.WorkType == EcSigning && request.Messages[0] == nil
 }
 
 func (request *WorkRequest) IsEcdsa() bool {

@@ -49,7 +49,6 @@ type WorkerExecutor struct {
 
 	// ECDSA Input
 	ecKeygenInput   *eckeygen.LocalPreParams
-	ecSigningInput  *eckeygen.LocalPartySaveData // output from keygen. This field is used for presign.
 	ecPresignOutput []*ecsigning.SignatureData_OneRoundData
 
 	callback func(*WorkerExecutor, ExecutionResult)
@@ -363,8 +362,6 @@ func (w *WorkerExecutor) checkKeygenResult(job *Job, result JobResult) (Executio
 
 // Implements checkSigningResult of JobCallback.
 func (w *WorkerExecutor) checkSigningResult(job *Job, result JobResult) (ExecutionResult, bool) {
-	fmt.Println("Checking signing result...")
-
 	w.finalOutputLock.Lock()
 
 	if w.request.IsEcPresign() {

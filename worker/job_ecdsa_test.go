@@ -17,7 +17,7 @@ import (
 func TestEcJob_Keygen(t *testing.T) {
 	t.Parallel()
 
-	n := 15
+	n := 6
 	threshold := 1
 
 	jobs := make([]*Job, n)
@@ -44,7 +44,7 @@ func TestEcJob_Keygen(t *testing.T) {
 
 	runJobs(t, jobs, cbs, true)
 
-	// Uncomment this line to save the keygen outputs
+	// Uncomment this line to save the keygen outputs and set n = 15 in the test
 	// SaveEcKeygenOutput(outputs)
 }
 
@@ -79,7 +79,7 @@ func TestEcJob_Presign(t *testing.T) {
 	runJobs(t, jobs, cbs, true)
 
 	// Uncomment this line to save the presign outputs
-	SaveEcPresignData(n, keygenOutputs, presignOutputs, pIDs)
+	// SaveEcPresignData(n, keygenOutputs, presignOutputs, pIDs)
 }
 
 func TestEcJob_Signing_WithPresign(t *testing.T) {

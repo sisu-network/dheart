@@ -96,7 +96,7 @@ func TestEcWorkerSigning_EndToEnd(t *testing.T) {
 			len(pIDs)-1,
 			signingMsgs,
 			[]string{"eth"},
-			nil,
+			wrapper.KeygenOutputs[i],
 		)
 
 		workerIndex := i
@@ -290,7 +290,7 @@ func TestEcWorkerSigning_ExecutionTimeout(t *testing.T) {
 			len(pIDs)-1,
 			[][]byte{[]byte(signingMsg)},
 			[]string{"eth"},
-			nil,
+			wrapper.KeygenOutputs[i],
 		)
 
 		workerIndex := i
@@ -369,7 +369,7 @@ func TestEcWorkerSigning_Threshold(t *testing.T) {
 func doTestThreshold(t *testing.T) {
 	n := 4
 	wrapper := LoadEcPresignSavedData()
-	threshold := 1
+	threshold := 3
 
 	if len(wrapper.Outputs) != threshold+1 {
 		t.Fatal(fmt.Errorf("Signing input is not correct!"))
@@ -415,7 +415,7 @@ func doTestThreshold(t *testing.T) {
 			threshold,
 			signingMsgs,
 			[]string{"eth"},
-			nil,
+			wrapper.KeygenOutputs[i],
 		)
 
 		myPid := pIDs[i]

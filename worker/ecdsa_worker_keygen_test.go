@@ -18,7 +18,7 @@ import (
 
 //--- Miscellaneous helpers functions -- /
 
-func TestEcWorkKeygen_EndToEnd(t *testing.T) {
+func TestEcWorkerKeygen_EndToEnd(t *testing.T) {
 	totalParticipants := 6
 	threshold := 1
 	batchSize := 1
@@ -94,7 +94,7 @@ func TestEcWorkKeygen_EndToEnd(t *testing.T) {
 	}
 }
 
-func TestEcWorkKeygen_Timeout(t *testing.T) {
+func TestEcWorkerKeygen_Timeout(t *testing.T) {
 	log.Verbose("Running TestKeygenTimeout test")
 	totalParticipants := 6
 	threshold := 1
