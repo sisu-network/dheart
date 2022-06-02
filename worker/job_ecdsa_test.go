@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sisu-network/tss-lib/crypto"
 	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +44,7 @@ func TestEcJob_Keygen(t *testing.T) {
 
 	runJobs(t, jobs, cbs, true)
 
-	// Uncomment this line to save the outputs
+	// Uncomment this line to save the keygen outputs
 	// SaveEcKeygenOutput(outputs)
 }
 
@@ -55,23 +57,32 @@ func TestEcJob_Presign(t *testing.T) {
 	cbs := make([]*MockJobCallback, n)
 
 	pIDs := GetTestPartyIds(n)
-	presignInputs := LoadEcKeygenSavedData(pIDs)
+	keygenOutputs := LoadEcKeygenSavedData(pIDs)
+
+	presignOutputs := make([]*ecsigning.SignatureData_OneRoundData, n)
 
 	for i := 0; i < n; i++ {
 		index := i
-		cbs[index] = &MockJobCallback{}
+		cbs[index] = &MockJobCallback{
+			OnJobResultFunc: func(job *Job, result JobResult) {
+				presignOutputs[index] = result.EcSigning.OneRoundData
+			},
+		}
 	}
 
 	for i := 0; i < n; i++ {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
-		jobs[i] = NewEcSigningJob("Presign0", i, pIDs, params, nil, *presignInputs[i], nil, cbs[i], time.Second*10)
+		jobs[i] = NewEcSigningJob("Presign0", i, pIDs, params, nil, *keygenOutputs[i], nil, cbs[i], time.Second*10)
 	}
 
 	runJobs(t, jobs, cbs, true)
+
+	// Uncomment this line to save the presign outputs
+	SaveEcPresignData(n, keygenOutputs, presignOutputs, pIDs)
 }
 
-func TestEcJob_Signing(t *testing.T) {
+func TestEcJob_Signing_WithPresign(t *testing.T) {
 	t.Parallel()
 
 	n := 4
@@ -89,21 +100,59 @@ func TestEcJob_Signing(t *testing.T) {
 		}
 	}
 
-	savedPresigns := LoadEcPresignSavedData(0)
+	savedPresigns := LoadEcPresignSavedData()
 	pIDs := savedPresigns.PIDs
-	presignInputs := LoadEcKeygenSavedData(pIDs)
+	keygenOutputs := savedPresigns.KeygenOutputs
 
 	msg := "Test message"
 
 	for i := 0; i < n; i++ {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
-		jobs[i] = NewEcSigningJob("Signinng0", i, pIDs, params, []byte(msg), *presignInputs[i],
+		jobs[i] = NewEcSigningJob("Signinng0", i, pIDs, params, []byte(msg), *keygenOutputs[i],
 			savedPresigns.Outputs[i], cbs[i], time.Second*15)
 	}
 
 	runJobs(t, jobs, cbs, true)
 
+	verifyEcSignature(t, msg, results, keygenOutputs[0].ECDSAPub)
+}
+
+func TestEcJob_Signing_NoPresign(t *testing.T) {
+	t.Parallel()
+
+	n := 4
+	threshold := 1
+
+	jobs := make([]*Job, n)
+	cbs := make([]*MockJobCallback, n)
+	results := make([]JobResult, n)
+
+	for i := 0; i < n; i++ {
+		index := i
+		cbs[index] = &MockJobCallback{}
+		cbs[index].OnJobResultFunc = func(job *Job, result JobResult) {
+			results[index] = result
+		}
+	}
+
+	pIDs := GetTestPartyIds(n)
+	keygenOutputs := LoadEcKeygenSavedData(pIDs)
+	msg := "Test message"
+
+	for i := 0; i < n; i++ {
+		p2pCtx := tss.NewPeerContext(pIDs)
+		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
+		jobs[i] = NewEcSigningJob("Signinng0", i, pIDs, params, []byte(msg), *keygenOutputs[i],
+			nil, cbs[i], time.Second*15)
+	}
+
+	runJobs(t, jobs, cbs, true)
+
+	verifyEcSignature(t, msg, results, keygenOutputs[0].ECDSAPub)
+}
+
+func verifyEcSignature(t *testing.T, msg string, results []JobResult, pubkey *crypto.ECPoint) {
 	// Verify that all jobs produce the same signature
 	for _, result := range results {
 		require.Equal(t, result.EcSigning.Signature, results[0].EcSigning.Signature)
@@ -113,7 +162,7 @@ func TestEcJob_Signing(t *testing.T) {
 	}
 
 	// Verify ecdsa signature
-	pkX, pkY := presignInputs[0].ECDSAPub.X(), presignInputs[0].ECDSAPub.Y()
+	pkX, pkY := pubkey.X(), pubkey.Y()
 	pk := ecdsa.PublicKey{
 		Curve: tss.EC("ecdsa"),
 		X:     pkX,

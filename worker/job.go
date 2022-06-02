@@ -39,6 +39,7 @@ type JobResult struct {
 	Failure JobFailure
 
 	EcKeygen  eckeygen.LocalPartySaveData
+	EcPresign *ecsigning.SignatureData_OneRoundData
 	EcSigning *ecsigning.SignatureData
 
 	EdKeygen  edkeygen.LocalPartySaveData
@@ -56,6 +57,7 @@ type Job struct {
 	timeOut  time.Duration
 
 	// Ecdsa
+	hasPresignData bool
 	ecEndKeygenCh  chan eckeygen.LocalPartySaveData
 	ecEndSigningCh chan *ecsigning.SignatureData
 
@@ -114,6 +116,7 @@ func NewEcSigningJob(
 
 	job := baseJob(workId, index, party, wTypes.EcSigning, callback, outCh, timeOut)
 	job.ecEndSigningCh = endCh
+	job.hasPresignData = signingInput != nil
 
 	return job
 }
@@ -232,6 +235,7 @@ func (job *Job) startListening() {
 				return
 			}
 
+		// Ecdsa
 		case data := <-job.ecEndKeygenCh:
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{
@@ -265,6 +269,7 @@ func (job *Job) startListening() {
 				return
 			}
 
+		// Eddsa
 		case data := <-job.edEndSigningCh:
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{
@@ -293,7 +298,7 @@ func (job *Job) addOutMessage(msg tss.Message) {
 	count := len(job.finishedMsgs)
 	job.finishLock.Unlock()
 
-	if count == message.GetMessageCountByWorkType(job.jobType) {
+	if count == message.GetMessageCountByWorkType(job.jobType, job.hasPresignData) {
 		// Mark the outCh done
 		job.doneOutCh.Store(true)
 	}

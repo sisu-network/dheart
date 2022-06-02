@@ -61,11 +61,15 @@ func GetMsgRound(content tss.MessageContent) (Round, error) {
 	}
 }
 
-func GetMessageCountByWorkType(jobType wtypes.WorkType) int {
+func GetMessageCountByWorkType(jobType wtypes.WorkType, isPresign bool) int {
 	switch jobType {
 	case wtypes.EcKeygen:
 		return 4
 	case wtypes.EcSigning:
+		if isPresign {
+			return 1
+		}
+
 		return 7
 	case wtypes.EdKeygen:
 		return 3

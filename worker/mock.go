@@ -289,13 +289,14 @@ func LoadEcKeygenSavedData(pids tss.SortedPartyIDs) []*eckeygen.LocalPartySaveDa
 	return savedData
 }
 
-func SaveEcPresignData(n int, data []*ecsigning.SignatureData_OneRoundData, pIDs tss.SortedPartyIDs, testIndex int) error {
+func SaveEcPresignData(n int, keygenOutputs []*eckeygen.LocalPartySaveData, data []*ecsigning.SignatureData_OneRoundData, pIDs tss.SortedPartyIDs) error {
 	wrapper := &PresignDataWrapper{
-		Outputs: data,
-		PIDs:    pIDs,
+		KeygenOutputs: keygenOutputs,
+		Outputs:       data,
+		PIDs:          pIDs,
 	}
 
-	fileName := GetTestSavedFileName(TestEcPresignSavedDataFixtureDirFormat, TestEcPresignSavedDataFixtureFileFormat, testIndex)
+	fileName := GetTestSavedFileName(TestEcPresignSavedDataFixtureDirFormat, TestEcPresignSavedDataFixtureFileFormat, 0)
 
 	bz, err := json.Marshal(wrapper)
 	if err != nil {
@@ -309,8 +310,8 @@ func SaveEcPresignData(n int, data []*ecsigning.SignatureData_OneRoundData, pIDs
 	return nil
 }
 
-func LoadEcPresignSavedData(testIndex int) *PresignDataWrapper {
-	fileName := GetTestSavedFileName(TestEcPresignSavedDataFixtureDirFormat, TestEcPresignSavedDataFixtureFileFormat, testIndex)
+func LoadEcPresignSavedData() *PresignDataWrapper {
+	fileName := GetTestSavedFileName(TestEcPresignSavedDataFixtureDirFormat, TestEcPresignSavedDataFixtureFileFormat, 0)
 	bz, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		panic(err)

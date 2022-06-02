@@ -70,7 +70,7 @@ func generateEthTx() *etypes.Transaction {
 }
 
 func TestEcWorkerSigning_EndToEnd(t *testing.T) {
-	wrapper := LoadEcPresignSavedData(0)
+	wrapper := LoadEcPresignSavedData()
 	n := len(wrapper.Outputs)
 
 	// Batch should have the same set of party ids.
@@ -220,7 +220,7 @@ func TestEcWorkerSigning_PresignAndSign(t *testing.T) {
 }
 
 func TestEcWorkerSigning_PreExecutionTimeout(t *testing.T) {
-	wrapper := LoadEcPresignSavedData(0)
+	wrapper := LoadEcPresignSavedData()
 	n := len(wrapper.Outputs)
 	pIDs := wrapper.PIDs
 
@@ -273,7 +273,7 @@ func TestEcWorkerSigning_PreExecutionTimeout(t *testing.T) {
 }
 
 func TestEcWorkerSigning_ExecutionTimeout(t *testing.T) {
-	wrapper := LoadEcPresignSavedData(0)
+	wrapper := LoadEcPresignSavedData()
 	n := len(wrapper.Outputs)
 	pIDs := wrapper.PIDs
 
@@ -368,8 +368,8 @@ func TestEcWorkerSigning_Threshold(t *testing.T) {
 
 func doTestThreshold(t *testing.T) {
 	n := 4
-	wrapper := LoadEcPresignSavedData(2)
-	threshold := 2
+	wrapper := LoadEcPresignSavedData()
+	threshold := 1
 
 	if len(wrapper.Outputs) != threshold+1 {
 		t.Fatal(fmt.Errorf("Signing input is not correct!"))
