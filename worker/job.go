@@ -95,7 +95,7 @@ func NewEcSigningJob(
 	index int,
 	pIDs tss.SortedPartyIDs,
 	params *tss.Parameters,
-	msg string,
+	msg []byte,
 	keygenData eckeygen.LocalPartySaveData,
 	signingInput *ecsigning.SignatureData_OneRoundData,
 	callback JobCallback,
@@ -104,7 +104,12 @@ func NewEcSigningJob(
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan *ecsigning.SignatureData, len(pIDs))
 
-	msgInt := hashToInt([]byte(msg), tss.EC(tss.EcdsaScheme))
+	var msgInt *big.Int
+	if msg == nil {
+		msgInt = nil
+	} else {
+		msgInt = hashToInt(msg, tss.EC(tss.EcdsaScheme))
+	}
 	party := ecsigning.NewLocalParty(msgInt, params, keygenData, signingInput, outCh, endCh)
 
 	job := baseJob(workId, index, party, wTypes.EcSigning, callback, outCh, timeOut)

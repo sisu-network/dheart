@@ -152,7 +152,7 @@ func (w *WorkerExecutor) Init() (err error) {
 			jobs[i] = NewEcKeygenJob(workId, i, w.pIDs, params, w.ecKeygenInput, w, w.cfg.KeygenJobTimeout)
 
 		case wTypes.EcSigning:
-			jobs[i] = NewEcSigningJob(workId, i, w.pIDs, params, w.request.Messages[i],
+			jobs[i] = NewEcSigningJob(workId, i, w.pIDs, params, []byte(w.request.Messages[i]),
 				*w.request.EcSigningInput, w.ecSigningOneRound[i], w, w.cfg.SigningJobTimeout)
 
 		// Eddsa

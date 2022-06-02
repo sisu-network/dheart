@@ -58,13 +58,14 @@ func TestEcJob_Presign(t *testing.T) {
 	presignInputs := LoadEcKeygenSavedData(pIDs)
 
 	for i := 0; i < n; i++ {
-		cbs[i] = &MockJobCallback{}
+		index := i
+		cbs[index] = &MockJobCallback{}
 	}
 
 	for i := 0; i < n; i++ {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
-		jobs[i] = NewEcSigningJob("Presign0", i, pIDs, params, "", *presignInputs[i], nil, cbs[i], time.Second*10)
+		jobs[i] = NewEcSigningJob("Presign0", i, pIDs, params, nil, *presignInputs[i], nil, cbs[i], time.Second*10)
 	}
 
 	runJobs(t, jobs, cbs, true)
@@ -97,7 +98,7 @@ func TestEcJob_Signing(t *testing.T) {
 	for i := 0; i < n; i++ {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
-		jobs[i] = NewEcSigningJob("Signinng0", i, pIDs, params, msg, *presignInputs[i],
+		jobs[i] = NewEcSigningJob("Signinng0", i, pIDs, params, []byte(msg), *presignInputs[i],
 			savedPresigns.Outputs[i][0], cbs[i], time.Second*15)
 	}
 
