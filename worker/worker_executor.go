@@ -29,6 +29,7 @@ type ExecutionResult struct {
 	Request *types.WorkRequest
 
 	KeygenOutputs  []*eckeygen.LocalPartySaveData
+	PresignOutputs []*ecsigning.SignatureData_OneRoundData
 	SigningOutputs []*libCommon.ECSignature
 }
 
@@ -47,9 +48,9 @@ type WorkerExecutor struct {
 	cfg        config.TimeoutConfig
 
 	// ECDSA Input
-	ecKeygenInput     *eckeygen.LocalPreParams
-	ecSigningInput    *eckeygen.LocalPartySaveData // output from keygen. This field is used for presign.
-	ecSigningOneRound []*ecsigning.SignatureData_OneRoundData
+	ecKeygenInput   *eckeygen.LocalPreParams
+	ecSigningInput  *eckeygen.LocalPartySaveData // output from keygen. This field is used for presign.
+	ecPresignOutput []*ecsigning.SignatureData_OneRoundData
 
 	callback func(*WorkerExecutor, ExecutionResult)
 
@@ -67,8 +68,10 @@ type WorkerExecutor struct {
 	jobOutput     map[string][]tss.Message
 	jobOutputLock *sync.RWMutex
 
-	keygenOutputs   []*eckeygen.LocalPartySaveData
-	signingOutputs  []*libCommon.ECSignature
+	keygenOutputs  []*eckeygen.LocalPartySaveData
+	presignOutputs []*ecsigning.SignatureData_OneRoundData
+	signingOutputs []*libCommon.ECSignature
+
 	finalOutputLock *sync.RWMutex
 	isStopped       atomic.Bool
 
@@ -84,7 +87,7 @@ func NewWorkerExecutor(
 	pids []*tss.PartyID,
 	dispatcher interfaces.MessageDispatcher,
 	db db.Database,
-	ecSigningInput []*ecsigning.SignatureData_OneRoundData,
+	ecPresignOutput []*ecsigning.SignatureData_OneRoundData,
 	callback func(*WorkerExecutor, ExecutionResult),
 	cfg config.TimeoutConfig,
 ) *WorkerExecutor {
@@ -93,24 +96,29 @@ func NewWorkerExecutor(
 		pIDsMap[pid.Id] = pid
 	}
 
+	if ecPresignOutput == nil {
+		ecPresignOutput = make([]*ecsigning.SignatureData_OneRoundData, request.BatchSize)
+	}
+
 	return &WorkerExecutor{
-		request:           request,
-		workType:          workType,
-		myPid:             myPid,
-		pIDs:              pids,
-		pIDsMap:           pIDsMap,
-		dispatcher:        dispatcher,
-		db:                db,
-		callback:          callback,
-		ecSigningOneRound: ecSigningInput,
-		jobsLock:          &sync.RWMutex{},
-		jobOutputLock:     &sync.RWMutex{},
-		finalOutputLock:   &sync.RWMutex{},
-		keygenOutputs:     make([]*eckeygen.LocalPartySaveData, request.BatchSize),
-		signingOutputs:    make([]*libCommon.ECSignature, request.BatchSize),
-		jobOutput:         make(map[string][]tss.Message),
-		isStopped:         *atomic.NewBool(false),
-		cfg:               cfg,
+		request:         request,
+		workType:        workType,
+		myPid:           myPid,
+		pIDs:            pids,
+		pIDsMap:         pIDsMap,
+		dispatcher:      dispatcher,
+		db:              db,
+		callback:        callback,
+		ecPresignOutput: ecPresignOutput,
+		jobsLock:        &sync.RWMutex{},
+		jobOutputLock:   &sync.RWMutex{},
+		finalOutputLock: &sync.RWMutex{},
+		keygenOutputs:   make([]*eckeygen.LocalPartySaveData, request.BatchSize),
+		presignOutputs:  make([]*ecsigning.SignatureData_OneRoundData, request.BatchSize),
+		signingOutputs:  make([]*libCommon.ECSignature, request.BatchSize),
+		jobOutput:       make(map[string][]tss.Message),
+		isStopped:       *atomic.NewBool(false),
+		cfg:             cfg,
 	}
 }
 
@@ -153,7 +161,7 @@ func (w *WorkerExecutor) Init() (err error) {
 
 		case wTypes.EcSigning:
 			jobs[i] = NewEcSigningJob(workId, i, w.pIDs, params, []byte(w.request.Messages[i]),
-				*w.request.EcSigningInput, w.ecSigningOneRound[i], w, w.cfg.SigningJobTimeout)
+				*w.request.EcSigningInput, w.ecPresignOutput[i], w, w.cfg.SigningJobTimeout)
 
 		// Eddsa
 		case wTypes.EdKeygen:
@@ -284,7 +292,11 @@ func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
 		case types.EcKeygen:
 			workResult, batchCompleted = w.checkKeygenResult(job, result)
 		case types.EcSigning:
-			workResult, batchCompleted = w.checkSigningResult(job, result)
+			if w.request.IsEcPresign() {
+				workResult, batchCompleted = w.checkPresignResult(job, result)
+			} else {
+				workResult, batchCompleted = w.checkSigningResult(job, result)
+			}
 		}
 
 		if batchCompleted {
@@ -298,6 +310,29 @@ func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
 			})
 		}
 	}
+}
+
+func (w *WorkerExecutor) checkPresignResult(job *Job, result JobResult) (ExecutionResult, bool) {
+	w.finalOutputLock.Lock()
+	w.presignOutputs[job.index] = result.EcSigning.OneRoundData
+	// Count the number of finished job.
+	count := 0
+	for _, item := range w.presignOutputs {
+		if item != nil {
+			count++
+		}
+	}
+	w.finalOutputLock.Unlock()
+
+	if count == w.request.BatchSize {
+		log.Verbose(w.request.WorkId, " Presign Done!")
+		return ExecutionResult{
+			Success:        true,
+			PresignOutputs: w.presignOutputs,
+		}, true
+	}
+
+	return ExecutionResult{}, false
 }
 
 // Implements checkKeygenResult of JobCallback. This function is called from a job after key
@@ -328,24 +363,30 @@ func (w *WorkerExecutor) checkKeygenResult(job *Job, result JobResult) (Executio
 
 // Implements checkSigningResult of JobCallback.
 func (w *WorkerExecutor) checkSigningResult(job *Job, result JobResult) (ExecutionResult, bool) {
+	fmt.Println("Checking signing result...")
+
 	w.finalOutputLock.Lock()
-	w.signingOutputs[job.index] = result.EcSigning.Signature
-	// Count the number of finished job.
-	count := 0
-	for _, item := range w.signingOutputs {
-		if item != nil {
-			count++
+
+	if w.request.IsEcPresign() {
+	} else {
+		w.signingOutputs[job.index] = result.EcSigning.Signature
+		// Count the number of finished job.
+		count := 0
+		for _, item := range w.signingOutputs {
+			if item != nil {
+				count++
+			}
 		}
-	}
-	w.finalOutputLock.Unlock()
+		w.finalOutputLock.Unlock()
 
-	if count == w.request.BatchSize {
-		log.Verbose(w.request.WorkId, " Signing Done!")
+		if count == w.request.BatchSize {
+			log.Verbose(w.request.WorkId, " Signing Done!")
 
-		return ExecutionResult{
-			Success:        true,
-			SigningOutputs: w.signingOutputs,
-		}, true
+			return ExecutionResult{
+				Success:        true,
+				SigningOutputs: w.signingOutputs,
+			}, true
+		}
 	}
 
 	return ExecutionResult{}, false

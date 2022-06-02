@@ -19,7 +19,6 @@ import (
 //--- Miscellaneous helpers functions -- /
 
 func TestEcWorkKeygen_EndToEnd(t *testing.T) {
-	log.Verbose("Running TestKeygenEndToEnd test")
 	totalParticipants := 6
 	threshold := 1
 	batchSize := 1
@@ -93,9 +92,6 @@ func TestEcWorkKeygen_EndToEnd(t *testing.T) {
 			assert.Equal(t, finalOutput[i][j].ECDSAPub.Y(), finalOutput[0][j].ECDSAPub.Y())
 		}
 	}
-
-	// Save final outputs. Uncomment this line when you want to save keygen output to fixtures.
-	// assert.NoError(t, helper.SaveKeygenOutput(finalOutput))
 }
 
 func TestEcWorkKeygen_Timeout(t *testing.T) {

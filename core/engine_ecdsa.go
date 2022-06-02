@@ -54,7 +54,7 @@ func (engine *defaultEngine) onWorkSigningFinished(request *types.WorkRequest, d
 		r := sig.R
 		s := sig.S
 
-		if libchain.IsETHBasedChain(request.Chains[0]) {
+		if libchain.IsETHBasedChain(request.Chains[i]) {
 			bitSizeInBytes := tss.EC(tss.EcdsaScheme).Params().BitSize / 8
 			r = utils.PadToLengthBytesForSignature(sig.R, bitSizeInBytes)
 			s = utils.PadToLengthBytesForSignature(sig.S, bitSizeInBytes)

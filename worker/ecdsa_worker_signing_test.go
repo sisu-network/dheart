@@ -84,7 +84,7 @@ func TestEcWorkerSigning_EndToEnd(t *testing.T) {
 	signer := etypes.NewEIP2930Signer(big.NewInt(1))
 	hash := signer.Hash(ethTx)
 	hashBytes := hash[:]
-	signingMsgs := []string{string(hashBytes)}
+	signingMsgs := [][]byte{hashBytes}
 
 	outputs := make([][]*libCommon.ECSignature, len(pIDs)) // n * batchSize
 	outputLock := &sync.Mutex{}
@@ -157,7 +157,7 @@ func TestEcWorkerSigning_PresignAndSign(t *testing.T) {
 	workers := make([]Worker, n)
 	done := make(chan bool)
 	finishedWorkerCount := 0
-	signingMsgs := []string{"This is a test", "another message"}
+	signingMsgs := [][]byte{[]byte("This is a test"), []byte("another message")}
 
 	outputs := make([][]*libCommon.ECSignature, len(pIDs)) // n * batchSize
 	outputLock := &sync.Mutex{}
@@ -235,7 +235,7 @@ func TestEcWorkerSigning_PreExecutionTimeout(t *testing.T) {
 			"Signing0",
 			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
-			[]string{signingMsg},
+			[][]byte{[]byte(signingMsg)},
 			[]string{"eth"},
 			nil,
 		)
@@ -288,7 +288,7 @@ func TestEcWorkerSigning_ExecutionTimeout(t *testing.T) {
 			"Signing0",
 			CopySortedPartyIds(pIDs),
 			len(pIDs)-1,
-			[]string{signingMsg},
+			[][]byte{[]byte(signingMsg)},
 			[]string{"eth"},
 			nil,
 		)
@@ -333,7 +333,7 @@ func TestEcWorkerSigning_ExecutionTimeout(t *testing.T) {
 	assert.EqualValues(t, 4, numFailedWorkers)
 }
 
-func verifySignature(t *testing.T, msgs []string, outputs [][]*libCommon.ECSignature, pubX, pubY *big.Int) {
+func verifySignature(t *testing.T, msgs [][]byte, outputs [][]*libCommon.ECSignature, pubX, pubY *big.Int) {
 	// Loop every single element in the batch
 	for j := range outputs[0] {
 		// Verify all workers have the same signature.
@@ -352,7 +352,7 @@ func verifySignature(t *testing.T, msgs []string, outputs [][]*libCommon.ECSigna
 				X:     pubX,
 				Y:     pubY,
 			}
-			ok := ecdsa.Verify(&pk, []byte(msgs[j]), R, S)
+			ok := ecdsa.Verify(&pk, msgs[j], R, S)
 			assert.True(t, ok, "ecdsa verify must pass")
 		}
 	}
@@ -403,7 +403,7 @@ func doTestThreshold(t *testing.T) {
 	signer := etypes.NewEIP2930Signer(big.NewInt(1))
 	hash := signer.Hash(ethTx)
 	hashBytes := hash[:]
-	signingMsgs := []string{string(hashBytes)}
+	signingMsgs := [][]byte{hashBytes}
 
 	outputs := make([][]*libCommon.ECSignature, 0) // n * batchSize
 	outputLock := &sync.Mutex{}

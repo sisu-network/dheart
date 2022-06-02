@@ -31,7 +31,7 @@ type WorkRequest struct {
 	EdSigningInput *edkeygen.LocalPartySaveData
 
 	// Used for signing
-	Messages []string // TODO: Make this a byte array
+	Messages [][]byte // TODO: Make this a byte array
 	Chains   []string
 }
 
@@ -44,10 +44,11 @@ func NewEcKeygenRequest(keyType, workId string, pIds tss.SortedPartyIDs, thresho
 }
 
 // the presignInputs param is optional
-func NewEcSigningRequest(workId string, pIds tss.SortedPartyIDs, threshold int, messages []string, chains []string, presignInput *keygen.LocalPartySaveData) *WorkRequest {
+func NewEcSigningRequest(workId string, pIds tss.SortedPartyIDs, threshold int, messages [][]byte, chains []string,
+	keygenOutput *keygen.LocalPartySaveData) *WorkRequest {
 	n := len(pIds)
 	request := baseRequest(EcSigning, workId, n, threshold, pIds, len(messages))
-	request.EcSigningInput = presignInput
+	request.EcSigningInput = keygenOutput
 	request.Messages = messages
 	request.Chains = chains
 
@@ -61,7 +62,8 @@ func NewEdKeygenRequest(keyType, workId string, pIds tss.SortedPartyIDs, thresho
 	return request
 }
 
-func NewEdSigningRequest(workId string, pIds tss.SortedPartyIDs, threshold int, messages []string, chains []string, inputs *edkeygen.LocalPartySaveData, batchSize int) *WorkRequest {
+func NewEdSigningRequest(workId string, pIds tss.SortedPartyIDs, threshold int, messages [][]byte,
+	chains []string, inputs *edkeygen.LocalPartySaveData, batchSize int) *WorkRequest {
 	request := baseRequest(EdSigning, workId, len(pIds), threshold, pIds, batchSize)
 	request.EdSigningInput = inputs
 	request.Messages = messages
@@ -123,6 +125,10 @@ func (request *WorkRequest) IsKeygen() bool {
 
 func (request *WorkRequest) IsSigning() bool {
 	return request.WorkType == EcSigning || request.WorkType == EdSigning
+}
+
+func (request *WorkRequest) IsEcPresign() bool {
+	return request.WorkType == EcSigning || request.Messages[0] == nil
 }
 
 func (request *WorkRequest) IsEcdsa() bool {

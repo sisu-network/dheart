@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sisu-network/dheart/core/components"
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/types/common"
@@ -26,7 +27,6 @@ import (
 // }
 
 func TestEcWorkerPresign_EndToEnd(t *testing.T) {
-	log.Verbose("Running TestPresign_EndToEnd")
 	n := 4
 	threshold := n - 1
 
@@ -42,7 +42,8 @@ func TestEcWorkerPresign_EndToEnd(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), threshold, nil, nil, presignInputs[i])
+		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), threshold, make([][]byte, 1),
+			nil, presignInputs[i])
 
 		cfg := config.NewDefaultTimeoutConfig()
 		cfg.MonitorMessageTimeout = time.Second * 60
@@ -76,7 +77,7 @@ func TestEcWorkerPresign_EndToEnd(t *testing.T) {
 			},
 			cfg,
 			1,
-			nil,
+			&components.MockAvailablePresigns{},
 		)
 
 		workers[i] = worker
@@ -95,7 +96,6 @@ func TestEcWorkerPresign_EndToEnd(t *testing.T) {
 }
 
 func TestEcWorkerPresign_PreExecutionTimeout(t *testing.T) {
-	log.Verbose("Running TestPresign_PreExecutionTimeout")
 	n := 4
 	pIDs := GetTestPartyIds(n)
 	presignInputs := LoadEcKeygenSavedData(pIDs)
@@ -106,7 +106,7 @@ func TestEcWorkerPresign_PreExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), len(pIDs)-1, nil, nil,
+		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), len(pIDs)-1, make([][]byte, 1), nil,
 			presignInputs[i])
 
 		cfg := config.NewDefaultTimeoutConfig()
@@ -126,7 +126,7 @@ func TestEcWorkerPresign_PreExecutionTimeout(t *testing.T) {
 			},
 			cfg,
 			1,
-			nil,
+			&components.MockAvailablePresigns{},
 		)
 
 		workers[i] = worker
@@ -153,11 +153,11 @@ func TestEcWorkerPresign_ExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), len(pIDs)-1, nil, nil,
+		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), len(pIDs)-1, make([][]byte, 1), nil,
 			presignInputs[i])
 
 		cfg := config.NewDefaultTimeoutConfig()
-		cfg.PresignJobTimeout = time.Second
+		cfg.SigningJobTimeout = time.Second
 
 		worker := NewSigningWorker(
 			request,
@@ -173,7 +173,7 @@ func TestEcWorkerPresign_ExecutionTimeout(t *testing.T) {
 			},
 			cfg,
 			1,
-			nil,
+			&components.MockAvailablePresigns{},
 		)
 
 		workers[i] = worker
@@ -206,7 +206,7 @@ func TestEcWorkerPresign_Threshold(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), threshold, nil, nil,
+		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), threshold, make([][]byte, 1), nil,
 			presignInputs[i])
 
 		cfg := config.NewDefaultTimeoutConfig()
@@ -241,7 +241,7 @@ func TestEcWorkerPresign_Threshold(t *testing.T) {
 			},
 			cfg,
 			1,
-			nil,
+			&components.MockAvailablePresigns{},
 		)
 
 		workers[i] = worker

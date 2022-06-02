@@ -232,12 +232,17 @@ func (s *PreworkSelection) checkEnoughParticipants() (bool, []string, []*tss.Par
 	}
 
 	if s.request.IsEddsa() {
-		return true, nil, s.availableParties.getPartyList(s.request.Threshold, s.myPid)
+		parties := s.availableParties.getPartyList(s.request.Threshold, s.myPid)
+		parties = append(parties, s.myPid)
+
+		return true, nil, parties
 	}
 
-	if s.request.IsSigning() {
-		batchSize := s.request.BatchSize
+	if s.request.IsSigning() && s.request.Messages != nil {
+		batchSize := len(s.request.Messages)
+
 		// Check if we can find a presign list that match this of nodes.
+		fmt.Println("AAAAA 00000", s.presignsManager, s.availableParties)
 		presignIds, selectedPids := s.presignsManager.GetAvailablePresigns(batchSize, s.request.N, s.availableParties.getAllPartiesMap())
 		if len(presignIds) == batchSize {
 			log.Info("We found a presign set: presignIds = ", presignIds, " batchSize = ", batchSize, " selectedPids = ", selectedPids)
@@ -252,10 +257,11 @@ func (s *PreworkSelection) checkEnoughParticipants() (bool, []string, []*tss.Par
 			return false, nil, nil
 		}
 	} else {
-		// Choose top parties with highest computing power.
-		topParties, _ := s.availableParties.getTopParties(s.request.GetMinPartyCount())
+		fmt.Println("AAAAA 11111")
+		parties := s.availableParties.getPartyList(s.request.Threshold, s.myPid)
+		parties = append(parties, s.myPid)
 
-		return true, nil, topParties
+		return true, nil, parties
 	}
 }
 
