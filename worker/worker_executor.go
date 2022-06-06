@@ -156,7 +156,7 @@ func (w *WorkerExecutor) Init() (err error) {
 
 		case wTypes.EcSigning:
 			jobs[i] = NewEcSigningJob(workId, i, w.pIDs, params, []byte(w.request.Messages[i]),
-				*w.request.EcSigningInput, w.ecPresignOutput[i], w, w.cfg.SigningJobTimeout)
+				*w.request.EcSigningInput, w.ecPresignOutput[i], w, w.cfg.SigningJobTimeout, w.request.Chains[0])
 
 		// Eddsa
 		case wTypes.EdKeygen:

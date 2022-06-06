@@ -3,6 +3,8 @@ package db
 import (
 	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
+	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
+	edkeygen "github.com/sisu-network/tss-lib/eddsa/keygen"
 
 	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
@@ -10,6 +12,7 @@ import (
 
 //---/
 
+// @Deprecated
 type MockDatabase struct {
 	// TODO: remove this unused variable
 	ecSigningOneRound []*ecsigning.SignatureData_OneRoundData
@@ -34,8 +37,20 @@ func (m *MockDatabase) LoadPreparams() (*keygen.LocalPreParams, error) {
 	return nil, nil
 }
 
-func (m *MockDatabase) SaveEcKeygen(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
+func (m *MockDatabase) SaveEcKeygen(keyType string, workId string, pids []*tss.PartyID, keygenOutput *eckeygen.LocalPartySaveData) error {
 	return nil
+}
+
+func (m *MockDatabase) LoadEcKeygen(keyType string) (*eckeygen.LocalPartySaveData, error) {
+	return nil, nil
+}
+
+func (m *MockDatabase) SaveEdKeygen(keyType string, workId string, pids []*tss.PartyID, keygenOutput *edkeygen.LocalPartySaveData) error {
+	return nil
+}
+
+func (m *MockDatabase) LoadEdKeygen(keyType string) (*edkeygen.LocalPartySaveData, error) {
+	return nil, nil
 }
 
 func (m *MockDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*ecsigning.SignatureData_OneRoundData) error {
@@ -59,10 +74,6 @@ func (m *MockDatabase) LoadPresign(presignIds []string) ([]*ecsigning.SignatureD
 }
 
 func (m *MockDatabase) LoadPresignStatus(presignIds []string) ([]string, error) {
-	return nil, nil
-}
-
-func (m *MockDatabase) LoadEcKeygen(chain string) (*keygen.LocalPartySaveData, error) {
 	return nil, nil
 }
 

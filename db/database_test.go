@@ -36,13 +36,11 @@ func TestSqlDatabase_SaveEcKeygen(t *testing.T) {
 			Id: "party-0",
 		},
 	}}
-	presignData := []*keygen.LocalPartySaveData{
-		{
-			H1j: []*big.Int{big.NewInt(10)},
-		},
+	presignInput := &keygen.LocalPartySaveData{
+		H1j: []*big.Int{big.NewInt(10)},
 	}
 
-	json, err := json.Marshal(presignData[0])
+	json, err := json.Marshal(presignInput)
 	assert.NoError(t, err)
 
 	mock.ExpectExec("INSERT INTO keygen").
@@ -50,7 +48,7 @@ func TestSqlDatabase_SaveEcKeygen(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1)).
 		WillReturnError(nil)
 
-	assert.NoError(t, sqlDatabase.SaveEcKeygen(chain, wordId, pids, presignData))
+	assert.NoError(t, sqlDatabase.SaveEcKeygen(chain, wordId, pids, presignInput))
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

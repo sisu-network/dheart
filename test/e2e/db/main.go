@@ -35,7 +35,7 @@ func testInsertingKeygenData(database db.Database) {
 	}
 
 	// Write data
-	err := database.SaveEcKeygen(libchain.GetKeygenType(chain), workId, pids, output)
+	err := database.SaveEcKeygen(libchain.GetKeygenType(chain), workId, pids, output[0])
 	if err != nil {
 		panic(err)
 	}

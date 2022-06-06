@@ -7,7 +7,10 @@ import (
 	"sync"
 	"time"
 
+	libchain "github.com/sisu-network/lib/chain"
+
 	"github.com/sisu-network/dheart/core/message"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/lib/log"
 	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
@@ -55,6 +58,7 @@ type Job struct {
 	party    tss.Party
 	callback JobCallback
 	timeOut  time.Duration
+	chain    string
 
 	// Ecdsa
 	hasPresignData bool
@@ -102,6 +106,7 @@ func NewEcSigningJob(
 	signingInput *ecsigning.SignatureData_OneRoundData,
 	callback JobCallback,
 	timeOut time.Duration,
+	chain string,
 ) *Job {
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan *ecsigning.SignatureData, len(pIDs))
@@ -248,6 +253,8 @@ func (job *Job) startListening() {
 			}
 
 		case data := <-job.ecEndSigningCh:
+			job.padEcSignature(data)
+
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{
 				Success:   true,
@@ -283,6 +290,16 @@ func (job *Job) startListening() {
 				return
 			}
 		}
+	}
+}
+
+// Add padding bytes to Ecdsa signature
+func (job *Job) padEcSignature(sigData *ecsigning.SignatureData) {
+	if libchain.IsETHBasedChain(job.chain) {
+		bitSizeInBytes := tss.EC(tss.EcdsaScheme).Params().BitSize / 8
+		r := utils.PadToLengthBytesForSignature(sigData.Signature.R, bitSizeInBytes)
+		s := utils.PadToLengthBytesForSignature(sigData.Signature.S, bitSizeInBytes)
+		sigData.Signature.Signature = append(r, s...)
 	}
 }
 

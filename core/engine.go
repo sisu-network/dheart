@@ -476,9 +476,9 @@ func (engine *defaultEngine) GetPresignOutputs(presignIds []string) []*ecsigning
 func (engine *defaultEngine) OnWorkerResult(request *types.WorkRequest, result *worker.WorkerResult) {
 	switch request.WorkType {
 	case types.EcKeygen:
-		engine.onEcKeygenFinished(request, worker.GetEcKeygenOutputs(result.JobResults))
+		engine.onEcKeygenFinished(request, worker.GetEcKeygenOutputs(result.JobResults)[0])
 	case types.EdKeygen:
-		// TODO: implement
+		engine.onEdKeygenFinished(request, worker.GetEdKeygenOutputs(result.JobResults)[0])
 	case types.EcSigning:
 		engine.onEcSigningFinished(request, worker.GetEcSigningOutputs(result.JobResults))
 	case types.EdSigning:

@@ -91,5 +91,5 @@ func main() {
 	// Run keygen
 	keygenResult := doKeygen(pids, index, engine, keygenCh)
 
-	fmt.Println("keygenResult = ", keygenResult)
+	fmt.Println("keygenResult = ", keygenResult.Address)
 }

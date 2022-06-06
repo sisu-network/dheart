@@ -295,8 +295,15 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 	return nil
 }
 
+// Callback from worker executor
 func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result ExecutionResult) {
 	if result.Success {
+		ok := w.saveJobResultData(result)
+		if !ok {
+			w.callback.OnWorkFailed(w.request)
+			return
+		}
+
 		w.callback.OnWorkerResult(w.request, &WorkerResult{
 			Success:    true,
 			JobResults: result.JobResults,
@@ -304,6 +311,29 @@ func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result Ex
 	} else {
 		w.callback.OnWorkFailed(w.request)
 	}
+}
+
+func (w *DefaultWorker) saveJobResultData(result ExecutionResult) bool {
+	if w.request.IsKeygen() {
+		if w.request.IsEcdsa() {
+			// Save to database
+			if err := w.db.SaveEcKeygen(w.request.KeygenType, w.request.WorkId, w.request.AllParties,
+				GetEcKeygenOutputs(result.JobResults)[0]); err != nil {
+				log.Error("error when saving keygen data", err)
+				return false
+			}
+		} else {
+			if err := w.db.SaveEdKeygen(w.request.KeygenType, w.request.WorkId, w.request.AllParties,
+				GetEdKeygenOutputs(result.JobResults)[0]); err != nil {
+				log.Error("error when saving keygen data", err)
+				return false
+			}
+		}
+	} else if w.request.IsEcPresign() {
+		// TODO: Save presign data here.
+	}
+
+	return true
 }
 
 func (w *DefaultWorker) Stop() {
