@@ -473,6 +473,8 @@ github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018/go.mod h1:rQY
 github.com/deckarep/golang-set v0.0.0-20180603214616-504e848d77ea/go.mod h1:93vsz/8Wt4joVM7c2AVqh+YRMiUSc14yDtF28KmMOgQ=
 github.com/deckarep/golang-set v1.7.1 h1:SCQV0S6gTtp6itiFrTqI+pfmJ4LN85S1YzhDf9rTHJQ=
 github.com/deckarep/golang-set v1.7.1/go.mod h1:93vsz/8Wt4joVM7c2AVqh+YRMiUSc14yDtF28KmMOgQ=
+github.com/decred/dcrd/dcrec/edwards v1.0.0 h1:UDcPNzclKiJlWqV3x1Fl8xMCJrolo4PB4X9t8LwKDWU=
+github.com/decred/dcrd/dcrec/edwards v1.0.0/go.mod h1:HblVh1OfMt7xSxUL1ufjToaEvpbjpWvvTAUx4yem8BI=
 github.com/decred/dcrd/dcrec/edwards/v2 v2.0.1/go.mod h1:d0H8xGMWbiIQP7gN3v2rByWUcuZPm9YsgmnfoxgbINc=
 github.com/decred/dcrd/dcrec/edwards/v2 v2.0.2 h1:bX7rtGTMBDJxujZ29GNqtn7YCAdINjHKnA6J6tBBv6s=
 github.com/decred/dcrd/dcrec/edwards/v2 v2.0.2/go.mod h1:d0H8xGMWbiIQP7gN3v2rByWUcuZPm9YsgmnfoxgbINc=

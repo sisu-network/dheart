@@ -3,9 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/big"
 	"time"
 
-	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	"github.com/decred/dcrd/dcrec/edwards/v2"
 
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/core/config"
@@ -13,27 +14,23 @@ import (
 	"github.com/sisu-network/dheart/test/e2e/helper"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/dheart/worker"
 	wtypes "github.com/sisu-network/dheart/worker/types"
+	edkeygen "github.com/sisu-network/tss-lib/eddsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan *types.KeygenResult) *types.KeygenResult {
-	workId := "keygen0"
+func doKeysign(pids tss.SortedPartyIDs, index int, engine core.Engine, message []byte,
+	keygenData *edkeygen.LocalPartySaveData) {
+	workId := "keysign0"
 	threshold := utils.GetThreshold(len(pids))
-	request := wtypes.NewEdKeygenRequest(workId, pids, threshold)
+	request := wtypes.NewEdSigningRequest(workId, pids, threshold, [][]byte{message},
+		[]string{"eth"}, keygenData, 1)
+
 	err := engine.AddRequest(request)
 	if err != nil {
 		panic(err)
 	}
-
-	var result *types.KeygenResult
-	select {
-	case result = <-outCh:
-	case <-time.After(time.Second * 100):
-		panic("Keygen timeout")
-	}
-
-	return result
 }
 
 func main() {
@@ -49,47 +46,58 @@ func main() {
 		panic(err)
 	}
 
-	pids := make([]*tss.PartyID, n)
-	allKeys := p2p.GetAllSecp256k1PrivateKeys(n)
+	pids := worker.GetTestPartyIds(n)
 	nodes := make([]*core.Node, n)
-	tendermintPubKeys := make([]ctypes.PubKey, n)
 
 	// Add nodes
 	privKeys := p2p.GetAllSecp256k1PrivateKeys(n)
+
 	for i := 0; i < n; i++ {
 		pubKey := privKeys[i].PubKey()
 		node := core.NewNode(pubKey)
 		nodes[i] = node
 		pids[i] = node.PartyId
 	}
-	pids = tss.SortPartyIDs(pids)
 
 	// Create new engine
-	keygenCh := make(chan *types.KeygenResult)
-	keysignch := make(chan *types.KeysignResult)
+	keysignch := make(chan *types.KeysignResult, 1)
 	cb := &core.MockEngineCallback{
-		OnWorkKeygenFinishedFunc: func(result *types.KeygenResult) {
-			keygenCh <- result
-		},
 		OnWorkSigningFinishedFunc: func(request *wtypes.WorkRequest, result *types.KeysignResult) {
+			fmt.Println("AAAA")
 			keysignch <- result
+			fmt.Println("BBBBB")
 		},
 	}
 
 	database := helper.GetInMemoryDb(index)
-	engine := core.NewEngine(nodes[index], cm, database, cb, allKeys[index], config.NewDefaultTimeoutConfig())
+	engine := core.NewEngine(nodes[index], cm, database, cb, privKeys[index], config.NewDefaultTimeoutConfig())
 	cm.AddListener(p2p.TSSProtocolID, engine)
 
 	// Add nodes
 	for i := 0; i < n; i++ {
 		engine.AddNodes(nodes)
-		tendermintPubKeys[i] = privKeys[i].PubKey()
 	}
 
 	time.Sleep(time.Second * 3)
 
-	// Run keygen
-	keygenResult := doKeygen(pids, index, engine, keygenCh)
+	myKeygen := worker.LoadEdKeygenSavedData(pids)[index]
 
-	fmt.Println("keygenResult = ", keygenResult.Address)
+	pubkey := edwards.NewPublicKey(myKeygen.EDDSAPub.X(), myKeygen.EDDSAPub.Y())
+	address := utils.GetAddressFromCardanoPubkey(pubkey.Serialize()).String()
+	fmt.Println("keygenResult = ", address)
+
+	message := []byte("this is a test")
+	doKeysign(pids, index, engine, message, myKeygen)
+
+	select {
+	case result := <-keysignch:
+		if result.Outcome != types.OutcomeSuccess {
+			panic("signing failed")
+		}
+
+		if !edwards.Verify(pubkey, message, new(big.Int).SetBytes(result.Signatures[0][:32]),
+			new(big.Int).SetBytes(result.Signatures[0][32:])) {
+			panic("Signature failure")
+		}
+	}
 }

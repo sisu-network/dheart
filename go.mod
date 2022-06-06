@@ -37,6 +37,7 @@ require (
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20170701192655-dcfb0a7ac018 // indirect
+	github.com/decred/dcrd/dcrec/edwards v1.0.0 // indirect
 	github.com/echovl/ed25519 v0.2.0 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/flynn/noise v0.0.0-20180327030543-2492fe189ae6 // indirect

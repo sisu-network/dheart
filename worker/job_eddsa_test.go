@@ -14,14 +14,12 @@ import (
 func TestEdJob_Keygen(t *testing.T) {
 	t.Parallel()
 
-	n := 6
+	n := 15
 	threshold := 1
 	jobs := make([]*Job, n)
 	cbs := make([]*MockJobCallback, n)
-
-	pIDs := GetTestPartyIds(n)
-
 	outputs := make([]*edkeygen.LocalPartySaveData, n)
+	pIDs := GetTestPartyIds(n)
 
 	for i := 0; i < n; i++ {
 		index := i

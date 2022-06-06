@@ -267,8 +267,6 @@ func (job *Job) startListening() {
 
 		// Eddsa
 		case data := <-job.edEndKeygenCh:
-			fmt.Println("Job is done")
-
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{
 				Success:  true,
