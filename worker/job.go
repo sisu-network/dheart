@@ -38,11 +38,11 @@ type JobResult struct {
 	Success bool
 	Failure JobFailure
 
-	EcKeygen  eckeygen.LocalPartySaveData
+	EcKeygen  *eckeygen.LocalPartySaveData
 	EcPresign *ecsigning.SignatureData_OneRoundData
 	EcSigning *ecsigning.SignatureData
 
-	EdKeygen  edkeygen.LocalPartySaveData
+	EdKeygen  *edkeygen.LocalPartySaveData
 	EdSigning *edsigning.SignatureData
 }
 
@@ -240,7 +240,7 @@ func (job *Job) startListening() {
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{
 				Success:  true,
-				EcKeygen: data,
+				EcKeygen: &data,
 			})
 
 			if job.isDone() {
@@ -260,10 +260,12 @@ func (job *Job) startListening() {
 
 		// Eddsa
 		case data := <-job.edEndKeygenCh:
+			fmt.Println("Job is done")
+
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{
 				Success:  true,
-				EdKeygen: data,
+				EdKeygen: &data,
 			})
 
 			if job.isDone() {

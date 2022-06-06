@@ -62,7 +62,7 @@ func TestEcWorkerKeygen_EndToEnd(t *testing.T) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					finalOutput[workerIndex] = result.EcKeygenData
+					finalOutput[workerIndex] = GetEcKeygenOutputs(result.JobResults)
 					finishedWorkerCount += 1
 
 					if finishedWorkerCount == totalParticipants {

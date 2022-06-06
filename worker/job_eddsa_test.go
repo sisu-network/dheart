@@ -27,7 +27,7 @@ func TestEdJob_Keygen(t *testing.T) {
 		index := i
 		cbs[index] = &MockJobCallback{}
 		cbs[index].OnJobResultFunc = func(job *Job, result JobResult) {
-			outputs[index] = &result.EdKeygen
+			outputs[index] = result.EdKeygen
 		}
 	}
 

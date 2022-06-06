@@ -1,11 +1,8 @@
 package worker
 
 import (
-	libCommon "github.com/sisu-network/tss-lib/common"
-
 	commonTypes "github.com/sisu-network/dheart/types/common"
 	"github.com/sisu-network/dheart/worker/types"
-	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
 	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 )
@@ -50,10 +47,5 @@ type WorkerResult struct {
 	Request        *types.WorkRequest
 	SelectedPids   []*tss.PartyID
 
-	// Ecdsa
-	EcKeygenData  []*eckeygen.LocalPartySaveData
-	EcPresignData []*ecsigning.SignatureData_OneRoundData
-	EcSigningData []*libCommon.ECSignature
-
-	// Eddsa
+	JobResults []*JobResult
 }

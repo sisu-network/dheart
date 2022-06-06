@@ -58,7 +58,7 @@ func TestEcWorkerPresign_EndToEnd(t *testing.T) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					presignOutputs = append(presignOutputs, result.EcPresignData)
+					presignOutputs = append(presignOutputs, GetEcPresignOutputs(result.JobResults))
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true
@@ -222,7 +222,7 @@ func TestEcWorkerPresign_Threshold(t *testing.T) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					presignOutputs = append(presignOutputs, result.EcPresignData)
+					presignOutputs = append(presignOutputs, GetEcPresignOutputs(result.JobResults))
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true

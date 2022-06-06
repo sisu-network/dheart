@@ -327,7 +327,7 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	}
 
 	// TODO: Load multiple input here.
-	presignInput, err := h.db.LoadKeygenData(req.KeyType)
+	presignInput, err := h.db.LoadEcKeygen(req.KeyType)
 	if err != nil {
 		return err
 	}
@@ -381,7 +381,7 @@ func (h *Heart) doPresign(blockHeight int64) {
 	sorted := tss.SortPartyIDs(pids)
 
 	keygenType := "ecdsa"
-	presignInput, err := h.db.LoadKeygenData(keygenType)
+	presignInput, err := h.db.LoadEcKeygen(keygenType)
 
 	if err != nil {
 		log.Error("Cannot get presign input, err = ", err)

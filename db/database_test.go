@@ -15,7 +15,8 @@ import (
 	libchain "github.com/sisu-network/lib/chain"
 )
 
-func TestSqlDatabase_SaveKeygenData(t *testing.T) {
+// TODO: Replace all db mock by in-memory db.
+func TestSqlDatabase_SaveEcKeygen(t *testing.T) {
 	t.Parallel()
 
 	db, mock, err := sqlmock.New()
@@ -49,11 +50,11 @@ func TestSqlDatabase_SaveKeygenData(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1)).
 		WillReturnError(nil)
 
-	assert.NoError(t, sqlDatabase.SaveKeygenData(chain, wordId, pids, presignData))
+	assert.NoError(t, sqlDatabase.SaveEcKeygen(chain, wordId, pids, presignData))
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestSqlDatabase_LoadKeygenData(t *testing.T) {
+func TestSqlDatabase_LoadEcKeygen(t *testing.T) {
 	t.Parallel()
 
 	db, mock, err := sqlmock.New()
@@ -79,7 +80,7 @@ func TestSqlDatabase_LoadKeygenData(t *testing.T) {
 		WillReturnRows(rows).
 		WillReturnError(nil)
 
-	got, err := sqlDatabase.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
+	got, err := sqlDatabase.LoadEcKeygen(libchain.KEY_TYPE_ECDSA)
 	assert.NoError(t, err)
 	assert.EqualValues(t, data, *got)
 

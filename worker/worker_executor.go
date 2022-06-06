@@ -17,7 +17,6 @@ import (
 	"github.com/sisu-network/dheart/worker/types"
 	wTypes "github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
-	libCommon "github.com/sisu-network/tss-lib/common"
 	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
 	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
@@ -28,9 +27,7 @@ type ExecutionResult struct {
 	Success bool
 	Request *types.WorkRequest
 
-	KeygenOutputs  []*eckeygen.LocalPartySaveData
-	PresignOutputs []*ecsigning.SignatureData_OneRoundData
-	SigningOutputs []*libCommon.ECSignature
+	JobResults []*JobResult
 }
 
 type WorkerExecutor struct {
@@ -67,9 +64,7 @@ type WorkerExecutor struct {
 	jobOutput     map[string][]tss.Message
 	jobOutputLock *sync.RWMutex
 
-	keygenOutputs  []*eckeygen.LocalPartySaveData
-	presignOutputs []*ecsigning.SignatureData_OneRoundData
-	signingOutputs []*libCommon.ECSignature
+	jobResults []*JobResult
 
 	finalOutputLock *sync.RWMutex
 	isStopped       atomic.Bool
@@ -112,12 +107,13 @@ func NewWorkerExecutor(
 		jobsLock:        &sync.RWMutex{},
 		jobOutputLock:   &sync.RWMutex{},
 		finalOutputLock: &sync.RWMutex{},
-		keygenOutputs:   make([]*eckeygen.LocalPartySaveData, request.BatchSize),
-		presignOutputs:  make([]*ecsigning.SignatureData_OneRoundData, request.BatchSize),
-		signingOutputs:  make([]*libCommon.ECSignature, request.BatchSize),
-		jobOutput:       make(map[string][]tss.Message),
-		isStopped:       *atomic.NewBool(false),
-		cfg:             cfg,
+		// ecKeygenOutputs:  make([]*eckeygen.LocalPartySaveData, request.BatchSize),
+		// ecPresignOutputs: make([]*ecsigning.SignatureData_OneRoundData, request.BatchSize),
+		// ecSigningOutputs: make([]*libCommon.ECSignature, request.BatchSize),
+		jobResults: make([]*JobResult, request.BatchSize),
+		jobOutput:  make(map[string][]tss.Message),
+		isStopped:  *atomic.NewBool(false),
+		cfg:        cfg,
 	}
 }
 
@@ -284,109 +280,33 @@ func (w *WorkerExecutor) OnJobResult(job *Job, result JobResult) {
 		return
 	}
 
-	if result.Success {
-		var workResult ExecutionResult
-		var batchCompleted bool
-		switch job.jobType {
-		case types.EcKeygen:
-			workResult, batchCompleted = w.checkKeygenResult(job, result)
-		case types.EcSigning:
-			if w.request.IsEcPresign() {
-				workResult, batchCompleted = w.checkPresignResult(job, result)
-			} else {
-				workResult, batchCompleted = w.checkSigningResult(job, result)
+	w.finalOutputLock.Lock()
+	w.jobResults[job.index] = &result
+	count := 0
+	hasFailure := false
+	for _, result := range w.jobResults {
+		if result != nil {
+			count++
+			if !result.Success {
+				hasFailure = true
 			}
 		}
+	}
+	w.finalOutputLock.Unlock()
 
-		if batchCompleted {
-			w.broadcastResult(workResult)
-		}
-	} else {
-		// Failure case
-		if result.Failure == JobFailureTimeout {
+	if count == w.request.BatchSize {
+		if hasFailure {
+			// If any of the job fails, this is considered to be a failure.
 			w.broadcastResult(ExecutionResult{
 				Success: false,
 			})
+		} else {
+			w.broadcastResult(ExecutionResult{
+				Success:    true,
+				JobResults: w.jobResults,
+			})
 		}
 	}
-}
-
-func (w *WorkerExecutor) checkPresignResult(job *Job, result JobResult) (ExecutionResult, bool) {
-	w.finalOutputLock.Lock()
-	w.presignOutputs[job.index] = result.EcSigning.OneRoundData
-	// Count the number of finished job.
-	count := 0
-	for _, item := range w.presignOutputs {
-		if item != nil {
-			count++
-		}
-	}
-	w.finalOutputLock.Unlock()
-
-	if count == w.request.BatchSize {
-		log.Verbose(w.request.WorkId, " Presign Done!")
-		return ExecutionResult{
-			Success:        true,
-			PresignOutputs: w.presignOutputs,
-		}, true
-	}
-
-	return ExecutionResult{}, false
-}
-
-// Implements checkKeygenResult of JobCallback. This function is called from a job after key
-// generation finishes.
-func (w *WorkerExecutor) checkKeygenResult(job *Job, result JobResult) (ExecutionResult, bool) {
-	w.finalOutputLock.Lock()
-	w.keygenOutputs[job.index] = &result.EcKeygen
-	// Count the number of finished job.
-	count := 0
-	for _, item := range w.keygenOutputs {
-		if item != nil {
-			count++
-		}
-	}
-	w.finalOutputLock.Unlock()
-
-	if count == w.request.BatchSize {
-		log.Verbose(w.request.WorkId, " Keygen Done!")
-
-		return ExecutionResult{
-			Success:       true,
-			KeygenOutputs: w.keygenOutputs,
-		}, true
-	}
-
-	return ExecutionResult{}, false
-}
-
-// Implements checkSigningResult of JobCallback.
-func (w *WorkerExecutor) checkSigningResult(job *Job, result JobResult) (ExecutionResult, bool) {
-	w.finalOutputLock.Lock()
-
-	if w.request.IsEcPresign() {
-	} else {
-		w.signingOutputs[job.index] = result.EcSigning.Signature
-		// Count the number of finished job.
-		count := 0
-		for _, item := range w.signingOutputs {
-			if item != nil {
-				count++
-			}
-		}
-		w.finalOutputLock.Unlock()
-
-		if count == w.request.BatchSize {
-			log.Verbose(w.request.WorkId, " Signing Done!")
-
-			return ExecutionResult{
-				Success:        true,
-				SigningOutputs: w.signingOutputs,
-			}, true
-		}
-	}
-
-	return ExecutionResult{}, false
 }
 
 // Implements MessageMonitorCallback

@@ -43,8 +43,8 @@ type Database interface {
 	SavePreparams(preparams *keygen.LocalPreParams) error
 	LoadPreparams() (*keygen.LocalPreParams, error)
 
-	SaveKeygenData(keyType string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
-	LoadKeygenData(keyType string) (*keygen.LocalPartySaveData, error)
+	SaveEcKeygen(keyType string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
+	LoadEcKeygen(keyType string) (*keygen.LocalPartySaveData, error)
 
 	SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*ecsigning.SignatureData_OneRoundData) error
 	GetAvailablePresignShortForm() ([]string, []string, error) // Returns presignIds, pids, error
@@ -265,7 +265,7 @@ func (d *SqlDatabase) LoadPreparams() (*keygen.LocalPreParams, error) {
 	return preparams, nil
 }
 
-func (d *SqlDatabase) SaveKeygenData(keyType string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
+func (d *SqlDatabase) SaveEcKeygen(keyType string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
 	if len(keygenOutput) == 0 {
 		return nil
 	}
@@ -297,7 +297,7 @@ func (d *SqlDatabase) SaveKeygenData(keyType string, workId string, pids []*tss.
 	return err
 }
 
-func (d *SqlDatabase) LoadKeygenData(keyType string) (*keygen.LocalPartySaveData, error) {
+func (d *SqlDatabase) LoadEcKeygen(keyType string) (*keygen.LocalPartySaveData, error) {
 	query := "SELECT keygen_output FROM keygen WHERE key_type=? AND batch_index=0"
 	params := []interface{}{
 		keyType,

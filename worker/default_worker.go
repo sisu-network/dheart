@@ -204,6 +204,7 @@ func (w *DefaultWorker) startEdExecution(result SelectionResult) {
 
 	w.curWorkType = w.request.WorkType
 	w.executor = w.getEdExecutor(sortedPids)
+	w.runExecutor(w.executor)
 }
 
 func (w *DefaultWorker) getEcExecutor(selectedPids []*tss.PartyID, ecSigningPresign []*ecsigning.SignatureData_OneRoundData) *WorkerExecutor {
@@ -296,17 +297,10 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 
 func (w *DefaultWorker) onJobExecutionResult(executor *WorkerExecutor, result ExecutionResult) {
 	if result.Success {
-		switch executor.workType {
-		case types.EcKeygen, types.EdKeygen:
-			w.callback.OnWorkerResult(w.request, &WorkerResult{
-				EcKeygenData: result.KeygenOutputs,
-			})
-
-		case types.EcSigning, types.EdSigning:
-			w.callback.OnWorkerResult(w.request, &WorkerResult{
-				EcSigningData: result.SigningOutputs,
-			})
-		}
+		w.callback.OnWorkerResult(w.request, &WorkerResult{
+			Success:    true,
+			JobResults: result.JobResults,
+		})
 	} else {
 		w.callback.OnWorkFailed(w.request)
 	}

@@ -34,7 +34,7 @@ func (m *MockDatabase) LoadPreparams() (*keygen.LocalPreParams, error) {
 	return nil, nil
 }
 
-func (m *MockDatabase) SaveKeygenData(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
+func (m *MockDatabase) SaveEcKeygen(chain string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
 	return nil
 }
 
@@ -62,7 +62,7 @@ func (m *MockDatabase) LoadPresignStatus(presignIds []string) ([]string, error) 
 	return nil, nil
 }
 
-func (m *MockDatabase) LoadKeygenData(chain string) (*keygen.LocalPartySaveData, error) {
+func (m *MockDatabase) LoadEcKeygen(chain string) (*keygen.LocalPartySaveData, error) {
 	return nil, nil
 }
 

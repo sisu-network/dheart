@@ -111,7 +111,7 @@ func TestEcWorkerSigning_EndToEnd(t *testing.T) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					outputs[workerIndex] = result.EcSigningData
+					outputs[workerIndex] = GetEcSigningOutputs(result.JobResults)
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true
@@ -186,7 +186,7 @@ func TestEcWorkerSigning_PresignAndSign(t *testing.T) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					outputs[workerIndex] = result.EcSigningData
+					outputs[workerIndex] = GetEcSigningOutputs(result.JobResults)
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true
@@ -430,7 +430,7 @@ func doTestThreshold(t *testing.T) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
 
-					outputs = append(outputs, result.EcSigningData)
+					outputs = append(outputs, GetEcSigningOutputs(result.JobResults))
 					finishedWorkerCount += 1
 					if finishedWorkerCount == n {
 						done <- true

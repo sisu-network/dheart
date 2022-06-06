@@ -153,11 +153,11 @@ func (engine *defaultEngine) startWork(request *types.WorkRequest) {
 
 	// Create a new worker.
 	switch request.WorkType {
-	case types.EcKeygen:
+	case types.EcKeygen, types.EdKeygen:
 		w = worker.NewKeygenWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config)
 
-	case types.EcSigning:
+	case types.EcSigning, types.EdSigning:
 		w = worker.NewSigningWorker(request, workPartyId, engine, engine.db, engine,
 			engine.config, MaxBatchSize, engine.presignsManager)
 	}
@@ -476,10 +476,17 @@ func (engine *defaultEngine) GetPresignOutputs(presignIds []string) []*ecsigning
 func (engine *defaultEngine) OnWorkerResult(request *types.WorkRequest, result *worker.WorkerResult) {
 	switch request.WorkType {
 	case types.EcKeygen:
-		engine.onWorkKeygenFinished(request, result.EcKeygenData)
+		engine.onEcKeygenFinished(request, worker.GetEcKeygenOutputs(result.JobResults))
+	case types.EdKeygen:
+		// TODO: implement
 	case types.EcSigning:
-		engine.onWorkSigningFinished(request, result.EcSigningData)
+		engine.onEcSigningFinished(request, worker.GetEcSigningOutputs(result.JobResults))
+	case types.EdSigning:
+		// TODO: implement
 	default:
 		log.Error("OnWorkerResult: Unknown work type ", request.WorkType)
 	}
+
+	engine.finishWorker(request.WorkId)
+	engine.startNextWork()
 }

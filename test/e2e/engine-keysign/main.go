@@ -130,7 +130,7 @@ func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, 
 	messages := [][]byte{message}
 	chains := []string{"eth"}
 
-	presignInput, err := database.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
+	presignInput, err := database.LoadEcKeygen(libchain.KEY_TYPE_ECDSA)
 	if err != nil {
 		panic(err)
 	}

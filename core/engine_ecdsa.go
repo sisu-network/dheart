@@ -15,10 +15,10 @@ import (
 	"github.com/sisu-network/tss-lib/tss"
 )
 
-func (engine *defaultEngine) onWorkKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
+func (engine *defaultEngine) onEcKeygenFinished(request *types.WorkRequest, output []*keygen.LocalPartySaveData) {
 	log.Info("Keygen finished for type ", request.KeygenType)
 	// Save to database
-	if err := engine.db.SaveKeygenData(request.KeygenType, request.WorkId, request.AllParties, output); err != nil {
+	if err := engine.db.SaveEcKeygen(request.KeygenType, request.WorkId, request.AllParties, output); err != nil {
 		log.Error("error when saving keygen data", err)
 	}
 
@@ -42,11 +42,9 @@ func (engine *defaultEngine) onWorkKeygenFinished(request *types.WorkRequest, ou
 	}
 
 	engine.callback.OnWorkKeygenFinished(&result)
-	engine.finishWorker(request.WorkId)
-	engine.startNextWork()
 }
 
-func (engine *defaultEngine) onWorkSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature) {
+func (engine *defaultEngine) onEcSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature) {
 	log.Info("Signing finished for workId ", request.WorkId)
 
 	signatures := make([][]byte, len(data))
@@ -58,10 +56,8 @@ func (engine *defaultEngine) onWorkSigningFinished(request *types.WorkRequest, d
 			bitSizeInBytes := tss.EC(tss.EcdsaScheme).Params().BitSize / 8
 			r = utils.PadToLengthBytesForSignature(sig.R, bitSizeInBytes)
 			s = utils.PadToLengthBytesForSignature(sig.S, bitSizeInBytes)
-		}
+			signatures[i] = append(r, s...)
 
-		signatures[i] = append(r, s...)
-		if libchain.IsETHBasedChain(request.Chains[i]) {
 			if len(signatures[i]) != 64 {
 				log.Error("ETH signature length is not 65, actual length = ", len(signatures[i]),
 					" msg = ", hex.EncodeToString([]byte(request.Messages[i])),
@@ -78,7 +74,4 @@ func (engine *defaultEngine) onWorkSigningFinished(request *types.WorkRequest, d
 	}
 
 	engine.callback.OnWorkSigningFinished(request, result)
-
-	engine.finishWorker(request.WorkId)
-	engine.startNextWork()
 }
