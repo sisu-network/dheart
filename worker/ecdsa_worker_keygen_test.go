@@ -81,9 +81,14 @@ func TestEcWorkerKeygen_EndToEnd(t *testing.T) {
 	runAllWorkers(workers, outCh, done)
 
 	// All outputs should have the same batch size.
+	outs := make([]*keygen.LocalPartySaveData, totalParticipants)
+
 	for i := 0; i < totalParticipants; i++ {
 		assert.Equal(t, len(finalOutput[i]), batchSize)
+		outs[i] = finalOutput[i][0]
 	}
+	// Uncomment this line to save output into fixtures. Remember to set n = 15.
+	// SaveEcKeygenOutput(outs)
 
 	for j := 0; j < batchSize; j++ {
 		// Check that everyone has the same public key.

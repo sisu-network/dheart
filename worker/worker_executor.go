@@ -155,8 +155,14 @@ func (w *WorkerExecutor) Init() (err error) {
 			jobs[i] = NewEcKeygenJob(workId, i, w.pIDs, params, w.ecKeygenInput, w, w.cfg.KeygenJobTimeout)
 
 		case wTypes.EcSigning:
+			var presignOutput *ecsigning.SignatureData_OneRoundData
+			if w.ecPresignOutput == nil {
+				presignOutput = nil
+			} else {
+				presignOutput = w.ecPresignOutput[i]
+			}
 			jobs[i] = NewEcSigningJob(workId, i, w.pIDs, params, []byte(w.request.Messages[i]),
-				*w.request.EcSigningInput, w.ecPresignOutput[i], w, w.cfg.SigningJobTimeout, w.request.Chains[0])
+				*w.request.EcSigningInput, presignOutput, w, w.cfg.SigningJobTimeout, w.request.Chains[0])
 
 		// Eddsa
 		case wTypes.EdKeygen:
@@ -262,8 +268,6 @@ func (w *WorkerExecutor) OnJobMessage(job *Job, msg tss.Message) {
 			log.Critical("Cannot build TSS message, err", err)
 			return
 		}
-
-		log.Verbose(w.request.WorkId, ": ", w.myPid.Id, " sending message ", msg.Type(), " to ", dest)
 
 		if dest == nil {
 			// broadcast

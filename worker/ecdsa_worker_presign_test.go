@@ -43,7 +43,7 @@ func TestEcWorkerPresign_EndToEnd(t *testing.T) {
 
 	for i := 0; i < n; i++ {
 		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), threshold, make([][]byte, 1),
-			nil, presignInputs[i])
+			[]string{"eth"}, presignInputs[i])
 
 		cfg := config.NewDefaultTimeoutConfig()
 		cfg.MonitorMessageTimeout = time.Second * 60
@@ -153,8 +153,8 @@ func TestEcWorkerPresign_ExecutionTimeout(t *testing.T) {
 	var numFailedWorkers uint32
 
 	for i := 0; i < n; i++ {
-		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), len(pIDs)-1, make([][]byte, 1), nil,
-			presignInputs[i])
+		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), len(pIDs)-1,
+			make([][]byte, 1), []string{"eth"}, presignInputs[i])
 
 		cfg := config.NewDefaultTimeoutConfig()
 		cfg.SigningJobTimeout = time.Second
@@ -206,8 +206,8 @@ func TestEcWorkerPresign_Threshold(t *testing.T) {
 	outputLock := &sync.Mutex{}
 
 	for i := 0; i < n; i++ {
-		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), threshold, make([][]byte, 1), nil,
-			presignInputs[i])
+		request := types.NewEcSigningRequest("Presign0", CopySortedPartyIds(pIDs), threshold,
+			make([][]byte, 1), []string{"eth"}, presignInputs[i])
 
 		cfg := config.NewDefaultTimeoutConfig()
 		cfg.MonitorMessageTimeout = time.Second * 60
