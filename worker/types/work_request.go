@@ -55,9 +55,9 @@ func NewEcSigningRequest(workId string, pIds tss.SortedPartyIDs, threshold int, 
 	return request
 }
 
-func NewEdKeygenRequest(keyType, workId string, pIds tss.SortedPartyIDs, threshold int) *WorkRequest {
+func NewEdKeygenRequest(workId string, pIds tss.SortedPartyIDs, threshold int) *WorkRequest {
 	request := baseRequest(EdKeygen, workId, len(pIds), threshold, pIds, 1)
-	request.KeygenType = keyType
+	request.KeygenType = "eddsa"
 
 	return request
 }

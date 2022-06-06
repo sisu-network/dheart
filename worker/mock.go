@@ -380,3 +380,21 @@ func LoadEdKeygenSavedData(pids tss.SortedPartyIDs) []*edkeygen.LocalPartySaveDa
 
 	return savedData
 }
+
+/////
+type MockMessageDispatcher struct {
+	BroadcastMessageFunc func(pIDs []*tss.PartyID, tssMessage *common.TssMessage)
+	UnicastMessageFunc   func(dest *tss.PartyID, tssMessage *common.TssMessage)
+}
+
+func (m *MockMessageDispatcher) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *common.TssMessage) {
+	if m.BroadcastMessageFunc != nil {
+		m.BroadcastMessageFunc(pIDs, tssMessage)
+	}
+}
+
+func (m *MockMessageDispatcher) UnicastMessage(dest *tss.PartyID, tssMessage *common.TssMessage) {
+	if m.UnicastMessageFunc != nil {
+		m.UnicastMessageFunc(dest, tssMessage)
+	}
+}

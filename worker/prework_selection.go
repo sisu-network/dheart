@@ -68,7 +68,7 @@ func NewPreworkSelection(request *types.WorkRequest, allParties []*tss.PartyID, 
 	db db.Database, preExecutionCache *enginecache.MessageCache, dispatcher interfaces.MessageDispatcher,
 	presignsManager corecomponents.AvailablePresigns, cfg config.TimeoutConfig, callback func(SelectionResult)) *PreworkSelection {
 
-	leader := chooseLeader(request.WorkId, request.AllParties)
+	leader := ChooseLeader(request.WorkId, request.AllParties)
 	return &PreworkSelection{
 		request:          request,
 		allParties:       allParties,
@@ -86,7 +86,7 @@ func NewPreworkSelection(request *types.WorkRequest, allParties []*tss.PartyID, 
 	}
 }
 
-func chooseLeader(workId string, parties []*tss.PartyID) *tss.PartyID {
+func ChooseLeader(workId string, parties []*tss.PartyID) *tss.PartyID {
 	keyStore := make(map[string]int)
 	sortedHashes := make([]string, len(parties))
 
