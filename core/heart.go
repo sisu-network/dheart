@@ -184,7 +184,13 @@ func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, result *htypes
 	clientRequest := h.keysignRequests[request.WorkId]
 	result.Request = clientRequest
 
-	h.client.PostKeysignResult(result)
+	err := h.client.PostKeysignResult(result)
+	if err != nil {
+		log.Error("Faield to post result back to sisu")
+	}
+
+	// Remove this request.
+	delete(h.keysignRequests, request.WorkId)
 }
 
 func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {

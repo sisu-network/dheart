@@ -4,7 +4,6 @@ import (
 	"github.com/sisu-network/dheart/client"
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/core/config"
-	"github.com/sisu-network/dheart/store"
 	"github.com/sisu-network/dheart/types"
 )
 
@@ -19,9 +18,9 @@ type Api interface {
 	Ping(source string)
 }
 
-func GetApi(cfg config.HeartConfig, store store.Store, client client.Client) Api {
+func GetApi(cfg config.HeartConfig, client client.Client) Api {
 	if cfg.UseOnMemory {
-		api := NewSingleNodeApi(client, store)
+		api := NewSingleNodeApi(client)
 		api.Init()
 		return api
 	} else {

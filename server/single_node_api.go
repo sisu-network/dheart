@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sisu-network/dheart/client"
-	"github.com/sisu-network/dheart/store"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/lib/log"
 
@@ -23,16 +22,14 @@ const (
 // generates a private key instead.
 type SingleNodeApi struct {
 	keyMap map[string]interface{}
-	store  store.Store
 	ecPriv *ecdsa.PrivateKey
 	c      client.Client
 }
 
-func NewSingleNodeApi(c client.Client, store store.Store) *SingleNodeApi {
+func NewSingleNodeApi(c client.Client) *SingleNodeApi {
 	return &SingleNodeApi{
 		keyMap: make(map[string]interface{}),
 		c:      c,
-		store:  store,
 	}
 }
 

@@ -98,15 +98,7 @@ func main() {
 		},
 	}
 
-	mockStore := &mock.MockStore{
-		GetEncryptedFunc: func(key []byte) (value []byte, err error) {
-			// private key of mnemonic "draft attract behave allow rib raise puzzle frost neck curtain gentle bless letter parrot hold century diet budget paper fetch hat vanish wonder maximum"
-			encodedPrivateKey := "9f575b88940d452da46a6ceec06a108fcd5863885524aec7fb0bc4906eb63ab1"
-			return hex.DecodeString(encodedPrivateKey)
-		},
-	}
-
-	api := server.NewSingleNodeApi(mockSisuClient, mockStore)
+	api := server.NewSingleNodeApi(mockSisuClient)
 	api.Init()
 	api.KeySign(request, nil)
 
