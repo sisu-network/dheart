@@ -107,6 +107,10 @@ func main() {
 	}
 
 	helper.LoadConfigEnv("../../../../.env")
+	for i := 0; i < n; i++ {
+		helper.ResetDb(i)
+	}
+	// Save mock keygen into db
 
 	keygenChs := make([]chan *types.KeygenResult, n)
 	keysignChs := make([]chan *types.KeysignResult, n)

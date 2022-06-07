@@ -16,7 +16,6 @@ port = 5679
   username = "root"
   password = "password"
   schema = "dheart1"
-  in-memory = true
   migration-path = "file://db/migrations/"
 [connection]
   host = "0.0.0.0"
