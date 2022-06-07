@@ -29,6 +29,10 @@ func (m *MockDatabase) Init() error {
 	return nil
 }
 
+func (m *MockDatabase) Close() error {
+	return nil
+}
+
 func (m *MockDatabase) SavePreparams(preparams *keygen.LocalPreParams) error {
 	return nil
 }

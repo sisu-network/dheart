@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -12,11 +13,14 @@ import (
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/sisu-network/lib/log"
 
+	"github.com/sisu-network/dheart/core/config"
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/test/e2e/fake-sisu/mock"
 	"github.com/sisu-network/dheart/test/e2e/helper"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
+	"github.com/sisu-network/dheart/worker"
 )
 
 type MockSisuNode struct {
@@ -97,6 +101,27 @@ func waitForDheartPings(pingChs []chan string) {
 	log.Info("Received all ping from all dheart instances")
 }
 
+func insertKeygenData(n, index int) {
+	cfg, err := config.ReadConfig(filepath.Join(fmt.Sprintf("./nodes/node%d", index), "dheart.toml"))
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("cfg = ", cfg)
+	database := db.NewDatabase(&cfg.Db)
+	err = database.Init()
+	if err != nil {
+		panic(err)
+	}
+
+	pids := worker.GetTestPartyIds(n)
+	keygenOutput := worker.LoadEdKeygenSavedData(pids)[index]
+	err = database.SaveEdKeygen("eddsa", "keygen0", pids, keygenOutput)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
 	var n int
 	flag.IntVar(&n, "n", 0, "Total nodes")
@@ -111,6 +136,9 @@ func main() {
 		helper.ResetDb(i)
 	}
 	// Save mock keygen into db
+	for i := 0; i < n; i++ {
+		insertKeygenData(n, i)
+	}
 
 	keygenChs := make([]chan *types.KeygenResult, n)
 	keysignChs := make([]chan *types.KeysignResult, n)

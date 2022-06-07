@@ -40,6 +40,7 @@ var (
 
 type Database interface {
 	Init() error
+	Close() error
 
 	SavePreparams(preparams *eckeygen.LocalPreParams) error
 	LoadPreparams() (*eckeygen.LocalPreParams, error)
@@ -229,6 +230,10 @@ func (d *SqlDatabase) Init() error {
 	return nil
 }
 
+func (d *SqlDatabase) Close() error {
+	return d.db.Close()
+}
+
 func (d *SqlDatabase) SavePreparams(preparams *eckeygen.LocalPreParams) error {
 	bz, err := json.Marshal(preparams)
 	if err != nil {
@@ -365,8 +370,8 @@ func (d *SqlDatabase) SavePresignData(workId string, pids []*tss.PartyID, presig
 	pidString := utils.GetPidString(pids)
 
 	// Constructs multi-insert query to do all insertion in 1 query.
-	query := "INSERT INTO presign (presign_id, work_id, pids_string, batch_index, status, presign_output) VALUES "
-	query = query + getQueryQuestionMark(len(presignOutputs), 6)
+	query := "INSERT INTO presign (presign_id, work_id, pids_string, status, presign_output) VALUES "
+	query = query + getQueryQuestionMark(len(presignOutputs), 5)
 
 	params := make([]interface{}, 0)
 	for i, output := range presignOutputs {
@@ -381,7 +386,6 @@ func (d *SqlDatabase) SavePresignData(workId string, pids []*tss.PartyID, presig
 		params = append(params, workId)
 		params = append(params, pidString)
 
-		params = append(params, i) // batch_index
 		params = append(params, PresignStatusNotUsed)
 
 		params = append(params, bz)
