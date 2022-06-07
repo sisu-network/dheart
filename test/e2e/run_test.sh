@@ -13,8 +13,8 @@ CUR_PATH=$(pwd)
 run_test() {
   echo "Running test in folder" $1
   cd $1
-  go run main.go -index 0 &
-  go run main.go -index 1 &
+  PROJECT_ID=$PROJECT_ID go run main.go -index 0 &
+  PROJECT_ID=$PROJECT_ID go run main.go -index 1 &
 
   echo "Waiting for all the jobs"
 

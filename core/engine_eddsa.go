@@ -1,7 +1,7 @@
 package core
 
 import (
-	"fmt"
+	"encoding/hex"
 	"math/big"
 
 	"github.com/decred/dcrd/dcrec/edwards/v2"
@@ -41,8 +41,7 @@ func (engine *defaultEngine) onEdSigningFinished(request *wtypes.WorkRequest, da
 	pubkey := edwards.NewPublicKey(myKeygen.EDDSAPub.X(), myKeygen.EDDSAPub.Y())
 	if !edwards.Verify(pubkey, request.Messages[0], new(big.Int).SetBytes(data[0].Signature.R),
 		new(big.Int).SetBytes(data[0].Signature.S)) {
-	} else {
-		fmt.Println("Signature Success!!", len(data[0].Signature.R), len(data[0].Signature.S))
+		log.Critical("EDDSA signing failed, msg hex = ", hex.EncodeToString(request.Messages[0]))
 	}
 
 	result := &htypes.KeysignResult{
