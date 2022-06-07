@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -9,14 +10,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/decred/dcrd/dcrec/edwards/v2"
+	libchain "github.com/sisu-network/lib/chain"
+
+	cardanobf "github.com/echovl/cardano-go/blockfrost"
+
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	"github.com/echovl/cardano-go"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/sisu-network/lib/log"
 
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
-	"github.com/sisu-network/dheart/test/e2e/fake-sisu/mock"
+	mock "github.com/sisu-network/dheart/test/e2e/app/sisu-mock"
 	"github.com/sisu-network/dheart/test/e2e/helper"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
@@ -44,9 +51,6 @@ func createNodes(index int, n int, keygenCh chan *types.KeygenResult, keysignCh 
 	}
 
 	privKey := p2p.GetAllSecp256k1PrivateKeys(n)[index]
-	peerId := p2p.P2PIDFromKey(privKey)
-	fmt.Println("peerId = ", peerId)
-	fmt.Println("pubkey = ", hex.EncodeToString(privKey.PubKey().Bytes()))
 
 	return &MockSisuNode{
 		server:  s,
@@ -116,10 +120,89 @@ func insertKeygenData(n, index int) {
 
 	pids := worker.GetTestPartyIds(n)
 	keygenOutput := worker.LoadEdKeygenSavedData(pids)[index]
-	err = database.SaveEdKeygen("eddsa", "keygen0", pids, keygenOutput)
+	err = database.SaveEdKeygen(libchain.KEY_TYPE_EDDSA, "keygen0", pids, keygenOutput)
 	if err != nil {
 		panic(err)
 	}
+}
+
+func getCardanoNode() cardano.Node {
+	projectId := os.Getenv("PROJECT_ID")
+	if len(projectId) == 0 {
+		panic("project id is empty")
+	}
+
+	node := cardanobf.NewNode(cardano.Testnet, projectId)
+	return node
+}
+
+func getCardanoTransferTransaction(node cardano.Node, sender cardano.Address) *cardano.Tx {
+	log.Info("Sender = ", sender)
+	receiver, err := cardano.NewAddress("addr_test1vqxyzpun2fpqafvkxxxceu5r8yh4dccy6xdcynnchd4dr7qtjh44z")
+	if err != nil {
+		panic(err)
+	}
+
+	tx, err := helper.BuildTx(node, cardano.Testnet, sender, receiver, cardano.NewValue(1e6))
+	if err != nil {
+		panic(err)
+	}
+
+	return tx
+}
+
+func doKeysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey,
+	keysignChs []chan *types.KeysignResult, publicKeyBytes []byte, message []byte) []byte {
+	n := len(nodes)
+	wg := new(sync.WaitGroup)
+	wg.Add(n)
+
+	for i := 0; i < len(nodes); i++ {
+		request := &types.KeysignRequest{
+			KeyType: libchain.KEY_TYPE_EDDSA,
+			KeysignMessages: []*types.KeysignMessage{
+				{
+					Id:          "Keysign0",
+					OutChain:    "cardano-testnet",
+					OutHash:     hex.EncodeToString(message),
+					BytesToSign: message,
+				},
+			},
+		}
+
+		nodes[i].client.KeySign(request, tendermintPubKeys)
+	}
+
+	results := make([]*types.KeysignResult, n)
+	for i := 0; i < n; i++ {
+		go func(index int) {
+			result := <-keysignChs[index]
+			results[index] = result
+			wg.Done()
+		}(i)
+	}
+
+	wg.Wait()
+
+	for i := 0; i < n; i++ {
+		if bytes.Compare(results[i].Signatures[0], results[0].Signatures[0]) != 0 {
+			panic("Signature does not match")
+		}
+	}
+
+	return results[0].Signatures[0]
+}
+
+func submitTx(node cardano.Node, tx *cardano.Tx, pubkey *edwards.PublicKey, signature []byte) {
+	for i := range tx.WitnessSet.VKeyWitnessSet {
+		tx.WitnessSet.VKeyWitnessSet[i] = cardano.VKeyWitness{VKey: pubkey.Serialize(), Signature: signature}
+	}
+
+	hash, err := node.SubmitTx(tx)
+	if err != nil {
+		panic(err)
+	}
+	log.Info("Hash = ", hash)
 }
 
 func main() {
@@ -162,4 +245,21 @@ func main() {
 
 	// Set private keys
 	bootstrapNetwork(nodes)
+
+	pids := worker.GetTestPartyIds(2)
+	myKeygen := worker.LoadEdKeygenSavedData(pids)[0]
+
+	pubkey := edwards.NewPublicKey(myKeygen.EDDSAPub.X(), myKeygen.EDDSAPub.Y())
+	address := utils.GetAddressFromCardanoPubkey(pubkey.Serialize())
+	log.Info("sender address = ", address)
+
+	node := getCardanoNode()
+	tx := getCardanoTransferTransaction(node, address)
+	message, err := tx.Hash()
+	if err != nil {
+		panic(err)
+	}
+
+	signature := doKeysign(nodes, tendermintPubKeys, keysignChs, pubkey.Serialize(), message)
+	submitTx(node, tx, pubkey, signature)
 }

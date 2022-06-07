@@ -3,10 +3,13 @@ package core
 import (
 	"bytes"
 	"encoding/hex"
+
 	"fmt"
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	libchain "github.com/sisu-network/lib/chain"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
@@ -333,20 +336,32 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	}
 
 	// TODO: Load multiple input here.
-	presignInput, err := h.db.LoadEcKeygen(req.KeyType)
-	if err != nil {
-		return err
-	}
-	workRequest := types.NewEcSigningRequest(
-		workId,
-		sorted,
-		utils.GetThreshold(sorted.Len()),
-		signMessages,
-		chains,
-		presignInput,
-	)
+	var workRequest *types.WorkRequest
+	switch req.KeyType {
+	case libchain.KEY_TYPE_ECDSA:
+		presignInput, err := h.db.LoadEcKeygen(req.KeyType)
+		if err != nil {
+			return err
+		}
+		workRequest = types.NewEcSigningRequest(
+			workId,
+			sorted,
+			utils.GetThreshold(sorted.Len()),
+			signMessages,
+			chains,
+			presignInput,
+		)
+	case libchain.KEY_TYPE_EDDSA:
+		keygenData, err := h.db.LoadEdKeygen(req.KeyType)
+		if err != nil {
+			return nil
+		}
 
-	err = h.engine.AddRequest(workRequest)
+		workRequest = types.NewEdSigningRequest(workId, sorted, utils.GetThreshold(sorted.Len()),
+			signMessages, chains, keygenData)
+	}
+
+	err := h.engine.AddRequest(workRequest)
 
 	h.keysignRequests[workRequest.WorkId] = req
 

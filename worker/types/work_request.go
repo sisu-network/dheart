@@ -63,7 +63,8 @@ func NewEdKeygenRequest(workId string, pIds tss.SortedPartyIDs, threshold int) *
 }
 
 func NewEdSigningRequest(workId string, pIds tss.SortedPartyIDs, threshold int, messages [][]byte,
-	chains []string, inputs *edkeygen.LocalPartySaveData, batchSize int) *WorkRequest {
+	chains []string, inputs *edkeygen.LocalPartySaveData) *WorkRequest {
+	batchSize := len(messages)
 	request := baseRequest(EdSigning, workId, len(pIds), threshold, pIds, batchSize)
 	request.EdSigningInput = inputs
 	request.Messages = messages

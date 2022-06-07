@@ -65,7 +65,7 @@ func doKeysign(pids tss.SortedPartyIDs, index int, engine core.Engine, message [
 	workId := "keysign0"
 	threshold := utils.GetThreshold(len(pids))
 	request := wtypes.NewEdSigningRequest(workId, pids, threshold, [][]byte{message},
-		[]string{"eth"}, keygenData, 1)
+		[]string{"eth"}, keygenData)
 
 	err := engine.AddRequest(request)
 	if err != nil {
@@ -131,6 +131,7 @@ func main() {
 	}
 
 	doKeysign(pids, index, engine, message, myKeygen)
+
 	select {
 	case result := <-keysignch:
 		if result.Outcome != types.OutcomeSuccess {

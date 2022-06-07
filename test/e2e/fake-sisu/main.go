@@ -26,7 +26,7 @@ import (
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/joho/godotenv"
 	"github.com/sisu-network/dheart/p2p"
-	"github.com/sisu-network/dheart/test/e2e/fake-sisu/mock"
+	mock "github.com/sisu-network/dheart/test/e2e/app/sisu-mock"
 	"github.com/sisu-network/dheart/test/e2e/helper"
 	"github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/utils"
