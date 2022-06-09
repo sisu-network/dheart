@@ -180,7 +180,7 @@ func keygen(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keygenChs 
 		if results[i].Address != results[0].Address {
 			panic(fmt.Sprintf("Node %d has different address %s", i, results[i].Address))
 		}
-		if bytes.Compare(results[i].EcdsaPubkey.X.Bytes(), results[0].EcdsaPubkey.X.Bytes()) != 0 {
+		if bytes.Compare(results[i].PubKeyBytes, results[0].PubKeyBytes) != 0 {
 			panic(fmt.Sprintf("Node %d has different pubkey bytes", i))
 		}
 	}
@@ -364,8 +364,7 @@ func main() {
 	log.Info("All keygen tasks finished")
 
 	// Test keysign.
-	publicKeyBytes := crypto.FromECDSAPub(keygenResult.EcdsaPubkey)
-	txs := keysign(nodes, tendermintPubKeys, keysignChs, publicKeyBytes, libchain.GetChainIntFromId(TEST_CHAIN))
+	txs := keysign(nodes, tendermintPubKeys, keysignChs, keygenResult.PubKeyBytes, libchain.GetChainIntFromId(TEST_CHAIN))
 	log.Info("Finished all keysign!")
 
 	deploySignedTx(keygenResult, txs)

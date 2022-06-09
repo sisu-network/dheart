@@ -71,20 +71,21 @@ func (api *SingleNodeApi) KeyGen(keygenId string, keyType string, tPubKeys []typ
 		case libchain.KEY_TYPE_ECDSA:
 			pubKey := api.ecPrivate.Public()
 			publicKeyECDSA, _ := pubKey.(*ecdsa.PublicKey)
+			publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
 			address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
 
 			result = types.KeygenResult{
 				KeyType:     keyType,
 				Outcome:     types.OutcomeSuccess,
 				Address:     address,
-				EcdsaPubkey: publicKeyECDSA,
+				PubKeyBytes: publicKeyBytes,
 			}
 		case libchain.KEY_TYPE_EDDSA:
 			api.edPrivate, _ = edwards.GeneratePrivateKey()
 			result = types.KeygenResult{
 				KeyType:     keyType,
 				Outcome:     types.OutcomeSuccess,
-				EddsaPubkey: api.edPrivate.PubKey(),
+				PubKeyBytes: api.edPrivate.PubKey().Serialize(),
 			}
 		}
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"encoding/hex"
 
 	"math/rand"
@@ -156,7 +157,12 @@ func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, 
 	switch result.Outcome {
 	case htypes.OutcomeSuccess:
 		for i, msg := range messages {
-			pk := keygenResult.EcdsaPubkey
+			x, y := elliptic.Unmarshal(tss.EC("ecdsa"), keygenResult.PubKeyBytes)
+			pk := ecdsa.PublicKey{
+				Curve: tss.EC("ecdsa"),
+				X:     x,
+				Y:     y,
+			}
 
 			sig := result.Signatures[i]
 			if len(sig) != 65 {
@@ -168,7 +174,7 @@ func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, 
 			r := sig[:32]
 			s := sig[32:]
 
-			verifySignature(pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
+			verifySignature(&pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
 		}
 
 		log.Info("Signing succeeded!")
