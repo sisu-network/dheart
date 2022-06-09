@@ -29,7 +29,7 @@ func (engine *defaultEngine) onEcKeygenFinished(request *types.WorkRequest, outp
 	// Make a callback and start next work.
 	result := htypes.KeygenResult{
 		KeyType:     request.KeygenType,
-		EcdsaPubkey: &publicKeyECDSA,
+		PubKeyBytes: publicKeyBytes,
 		Outcome:     htypes.OutcomeSuccess,
 		Address:     address,
 	}

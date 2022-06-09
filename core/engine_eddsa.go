@@ -20,7 +20,7 @@ func (engine *defaultEngine) onEdKeygenFinished(request *wtypes.WorkRequest, out
 	// Make a callback and start next work.
 	result := types.KeygenResult{
 		KeyType:     request.KeygenType,
-		EddsaPubkey: pubkey,
+		PubKeyBytes: pubkey.Serialize(),
 		Outcome:     types.OutcomeSuccess,
 		Address:     utils.GetAddressFromCardanoPubkey(pubkey.Serialize()).String(),
 	}
