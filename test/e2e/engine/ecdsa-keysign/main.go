@@ -8,7 +8,6 @@ import (
 
 	ipfslog "github.com/ipfs/go-log"
 
-	"crypto/elliptic"
 	"flag"
 	"fmt"
 	"math/big"
@@ -157,12 +156,7 @@ func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, 
 	switch result.Outcome {
 	case htypes.OutcomeSuccess:
 		for i, msg := range messages {
-			x, y := elliptic.Unmarshal(tss.EC(tss.EcdsaScheme), keygenResult.PubKeyBytes)
-			pk := ecdsa.PublicKey{
-				Curve: tss.EC(tss.EcdsaScheme),
-				X:     x,
-				Y:     y,
-			}
+			pk := keygenResult.EcdsaPubkey
 
 			sig := result.Signatures[i]
 			if len(sig) != 65 {
@@ -174,7 +168,7 @@ func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, 
 			r := sig[:32]
 			s := sig[32:]
 
-			verifySignature(&pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
+			verifySignature(pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
 		}
 
 		log.Info("Signing succeeded!")
