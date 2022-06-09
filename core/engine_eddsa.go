@@ -15,13 +15,12 @@ import (
 )
 
 func (engine *defaultEngine) onEdKeygenFinished(request *wtypes.WorkRequest, output *edkeygen.LocalPartySaveData) {
-	bz := output.EDDSAPub.Bytes()
 	pubkey := edwards.NewPublicKey(output.EDDSAPub.X(), output.EDDSAPub.Y())
 
 	// Make a callback and start next work.
 	result := types.KeygenResult{
 		KeyType:     request.KeygenType,
-		PubKeyBytes: bz,
+		EddsaPubkey: pubkey,
 		Outcome:     types.OutcomeSuccess,
 		Address:     utils.GetAddressFromCardanoPubkey(pubkey.Serialize()).String(),
 	}
