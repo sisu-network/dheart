@@ -125,7 +125,7 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 		if libchain.IsETHBasedChain(msg.OutChain) {
 			signature, err = api.keySignEth(msg.OutChain, msg.BytesToSign)
 		} else if libchain.IsCardanoChain(msg.OutChain) {
-			signature, err = api.keySignEth(msg.OutChain, msg.BytesToSign)
+			signature, err = api.keySignCardano(msg.OutChain, msg.BytesToSign)
 		} else {
 			err = fmt.Errorf("Unknown chain: %s for message at index %d", msg.OutChain, i)
 		}
