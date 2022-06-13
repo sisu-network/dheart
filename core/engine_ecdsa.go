@@ -50,5 +50,9 @@ func (engine *defaultEngine) onEcSigningFinished(request *types.WorkRequest, dat
 		Signatures: signatures,
 	}
 
+	for _, sig := range signatures {
+		log.Debugf("Signature = %s, length signature = ", string(sig), len(sig))
+	}
+
 	engine.callback.OnWorkSigningFinished(request, result)
 }
