@@ -361,7 +361,7 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 			presignInput,
 		)
 	case libchain.KEY_TYPE_EDDSA:
-		log.Debug("This is keysign for type ", libchain.KEY_TYPE_ECDSA)
+		log.Debug("This is keysign for type ", libchain.KEY_TYPE_EDDSA)
 		keygenData, err := h.db.LoadEdKeygen(req.KeyType)
 		if err != nil {
 			return nil
