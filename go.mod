@@ -23,7 +23,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/sisu-network/lib v0.0.1-alpha9.0.20220607090913-7a74c077ee70
 	github.com/sisu-network/tss-lib v0.1.3-0.20220602042956-0a991a4b5046
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
@@ -146,7 +146,7 @@ require (
 
 replace (
 	github.com/agl/ed25519 => github.com/binance-chain/edwards25519 v0.0.0-20200305024217-f36fc4b53d43
-	github.com/echovl/cardano-go => github.com/sisu-network/cardano-go v0.1.12-fork
+	github.com/echovl/cardano-go => github.com/sisu-network/cardano-go v0.1.13-0.20220613071927-adeae695a9ef
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	google.golang.org/grpc => google.golang.org/grpc v1.33.2
 )
