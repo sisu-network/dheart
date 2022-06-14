@@ -38,10 +38,12 @@ func (engine *defaultEngine) onEcKeygenFinished(request *types.WorkRequest, outp
 }
 
 func (engine *defaultEngine) onEcSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature) {
+	log.Debug("length of data = ", len(data))
 	log.Info("Signing finished for Ecdsa workId ", request.WorkId)
 
 	signatures := make([][]byte, len(data))
-	for i := range data {
+	for i, sig := range data {
+		signatures[i] = append(sig.R, sig.S...)
 		signatures[i] = append(signatures[i], data[i].SignatureRecovery[0])
 	}
 
@@ -51,7 +53,7 @@ func (engine *defaultEngine) onEcSigningFinished(request *types.WorkRequest, dat
 	}
 
 	for _, sig := range signatures {
-		log.Debugf("Signature = %s, length signature = ", string(sig), len(sig))
+		log.Debugf("Signature = %s, length signature = %d ", string(sig), len(sig))
 	}
 
 	engine.callback.OnWorkSigningFinished(request, result)

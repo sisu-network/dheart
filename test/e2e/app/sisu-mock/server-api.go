@@ -40,7 +40,7 @@ func (a *ApiHandler) KeygenResult(result *types.KeygenResult) bool {
 }
 
 func (a *ApiHandler) KeysignResult(result *types.KeysignResult) {
-	log.Info("There is keysign result")
+	log.Info("There is keysign result, success = ", result.Outcome)
 
 	if a.keysignCh != nil {
 		a.keysignCh <- result
