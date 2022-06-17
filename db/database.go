@@ -519,8 +519,6 @@ func (d *SqlDatabase) UpdatePresignStatus(presignIds []string) error {
 		interfaceArr[i+1] = presignId
 	}
 
-	log.Verbose("UpdatePresignStatus: query = ", query)
-
 	_, err := d.db.Exec(query, interfaceArr...)
 	return err
 }
