@@ -175,7 +175,7 @@ func runJobs(t *testing.T, jobs []*Job, cbs []*MockJobCallback, checkJobSuccess 
 
 	wg.Wait()
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 50; i++ {
 		allDone := true
 		for _, job := range jobs {
 			if !job.isDone() {
