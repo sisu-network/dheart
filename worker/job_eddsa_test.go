@@ -14,7 +14,8 @@ import (
 func TestEdJob_Keygen(t *testing.T) {
 	t.Parallel()
 
-	n := 15
+	// Change this to 15 when re-generating & saving keygen output
+	n := 6
 	threshold := 1
 	jobs := make([]*Job, n)
 	cbs := make([]*MockJobCallback, n)
