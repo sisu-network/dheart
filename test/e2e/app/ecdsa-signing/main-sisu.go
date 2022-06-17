@@ -271,7 +271,6 @@ func main() {
 	pids := worker.GetTestPartyIds(n)
 	myKeygen := worker.LoadEcKeygenSavedData(pids)[0]
 
-	log.Debug("start testing ecdsa keysign ...")
 	doKeysign(nodes, tendermintPubKeys, keysignChs, myKeygen.ECDSAPub.Bytes(),
 		libchain.GetChainIntFromId(TEST_CHAIN))
 }

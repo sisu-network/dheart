@@ -502,7 +502,6 @@ func (d *SqlDatabase) LoadPresignStatus(presignIds []string) ([]string, error) {
 		results = append(results, status)
 	}
 
-	log.Debug("load presign status result = ", results)
 	return results, nil
 }
 

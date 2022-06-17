@@ -303,10 +303,8 @@ func (h *Heart) Keygen(keygenId string, keyType string, tPubKeys []ctypes.PubKey
 	var request *types.WorkRequest
 	switch keyType {
 	case libchain.KEY_TYPE_ECDSA:
-		log.Debug("this is keygen for type ", libchain.KEY_TYPE_ECDSA)
 		request = types.NewEcKeygenRequest(keyType, workId, sorted, utils.GetThreshold(n), nil)
 	case libchain.KEY_TYPE_EDDSA:
-		log.Debug("this is keygen for type ", libchain.KEY_TYPE_EDDSA)
 		request = types.NewEdKeygenRequest(workId, sorted, utils.GetThreshold(n))
 	}
 
@@ -347,7 +345,6 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	var workRequest *types.WorkRequest
 	switch req.KeyType {
 	case libchain.KEY_TYPE_ECDSA:
-		log.Debug("This is keysign for type ", libchain.KEY_TYPE_ECDSA)
 		presignInput, err := h.db.LoadEcKeygen(req.KeyType)
 		if err != nil {
 			return err
@@ -361,7 +358,6 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 			presignInput,
 		)
 	case libchain.KEY_TYPE_EDDSA:
-		log.Debug("This is keysign for type ", libchain.KEY_TYPE_EDDSA)
 		keygenData, err := h.db.LoadEdKeygen(req.KeyType)
 		if err != nil {
 			return nil

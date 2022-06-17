@@ -161,8 +161,9 @@ func TestEngine_DelayStart(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
+		msg := []byte("Testmessage")
 		request := types.NewEcSigningRequest(workId, worker.CopySortedPartyIds(pIDs), n-1,
-			make([][]byte, 1), []string{"ganache1"}, savedData[i])
+			[][]byte{msg}, []string{"ganache1"}, savedData[i])
 
 		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simulate that different workers can start at different times.
@@ -216,8 +217,9 @@ func TestEngine_SendDuplicateMessage(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
+		msg := []byte("Testmessage")
 		request := types.NewEcSigningRequest(workId, worker.CopySortedPartyIds(pIDs), n-1,
-			make([][]byte, 1), []string{"ganache1"}, savedData[i])
+			[][]byte{msg}, []string{"ganache1"}, savedData[i])
 
 		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simulate that different workers can start at different times.
@@ -329,8 +331,9 @@ func TestEngine_MissingMessages(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewEcSigningRequest(workId, worker.CopySortedPartyIds(pIDs), n-1, make([][]byte, 1),
-			[]string{"ganache"}, savedData[i])
+		msg := []byte("Testmessage")
+		request := types.NewEcSigningRequest(workId, worker.CopySortedPartyIds(pIDs), n-1,
+			[][]byte{msg}, []string{"ganache"}, savedData[i])
 
 		go func(engine Engine, request *types.WorkRequest) {
 			engine.AddRequest(request)

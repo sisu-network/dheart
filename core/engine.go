@@ -297,8 +297,6 @@ func (engine *defaultEngine) BroadcastMessage(pIDs []*tss.PartyID, tssMessage *c
 
 	// Add this to the cache if it's an update message.
 	engine.cacheWorkMsg(signedMsg)
-
-	log.HighVerbose("Broadcasting signed message")
 	engine.sendSignMessaged(signedMsg, pIDs)
 }
 
@@ -316,8 +314,6 @@ func (engine *defaultEngine) UnicastMessage(dest *tss.PartyID, tssMessage *commo
 
 	// Add this to the cache if it's an update message.
 	engine.cacheWorkMsg(signedMsg)
-
-	log.HighVerbose("Unicasting signed message")
 	engine.sendSignMessaged(signedMsg, []*tss.PartyID{dest})
 }
 

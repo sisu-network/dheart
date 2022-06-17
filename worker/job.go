@@ -291,7 +291,7 @@ func (job *Job) startListening() {
 	}
 }
 
-// Add padding bytes to Ecdsa signature
+// Add padding bytes to Ecdsa signature for ETH based chains.
 func (job *Job) padEcSignature(sigData *ecsigning.SignatureData) {
 	if libchain.IsETHBasedChain(job.chain) {
 		bitSizeInBytes := tss.EC(tss.EcdsaScheme).Params().BitSize / 8
