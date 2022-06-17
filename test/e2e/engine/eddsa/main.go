@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"math/rand"
 	"os"
 	"time"
 
@@ -23,17 +22,6 @@ import (
 	edkeygen "github.com/sisu-network/tss-lib/eddsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 )
-
-func randByteArray(n int, seed int) []byte {
-	rand.Seed(int64(seed))
-
-	bz := make([]byte, n)
-	for i := 0; i < n; i++ {
-		bz[i] = byte(rand.Intn(256))
-	}
-
-	return bz
-}
 
 func getCardanoNode() cardano.Node {
 	projectId := os.Getenv("PROJECT_ID")
