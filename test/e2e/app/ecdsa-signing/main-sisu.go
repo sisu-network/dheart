@@ -2,16 +2,16 @@ package main
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/crypto"
 
 	libchain "github.com/sisu-network/lib/chain"
 
@@ -116,7 +116,6 @@ func insertKeygenData(n, index int) {
 		panic(err)
 	}
 
-	fmt.Println("cfg = ", cfg)
 	database := db.NewDatabase(&cfg.Db)
 	err = database.Init()
 	if err != nil {
@@ -186,15 +185,18 @@ func doKeysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysign
 
 	signedTxs := make([]*etypes.Transaction, len(results[0].Signatures))
 	for j := 0; j < len(results[0].Signatures); j++ {
-		log.Debug("Signature after signing = ", results[0].Signatures[j])
+		log.Info("Signature after signing = ", results[0].Signatures[j])
 		sigPublicKey, err := crypto.Ecrecover(hashBytes, results[0].Signatures[j])
 		if err != nil {
 			panic(err)
 		}
+
+		sigPublicKey = sigPublicKey[1:]
+
 		matches := bytes.Equal(sigPublicKey, publicKeyBytes)
 		if !matches {
-			log.Error("sigPublicKey = ", base64.StdEncoding.EncodeToString(sigPublicKey))
-			log.Error("publicKeyBytes = ", base64.StdEncoding.EncodeToString(publicKeyBytes))
+			log.Error("sigPublicKey = ", hex.EncodeToString(sigPublicKey))
+			log.Error("publicKeyBytes = ", hex.EncodeToString(publicKeyBytes))
 			panic("Reconstructed pubkey does not match pubkey")
 		} else {
 			log.Info("Signature matched")
@@ -209,6 +211,20 @@ func doKeysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysign
 	}
 
 	return signedTxs
+}
+
+func generateEthTx() *etypes.Transaction {
+	nonce := 0
+
+	value := big.NewInt(100000000000000000) // in wei (0.1 eth)
+	gasLimit := uint64(8_000_000)           // in units
+	gasPrice := big.NewInt(100000000)
+
+	toAddress := common.HexToAddress("0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d")
+	var data []byte
+	rawTx := etypes.NewTransaction(uint64(nonce), toAddress, value, gasLimit, gasPrice, data)
+
+	return rawTx
 }
 
 func main() {
@@ -252,23 +268,10 @@ func main() {
 	// Set private keys
 	bootstrapNetwork(nodes)
 
-	pids := worker.GetTestPartyIds(2)
+	pids := worker.GetTestPartyIds(n)
 	myKeygen := worker.LoadEcKeygenSavedData(pids)[0]
 
 	log.Debug("start testing ecdsa keysign ...")
-	doKeysign(nodes, tendermintPubKeys, keysignChs, myKeygen.ECDSAPub.Bytes(), libchain.GetChainIntFromId(TEST_CHAIN))
-}
-
-func generateEthTx() *etypes.Transaction {
-	nonce := 0
-
-	value := big.NewInt(100000000000000000) // in wei (0.1 eth)
-	gasLimit := uint64(8_000_000)           // in units
-	gasPrice := big.NewInt(100000000)
-
-	toAddress := common.HexToAddress("0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d")
-	var data []byte
-	rawTx := etypes.NewTransaction(uint64(nonce), toAddress, value, gasLimit, gasPrice, data)
-
-	return rawTx
+	doKeysign(nodes, tendermintPubKeys, keysignChs, myKeygen.ECDSAPub.Bytes(),
+		libchain.GetChainIntFromId(TEST_CHAIN))
 }

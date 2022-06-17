@@ -111,7 +111,6 @@ func insertKeygenData(n, index int) {
 		panic(err)
 	}
 
-	fmt.Println("cfg = ", cfg)
 	database := db.NewDatabase(&cfg.Db)
 	err = database.Init()
 	if err != nil {
