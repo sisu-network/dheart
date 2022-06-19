@@ -56,11 +56,6 @@ type WorkerExecutor struct {
 
 	// A map between of rounds and list of messages that have been produced. The size of the list
 	// is the same as batchSize.
-	//
-	// key: one of the 2 values
-	//      - round if a message is broadcast
-	//      - round-partyId if a message is unicast
-	// value: list of messages that have been produced for the round.
 	jobOutput     map[string][]tss.Message
 	jobOutputLock *sync.RWMutex
 
@@ -94,10 +89,19 @@ func NewWorkerExecutor(
 		ecPresignOutput = make([]*ecsigning.SignatureData_OneRoundData, request.BatchSize)
 	}
 
+	// Make a copy of my pid and assign correct index to it to avoid race condition.
+	copy := tss.NewPartyID(myPid.Id, myPid.Moniker, myPid.KeyInt())
+	// Assign the correct index for our pid.
+	for _, p := range pids {
+		if myPid.Id == p.Id {
+			copy.Index = p.Index
+		}
+	}
+
 	return &WorkerExecutor{
 		request:         request,
 		workType:        workType,
-		myPid:           myPid,
+		myPid:           copy,
 		pIDs:            pids,
 		pIDsMap:         pIDsMap,
 		dispatcher:      dispatcher,
@@ -107,13 +111,10 @@ func NewWorkerExecutor(
 		jobsLock:        &sync.RWMutex{},
 		jobOutputLock:   &sync.RWMutex{},
 		finalOutputLock: &sync.RWMutex{},
-		// ecKeygenOutputs:  make([]*eckeygen.LocalPartySaveData, request.BatchSize),
-		// ecPresignOutputs: make([]*ecsigning.SignatureData_OneRoundData, request.BatchSize),
-		// ecSigningOutputs: make([]*libCommon.ECSignature, request.BatchSize),
-		jobResults: make([]*JobResult, request.BatchSize),
-		jobOutput:  make(map[string][]tss.Message),
-		isStopped:  *atomic.NewBool(false),
-		cfg:        cfg,
+		jobResults:      make([]*JobResult, request.BatchSize),
+		jobOutput:       make(map[string][]tss.Message),
+		isStopped:       *atomic.NewBool(false),
+		cfg:             cfg,
 	}
 }
 
@@ -130,18 +131,8 @@ func (w *WorkerExecutor) Init() (err error) {
 	go w.messageMonitor.Start()
 
 	p2pCtx := tss.NewPeerContext(w.pIDs)
-
-	// Assign the correct index for our pid.
-	for _, p := range w.pIDs {
-		if w.myPid.Id == p.Id {
-			w.myPid.Index = p.Index
-		}
-	}
-
 	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.request.Threshold)
-
 	batchSize := w.request.BatchSize
-
 	jobs := make([]*Job, batchSize)
 	log.Info("batchSize = ", batchSize)
 	log.Info("WorkerExecutor WorkType = ", w.workType)

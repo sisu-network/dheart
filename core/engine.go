@@ -149,16 +149,16 @@ func (engine *defaultEngine) AddRequest(request *types.WorkRequest) error {
 func (engine *defaultEngine) startWork(request *types.WorkRequest) {
 	var w worker.Worker
 	// Make a copy of myPid since the index will be changed during the TSS work.
-	workPartyId := tss.NewPartyID(engine.myPid.Id, engine.myPid.Moniker, engine.myPid.KeyInt())
+	myPid := tss.NewPartyID(engine.myPid.Id, engine.myPid.Moniker, engine.myPid.KeyInt())
 
 	// Create a new worker.
 	switch request.WorkType {
 	case types.EcKeygen, types.EdKeygen:
-		w = worker.NewKeygenWorker(request, workPartyId, engine, engine.db, engine,
+		w = worker.NewKeygenWorker(request, myPid, engine, engine.db, engine,
 			engine.config)
 
 	case types.EcSigning, types.EdSigning:
-		w = worker.NewSigningWorker(request, workPartyId, engine, engine.db, engine,
+		w = worker.NewSigningWorker(request, myPid, engine, engine.db, engine,
 			engine.config, MaxBatchSize, engine.presignsManager)
 	}
 
