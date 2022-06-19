@@ -33,7 +33,7 @@ func TestEdJob_Keygen(t *testing.T) {
 	for i := 0; i < n; i++ {
 		p2pCtx := tss.NewPeerContext(pIDs)
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
-		jobs[i] = NewEdKeygenJob("Keygen0", i, pIDs, params, cbs[i], time.Second*15)
+		jobs[i] = NewEdKeygenJob("Keygen0", i, pIDs, params, cbs[i], time.Second*60)
 	}
 
 	runJobs(t, jobs, cbs, true)
