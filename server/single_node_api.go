@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/sisu-network/dheart/utils"
 	"time"
 
 	"github.com/decred/dcrd/dcrec/edwards/v2"
@@ -86,6 +87,7 @@ func (api *SingleNodeApi) KeyGen(keygenId string, keyType string, tPubKeys []typ
 				KeyType:     keyType,
 				Outcome:     types.OutcomeSuccess,
 				PubKeyBytes: api.edPrivate.PubKey().Serialize(),
+				Address:     utils.GetAddressFromCardanoPubkey(api.edPrivate.PubKey().Serialize()).String(),
 			}
 		}
 
