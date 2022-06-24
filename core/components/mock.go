@@ -1,7 +1,7 @@
 package components
 
 import (
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 )
 
@@ -10,7 +10,7 @@ import (
 type MockAvailablePresigns struct {
 	LoadFunc                 func() error
 	GetAvailablePresignsFunc func(batchSize int, n int, allPids map[string]*tss.PartyID) ([]string, []*tss.PartyID)
-	AddPresignFunc           func(workId string, partyIds []*tss.PartyID, presignOutputs []*presign.LocalPresignData)
+	AddPresignFunc           func(workId string, partyIds []*tss.PartyID, presignOutputs []*ecsigning.SignatureData_OneRoundData)
 }
 
 func NewMockAvailablePresigns() AvailablePresigns {
@@ -33,7 +33,7 @@ func (m *MockAvailablePresigns) GetAvailablePresigns(batchSize int, n int, allPi
 	return nil, nil
 }
 
-func (m *MockAvailablePresigns) AddPresign(workId string, partyIds []*tss.PartyID, presignOutputs []*presign.LocalPresignData) {
+func (m *MockAvailablePresigns) AddPresign(workId string, partyIds []*tss.PartyID, presignOutputs []*ecsigning.SignatureData_OneRoundData) {
 	if m.AddPresignFunc != nil {
 		m.AddPresignFunc(workId, partyIds, presignOutputs)
 	}

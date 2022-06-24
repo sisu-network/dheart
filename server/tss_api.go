@@ -39,7 +39,7 @@ func (api *TssApi) KeyGen(keygenId string, chain string, keyWrappers []types.Pub
 		return fmt.Errorf("invalid keys array cannot be empty")
 	}
 
-	log.Info("There is a keygen request ", keygenId, chain)
+	log.Infof("keygenId = %s, keyType = %s\n", keygenId, chain)
 
 	pubKeys := make([]ctypes.PubKey, len(keyWrappers))
 

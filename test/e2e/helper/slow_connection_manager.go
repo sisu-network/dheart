@@ -33,7 +33,7 @@ func (scm *SlowConnectionManager) WriteToStream(pID peer.ID, protocolId protocol
 
 	rd, _ := rand.Int(rand.Reader, big.NewInt(100))
 	if rd.Int64()%2 == 0 {
-		log.Debug("Drop broadcast message with type ", signedMsg.TssMessage.Type)
+		log.Verbose("Drop broadcast message with type ", signedMsg.TssMessage.Type)
 		return nil
 	}
 

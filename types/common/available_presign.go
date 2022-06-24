@@ -1,10 +1,10 @@
 package common
 
-import "github.com/sisu-network/tss-lib/ecdsa/presign"
+import ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 
 type AvailablePresign struct {
 	PresignId  string
 	PidsString string
 	Pids       []string
-	Output     *presign.LocalPresignData
+	Output     *ecsigning.SignatureData_OneRoundData
 }

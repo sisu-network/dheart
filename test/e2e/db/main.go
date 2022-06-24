@@ -8,7 +8,7 @@ import (
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
 
 	libchain "github.com/sisu-network/lib/chain"
@@ -35,13 +35,13 @@ func testInsertingKeygenData(database db.Database) {
 	}
 
 	// Write data
-	err := database.SaveKeygenData(libchain.GetKeygenType(chain), workId, pids, output)
+	err := database.SaveEcKeygen(libchain.GetKeygenType(chain), workId, pids, output[0])
 	if err != nil {
 		panic(err)
 	}
 
 	// Read data and do sanity check
-	loaded, err := database.LoadKeygenData(libchain.GetKeyTypeForChain(chain))
+	loaded, err := database.LoadEcKeygen(libchain.GetKeyTypeForChain(chain))
 	if err != nil {
 		panic(err)
 	}
@@ -67,7 +67,7 @@ func testInsertingPresignData(database db.Database) {
 			},
 		},
 	}
-	output := []*presign.LocalPresignData{
+	output := []*ecsigning.SignatureData_OneRoundData{
 		{
 			PartyId: "part1",
 		},

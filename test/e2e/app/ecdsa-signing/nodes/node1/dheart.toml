@@ -1,0 +1,28 @@
+# This is a TOML config file.
+# For more information, see https://github.com/toml-lang/toml
+
+home-dir = "/root/"
+use-on-memory = false
+shortcut-preparams = true
+sisu-server-url = "http://127.0.0.1:25457"
+port = 5679
+
+###############################################################################
+###                        Database Configuration                           ###
+###############################################################################
+[db]
+  host = "127.0.0.1"
+  port = 3306
+  username = "root"
+  password = "password"
+  schema = "dheart1"
+  migration-path = "file://db/migrations/"
+[connection]
+  host = "0.0.0.0"
+  port = 28301
+  rendezvous = "rendezvous"
+
+[[connection.peers]]
+	address = "/ip4/127.0.0.1/tcp/28300/p2p/16Uiu2HAm1RFRYn3Fp9yinGJyNE1MvjiXQWHKpyNHvyA4awAJuHq6"
+	pubkey = "02590a5b26e48f0aff9914db6f35622a63fb63af5913bf8ef92e82bff13fba0ef5"
+	pubkey_type = "secp256k1"

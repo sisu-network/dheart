@@ -70,8 +70,6 @@ func (c *DefaultClient) Ping(source string) error {
 }
 
 func (c *DefaultClient) PostKeygenResult(result *types.KeygenResult) error {
-	log.Debug("Sending keygen result to sisu server")
-
 	var r interface{}
 	err := c.client.CallContext(context.Background(), &r, "tss_keygenResult", result)
 	if err != nil {
@@ -89,8 +87,6 @@ func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
 		return nil
 	}
 
-	log.Debug("Sending presign result to sisu server")
-
 	var r interface{}
 	err := c.client.CallContext(context.Background(), &r, "tss_presignResult", result)
 	if err != nil {
@@ -103,8 +99,6 @@ func (c *DefaultClient) PostPresignResult(result *types.PresignResult) error {
 }
 
 func (c *DefaultClient) PostKeysignResult(result *types.KeysignResult) error {
-	log.Debug("Sending keysign result to sisu server")
-
 	var r interface{}
 	err := c.client.CallContext(context.Background(), &r, "tss_keysignResult", result)
 	if err != nil {

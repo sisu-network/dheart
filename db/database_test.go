@@ -1,287 +1,141 @@
 package db
 
 import (
-	"encoding/json"
 	"math/big"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
-
-	libchain "github.com/sisu-network/lib/chain"
 )
 
-func TestSqlDatabase_SaveKeygenData(t *testing.T) {
+func TestSqlDatabase_SaveEcKeygen(t *testing.T) {
 	t.Parallel()
 
-	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	sqlDatabase := SqlDatabase{
-		db: db,
-	}
+	dbConfig := config.GetLocalhostDbConfig()
+	dbConfig.Schema = "dheart"
+	dbConfig.InMemory = true
 
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
+	dbInstance := NewDatabase(&dbConfig)
+	dbInstance.Init()
 
-	chain := "chain-0"
-	wordId := "work0"
 	pids := []*tss.PartyID{{
 		MessageWrapper_PartyID: &tss.MessageWrapper_PartyID{
 			Id: "party-0",
 		},
 	}}
-	presignData := []*keygen.LocalPartySaveData{
-		{
-			H1j: []*big.Int{big.NewInt(10)},
+	err := dbInstance.SaveEcKeygen("ecdsa", "keygen0", pids, &keygen.LocalPartySaveData{
+		LocalPreParams: keygen.LocalPreParams{
+			P: big.NewInt(10),
+			Q: big.NewInt(20),
 		},
-	}
-
-	json, err := json.Marshal(presignData[0])
-	assert.NoError(t, err)
-
-	mock.ExpectExec("INSERT INTO keygen").
-		WithArgs(chain, wordId, "party-0", 0, json).
-		WillReturnResult(sqlmock.NewResult(1, 1)).
-		WillReturnError(nil)
-
-	assert.NoError(t, sqlDatabase.SaveKeygenData(chain, wordId, pids, presignData))
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestSqlDatabase_LoadKeygenData(t *testing.T) {
-	t.Parallel()
-
-	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	sqlDatabase := SqlDatabase{
-		db: db,
-	}
-
-	t.Cleanup(func() {
-		_ = db.Close()
 	})
+	require.Nil(t, err)
 
-	data := keygen.LocalPartySaveData{
-		Ks: []*big.Int{big.NewInt(10)},
-	}
+	keygenOutput, err := dbInstance.LoadEcKeygen("ecdsa")
+	require.Nil(t, err)
+	require.NotNil(t, keygenOutput)
 
-	json, err := json.Marshal(data)
-	assert.NoError(t, err)
-
-	rows := sqlmock.NewRows([]string{"keygen_output"}).AddRow(json)
-	mock.ExpectQuery("SELECT keygen_output FROM keygen WHERE key_type=\\? AND batch_index=0").
-		WithArgs(libchain.KEY_TYPE_ECDSA).
-		WillReturnRows(rows).
-		WillReturnError(nil)
-
-	got, err := sqlDatabase.LoadKeygenData(libchain.KEY_TYPE_ECDSA)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data, *got)
-
-	assert.NoError(t, mock.ExpectationsWereMet())
+	require.Equal(t, keygenOutput.LocalPreParams.P, big.NewInt(10))
+	require.Equal(t, keygenOutput.LocalPreParams.Q, big.NewInt(20))
 }
 
 func TestSqlDatabase_SavePresignData(t *testing.T) {
 	t.Parallel()
 
-	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	sqlDatabase := SqlDatabase{
-		db: db,
-	}
+	dbConfig := config.GetLocalhostDbConfig()
+	dbConfig.Schema = "dheart"
+	dbConfig.InMemory = true
 
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
+	dbInstance := NewDatabase(&dbConfig)
+	dbInstance.Init()
 
-	wordId := "work0"
 	pids := []*tss.PartyID{{
 		MessageWrapper_PartyID: &tss.MessageWrapper_PartyID{
-			Id: "party-0",
+			Id: "party0",
 		},
 	}}
-	presignData := []*presign.LocalPresignData{
+	mockKi := []byte("mockKI")
+	presignData := []*ecsigning.SignatureData_OneRoundData{
 		{
-			PartyId: "partyId",
+			PartyId: "party0",
+			KI:      mockKi,
 		},
 	}
 
-	json, err := json.Marshal(presignData[0])
-	assert.NoError(t, err)
+	err := dbInstance.SavePresignData("presign", pids, presignData)
+	require.Nil(t, err)
 
-	mock.ExpectExec("INSERT INTO presign").
-		WithArgs("work0-0", wordId, "party-0", 0, PresignStatusNotUsed, json).
-		WillReturnResult(sqlmock.NewResult(1, 1)).
-		WillReturnError(nil)
+	presigns, err := dbInstance.LoadPresign([]string{"presign-0"})
+	require.Nil(t, err)
+	require.Equal(t, 1, len(presigns))
+	require.Equal(t, mockKi, presigns[0].KI)
 
-	assert.NoError(t, sqlDatabase.SavePresignData(wordId, pids, presignData))
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestSqlDatabase_LoadPresign(t *testing.T) {
-	t.Parallel()
-
-	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	sqlDatabase := SqlDatabase{
-		db: db,
-	}
-
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
-
-	presignData := []*presign.LocalPresignData{
-		{
-			PartyId: "partyId1",
-		},
-		{
-			PartyId: "partyId2",
-		},
-	}
-
-	json1, err := json.Marshal(&presignData[0])
-	assert.NoError(t, err)
-
-	json2, err := json.Marshal(&presignData[1])
-	assert.NoError(t, err)
-
-	rows := sqlmock.NewRows([]string{"presign_output"}).AddRow(json1).AddRow(json2)
-	presignIDs := []string{"presign0", "presign1"}
-
-	mock.ExpectQuery("SELECT presign_output FROM presign WHERE presign_id IN \\(\\?, \\?\\) ORDER BY created_time DESC").
-		WithArgs(presignIDs[0], presignIDs[1]).
-		WillReturnRows(rows).
-		WillReturnError(nil)
-
-	got, err := sqlDatabase.LoadPresign(presignIDs)
-	assert.NoError(t, err)
-	assert.EqualValues(t, presignData, got)
-
-	assert.NoError(t, mock.ExpectationsWereMet())
+	availPresigns, loadedPids, err := dbInstance.GetAvailablePresignShortForm()
+	require.Nil(t, err)
+	require.Equal(t, []string{"presign-0"}, availPresigns)
+	require.Equal(t, []string{"party0"}, loadedPids)
 }
 
 func TestSqlDatabase_LoadPresignStatus(t *testing.T) {
 	t.Parallel()
 
-	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	sqlDatabase := SqlDatabase{
-		db: db,
+	dbConfig := config.GetLocalhostDbConfig()
+	dbConfig.Schema = "dheart"
+	dbConfig.InMemory = true
+
+	dbInstance := NewDatabase(&dbConfig)
+	dbInstance.Init()
+
+	pids := []*tss.PartyID{{
+		MessageWrapper_PartyID: &tss.MessageWrapper_PartyID{
+			Id: "party0",
+		},
+	}}
+	mockKi := []byte("mockKI")
+	presignData := []*ecsigning.SignatureData_OneRoundData{
+		{
+			PartyId: "party0",
+			KI:      mockKi,
+		},
 	}
 
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
+	err := dbInstance.SavePresignData("presign", pids, presignData)
+	require.Nil(t, err)
 
-	rows := sqlmock.NewRows([]string{"status"}).AddRow("used").AddRow("not_used")
-	presignIDs := []string{"presign0", "presign1"}
+	availPresigns, _, err := dbInstance.GetAvailablePresignShortForm()
+	require.Nil(t, err)
+	require.Equal(t, 1, len(availPresigns))
 
-	mock.ExpectQuery("SELECT status FROM presign WHERE presign_id IN \\(\\?, \\?\\) ORDER BY created_time DESC").
-		WithArgs(presignIDs[0], presignIDs[1]).
-		WillReturnRows(rows).
-		WillReturnError(nil)
+	err = dbInstance.UpdatePresignStatus([]string{"presign-0"})
+	require.Nil(t, err)
 
-	got, err := sqlDatabase.LoadPresignStatus(presignIDs)
-	assert.NoError(t, err)
-	assert.EqualValues(t, []string{"used", "not_used"}, got)
-
-	assert.NoError(t, mock.ExpectationsWereMet())
+	availPresigns, _, err = dbInstance.GetAvailablePresignShortForm()
+	require.Nil(t, err)
+	require.Equal(t, 0, len(availPresigns))
 }
 
 func TestSqlDatabase_SavePreparams(t *testing.T) {
 	t.Parallel()
 
-	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	sqlDatabase := SqlDatabase{
-		db: db,
-	}
+	dbConfig := config.GetLocalhostDbConfig()
+	dbConfig.Schema = "dheart"
+	dbConfig.InMemory = true
 
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
+	dbInstance := NewDatabase(&dbConfig)
+	dbInstance.Init()
 
-	preparams := keygen.LocalPreParams{
+	err := dbInstance.SavePreparams(&keygen.LocalPreParams{
 		P: big.NewInt(10),
-		Q: big.NewInt(10),
-	}
-
-	preparamsJS, err := json.Marshal(&preparams)
-	assert.NoError(t, err)
-
-	mock.ExpectExec("INSERT INTO preparams").
-		WithArgs(libchain.KEY_TYPE_ECDSA, preparamsJS).
-		WillReturnResult(sqlmock.NewResult(1, 1)).
-		WillReturnError(nil)
-
-	assert.NoError(t, sqlDatabase.SavePreparams(&preparams))
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestSqlDatabase_LoadPreparams(t *testing.T) {
-	t.Parallel()
-
-	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	sqlDatabase := SqlDatabase{
-		db: db,
-	}
-
-	t.Cleanup(func() {
-		_ = db.Close()
+		Q: big.NewInt(20),
 	})
+	require.Nil(t, err)
 
-	preparams := keygen.LocalPreParams{
-		P: big.NewInt(10),
-		Q: big.NewInt(10),
-	}
-
-	preparamsJS, err := json.Marshal(&preparams)
-	assert.NoError(t, err)
-
-	rows := sqlmock.NewRows([]string{"preparams"}).AddRow(preparamsJS)
-	mock.ExpectQuery("SELECT preparams FROM preparams WHERE key_type=\\?").
-		WithArgs(libchain.KEY_TYPE_ECDSA).
-		WillReturnRows(rows).
-		WillReturnError(nil)
-
-	got, err := sqlDatabase.LoadPreparams()
-	assert.NoError(t, err)
-	assert.EqualValues(t, preparams, *got)
-
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestSqlDatabase_GetAvailablePresignShortForm(t *testing.T) {
-	t.Parallel()
-
-	db, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	sqlDatabase := SqlDatabase{
-		db: db,
-	}
-
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
-
-	rows := sqlmock.NewRows([]string{"presign_id", "pids_string"}).AddRow("presign0", "1,2,3")
-	mock.ExpectQuery("SELECT presign_id, pids_string FROM presign WHERE status='not_used'").
-		WillReturnRows(rows).
-		WillReturnError(nil)
-
-	presignIDs, pidStrings, err := sqlDatabase.GetAvailablePresignShortForm()
-	assert.NoError(t, err)
-	assert.Len(t, presignIDs, 1)
-	assert.Equal(t, "presign0", presignIDs[0])
-	assert.Len(t, pidStrings, 1)
-	assert.Equal(t, "1,2,3", pidStrings[0])
-
-	assert.NoError(t, mock.ExpectationsWereMet())
+	preparams, err := dbInstance.LoadPreparams()
+	require.Nil(t, err)
+	require.Equal(t, big.NewInt(10), preparams.P)
+	require.Equal(t, big.NewInt(20), preparams.Q)
 }

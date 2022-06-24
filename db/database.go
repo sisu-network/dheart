@@ -21,8 +21,9 @@ import (
 	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/lib/log"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
-	"github.com/sisu-network/tss-lib/ecdsa/presign"
+	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
+	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
+	edkeygen "github.com/sisu-network/tss-lib/eddsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 
 	libchain "github.com/sisu-network/lib/chain"
@@ -39,17 +40,21 @@ var (
 
 type Database interface {
 	Init() error
+	Close() error
 
-	SavePreparams(preparams *keygen.LocalPreParams) error
-	LoadPreparams() (*keygen.LocalPreParams, error)
+	SavePreparams(preparams *eckeygen.LocalPreParams) error
+	LoadPreparams() (*eckeygen.LocalPreParams, error)
 
-	SaveKeygenData(keyType string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error
-	LoadKeygenData(keyType string) (*keygen.LocalPartySaveData, error)
+	SaveEcKeygen(keyType string, workId string, pids []*tss.PartyID, keygenOutput *eckeygen.LocalPartySaveData) error
+	LoadEcKeygen(keyType string) (*eckeygen.LocalPartySaveData, error)
 
-	SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error
+	SaveEdKeygen(keyType string, workId string, pids []*tss.PartyID, keygenOutput *edkeygen.LocalPartySaveData) error
+	LoadEdKeygen(keyType string) (*edkeygen.LocalPartySaveData, error)
+
+	SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*ecsigning.SignatureData_OneRoundData) error
 	GetAvailablePresignShortForm() ([]string, []string, error) // Returns presignIds, pids, error
 
-	LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error)
+	LoadPresign(presignIds []string) ([]*ecsigning.SignatureData_OneRoundData, error)
 	LoadPresignStatus(presignIds []string) ([]string, error)
 	UpdatePresignStatus(presignIds []string) error
 
@@ -225,7 +230,11 @@ func (d *SqlDatabase) Init() error {
 	return nil
 }
 
-func (d *SqlDatabase) SavePreparams(preparams *keygen.LocalPreParams) error {
+func (d *SqlDatabase) Close() error {
+	return d.db.Close()
+}
+
+func (d *SqlDatabase) SavePreparams(preparams *eckeygen.LocalPreParams) error {
 	bz, err := json.Marshal(preparams)
 	if err != nil {
 		return err
@@ -238,7 +247,7 @@ func (d *SqlDatabase) SavePreparams(preparams *keygen.LocalPreParams) error {
 	return err
 }
 
-func (d *SqlDatabase) LoadPreparams() (*keygen.LocalPreParams, error) {
+func (d *SqlDatabase) LoadPreparams() (*eckeygen.LocalPreParams, error) {
 	query := "SELECT preparams FROM preparams WHERE key_type=?"
 	rows, err := d.db.Query(query, libchain.KEY_TYPE_ECDSA)
 	if err != nil {
@@ -256,7 +265,7 @@ func (d *SqlDatabase) LoadPreparams() (*keygen.LocalPreParams, error) {
 		return nil, err
 	}
 
-	preparams := &keygen.LocalPreParams{}
+	preparams := &eckeygen.LocalPreParams{}
 	err = json.Unmarshal(bz, preparams)
 	if err != nil {
 		return nil, err
@@ -265,40 +274,12 @@ func (d *SqlDatabase) LoadPreparams() (*keygen.LocalPreParams, error) {
 	return preparams, nil
 }
 
-func (d *SqlDatabase) SaveKeygenData(keyType string, workId string, pids []*tss.PartyID, keygenOutput []*keygen.LocalPartySaveData) error {
-	if len(keygenOutput) == 0 {
-		return nil
-	}
-
-	pidString := utils.GetPidString(pids)
-	// Constructs multi-insert query to do all insertion in 1 query.
-	query := "INSERT INTO keygen (key_type, work_id, pids_string, batch_index, keygen_output) VALUES "
-
-	rowCount := 0
-	params := make([]interface{}, 0)
-	for i, output := range keygenOutput {
-		bz, err := json.Marshal(output)
-		if err != nil {
-			return err
-		}
-
-		params = append(params, keyType)
-		params = append(params, workId)
-		params = append(params, pidString)
-		params = append(params, i) // batch index
-		params = append(params, bz)
-
-		rowCount++
-	}
-
-	query = query + getQueryQuestionMark(rowCount, 5)
-	_, err := d.db.Exec(query, params...)
-
-	return err
+func (d *SqlDatabase) SaveEcKeygen(keyType string, workId string, pids []*tss.PartyID, keygenOutput *eckeygen.LocalPartySaveData) error {
+	return d.saveKeygen(keyType, workId, pids, keygenOutput)
 }
 
-func (d *SqlDatabase) LoadKeygenData(keyType string) (*keygen.LocalPartySaveData, error) {
-	query := "SELECT keygen_output FROM keygen WHERE key_type=? AND batch_index=0"
+func (d *SqlDatabase) LoadEcKeygen(keyType string) (*eckeygen.LocalPartySaveData, error) {
+	query := "SELECT keygen_output FROM keygen WHERE key_type=?"
 	params := []interface{}{
 		keyType,
 	}
@@ -309,7 +290,7 @@ func (d *SqlDatabase) LoadKeygenData(keyType string) (*keygen.LocalPartySaveData
 	}
 	defer rows.Close()
 
-	result := &keygen.LocalPartySaveData{}
+	result := &eckeygen.LocalPartySaveData{}
 	if rows.Next() {
 		var bz []byte
 
@@ -330,7 +311,58 @@ func (d *SqlDatabase) LoadKeygenData(keyType string) (*keygen.LocalPartySaveData
 	return result, nil
 }
 
-func (d *SqlDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*presign.LocalPresignData) error {
+func (d *SqlDatabase) SaveEdKeygen(keyType string, workId string, pids []*tss.PartyID, keygenOutput *edkeygen.LocalPartySaveData) error {
+	return d.saveKeygen(keyType, workId, pids, keygenOutput)
+}
+
+func (d *SqlDatabase) LoadEdKeygen(keyType string) (*edkeygen.LocalPartySaveData, error) {
+	query := "SELECT keygen_output FROM keygen WHERE key_type=?"
+	params := []interface{}{
+		keyType,
+	}
+
+	rows, err := d.db.Query(query, params...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := &edkeygen.LocalPartySaveData{}
+	if rows.Next() {
+		var bz []byte
+
+		if err := rows.Scan(&bz); err != nil {
+			log.Error("Cannot scan row", err)
+			return nil, err
+		}
+
+		if err := json.Unmarshal(bz, result); err != nil {
+			log.Error("Cannot unmarshal result", err)
+			return nil, err
+		}
+	} else {
+		log.Verbose("There is no such keygen output for ", keyType)
+		return nil, nil
+	}
+
+	return result, nil
+}
+
+func (d *SqlDatabase) saveKeygen(keyType string, workId string, pids []*tss.PartyID, keygenOutput any) error {
+	bz, err := json.Marshal(keygenOutput)
+	if err != nil {
+		return err
+	}
+
+	pidString := utils.GetPidString(pids)
+
+	query := "INSERT INTO keygen (key_type, work_id, pids_string, keygen_output) VALUES (?, ?, ?, ?)"
+	_, err = d.db.Exec(query, keyType, workId, pidString, bz)
+
+	return err
+}
+
+func (d *SqlDatabase) SavePresignData(workId string, pids []*tss.PartyID, presignOutputs []*ecsigning.SignatureData_OneRoundData) error {
 	if len(presignOutputs) == 0 {
 		return nil
 	}
@@ -338,8 +370,8 @@ func (d *SqlDatabase) SavePresignData(workId string, pids []*tss.PartyID, presig
 	pidString := utils.GetPidString(pids)
 
 	// Constructs multi-insert query to do all insertion in 1 query.
-	query := "INSERT INTO presign (presign_id, work_id, pids_string, batch_index, status, presign_output) VALUES "
-	query = query + getQueryQuestionMark(len(presignOutputs), 6)
+	query := "INSERT INTO presign (presign_id, work_id, pids_string, status, presign_output) VALUES "
+	query = query + getQueryQuestionMark(len(presignOutputs), 5)
 
 	params := make([]interface{}, 0)
 	for i, output := range presignOutputs {
@@ -354,7 +386,6 @@ func (d *SqlDatabase) SavePresignData(workId string, pids []*tss.PartyID, presig
 		params = append(params, workId)
 		params = append(params, pidString)
 
-		params = append(params, i) // batch_index
 		params = append(params, PresignStatusNotUsed)
 
 		params = append(params, bz)
@@ -404,7 +435,7 @@ func (d *SqlDatabase) DeleteKeygenWork(workId string) error {
 	return err
 }
 
-func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignData, error) {
+func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*ecsigning.SignatureData_OneRoundData, error) {
 	// 1. Construct the query
 	questions := getQueryQuestionMark(1, len(presignIds))
 
@@ -423,7 +454,7 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 	defer rows.Close()
 
 	// 2. Scan every rows and save it to loaded array
-	results := make([]*presign.LocalPresignData, 0)
+	results := make([]*ecsigning.SignatureData_OneRoundData, 0)
 	for rows.Next() {
 		var bz []byte
 		if err := rows.Scan(&bz); err != nil {
@@ -431,7 +462,7 @@ func (d *SqlDatabase) LoadPresign(presignIds []string) ([]*presign.LocalPresignD
 			return nil, err
 		}
 
-		data := presign.LocalPresignData{}
+		data := ecsigning.SignatureData_OneRoundData{}
 		if err := json.Unmarshal(bz, &data); err != nil {
 			log.Error("Cannot unmarshall data", err)
 			return nil, err
@@ -471,7 +502,6 @@ func (d *SqlDatabase) LoadPresignStatus(presignIds []string) ([]string, error) {
 		results = append(results, status)
 	}
 
-	log.Debug("load presign status result = ", results)
 	return results, nil
 }
 
@@ -487,8 +517,6 @@ func (d *SqlDatabase) UpdatePresignStatus(presignIds []string) error {
 	for i, presignId := range presignIds {
 		interfaceArr[i+1] = presignId
 	}
-
-	log.Verbose("UpdatePresignStatus: query = ", query)
 
 	_, err := d.db.Exec(query, interfaceArr...)
 	return err

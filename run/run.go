@@ -12,7 +12,6 @@ import (
 	"github.com/sisu-network/dheart/client"
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/server"
-	"github.com/sisu-network/dheart/store"
 	"github.com/sisu-network/lib/log"
 )
 
@@ -54,16 +53,10 @@ func SetupApiServer() {
 	}
 
 	cfg.AesKey = aesKey
-
-	store, err := store.NewStore(filepath.Join(homeDir, "/apidb"), aesKey)
-	if err != nil {
-		panic(err)
-	}
-
 	c := client.NewClient(cfg.SisuServerUrl)
 
 	handler := rpc.NewServer()
-	serverApi := server.GetApi(cfg, store, c)
+	serverApi := server.GetApi(cfg, c)
 	serverApi.Init()
 	handler.RegisterName("tss", serverApi)
 

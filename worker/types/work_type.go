@@ -3,24 +3,20 @@ package types
 type WorkType int32
 
 const (
-	EcdsaKeygen WorkType = iota + 1
-	EcdsaPresign
-	EcdsaSigning
+	EcKeygen WorkType = iota + 1
+	EcSigning
 
-	EddsaKeygen
-	EddsaPresign
-	EddsaSigning
+	EdKeygen
+	EdSigning
 )
 
 var (
 	WorkTypeStrings = map[WorkType]string{
-		EcdsaKeygen:  "ECDSA_KEYGEN",
-		EcdsaPresign: "ECDSA_PRESIGN",
-		EcdsaSigning: "ECDSA_SIGNING",
+		EcKeygen:  "ECDSA_KEYGEN",
+		EcSigning: "ECDSA_SIGNING",
 
-		EddsaKeygen:  "EDDSA_KEYGEN",
-		EddsaPresign: "EDDSA_PRESIGN",
-		EddsaSigning: "EDDSA_SIGNING",
+		EdKeygen:  "EDDSA_KEYGEN",
+		EdSigning: "EDDSA_SIGNING",
 	}
 )
 
@@ -29,13 +25,9 @@ func (w WorkType) String() string {
 }
 
 func (w WorkType) IsKeygen() bool {
-	return w == EcdsaKeygen || w == EddsaKeygen
-}
-
-func (w WorkType) IsPresign() bool {
-	return w == EcdsaPresign || w == EddsaPresign
+	return w == EcKeygen || w == EdKeygen
 }
 
 func (w WorkType) IsSigning() bool {
-	return w == EcdsaSigning || w == EddsaSigning
+	return w == EcSigning || w == EdSigning
 }

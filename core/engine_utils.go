@@ -10,34 +10,12 @@ import (
 	"github.com/sisu-network/lib/log"
 )
 
-func GetPresignWorkId(workType types.WorkType, nodes []*Node) string {
-	var prefix string
-	switch workType {
-	case types.EcdsaPresign:
-		prefix = "ecdsa_presign"
-	case types.EddsaPresign:
-		prefix = "eddsa_presign"
-	default:
-		log.Critical("Invalid presign work type")
-		return ""
-	}
-
-	digester := crypto.MD5.New()
-	for _, node := range nodes {
-		fmt.Fprint(digester, node.PartyId.Id)
-		fmt.Fprint(digester, node)
-	}
-	hash := hex.EncodeToString(digester.Sum(nil))
-
-	return prefix + "-" + hash
-}
-
 func GetKeysignWorkId(workType types.WorkType, txs [][]byte, block int64, chain string) string {
 	var prefix string
 	switch workType {
-	case types.EcdsaSigning:
+	case types.EcSigning:
 		prefix = "ecdsa_signing"
-	case types.EddsaSigning:
+	case types.EdSigning:
 		prefix = "eddsa_signing"
 	default:
 		log.Critical("Invalid keygen work type, workType =", workType)

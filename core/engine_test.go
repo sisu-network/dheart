@@ -11,7 +11,7 @@ import (
 	"github.com/sisu-network/dheart/core/config"
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/types/common"
-	"github.com/sisu-network/dheart/worker/helper"
+	"github.com/sisu-network/dheart/worker"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	"github.com/sisu-network/tss-lib/tss"
@@ -121,7 +121,7 @@ func getEngineTestPresignAndPids(n int, workId string, pIDs tss.SortedPartyIDs) 
 	return presignIds, pidStrings
 }
 
-func TestEngineDelayStart(t *testing.T) {
+func TestEngine_DelayStart(t *testing.T) {
 	log.Verbose("Running test with tss works starting at different time.")
 	n := 4
 
@@ -138,22 +138,20 @@ func TestEngineDelayStart(t *testing.T) {
 	presignIds, pidStrings := getEngineTestPresignAndPids(n, workId, pIDs)
 
 	for i := 0; i < n; i++ {
-		cb := func(result *htypes.PresignResult) {
-			outputLock.Lock()
-			defer outputLock.Unlock()
-
-			finishedWorkerCount += 1
-			if finishedWorkerCount == n {
-				done <- true
-			}
-		}
-
 		engines[i] = NewEngine(
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
 			components.GetMokDbForAvailManager(presignIds, pidStrings),
-			&helper.MockEngineCallback{
-				OnWorkPresignFinishedFunc: cb,
+			&MockEngineCallback{
+				OnWorkSigningFinishedFunc: func(request *types.WorkRequest, result *htypes.KeysignResult) {
+					outputLock.Lock()
+					defer outputLock.Unlock()
+
+					finishedWorkerCount += 1
+					if finishedWorkerCount == n {
+						done <- true
+					}
+				},
 			},
 			privKeys[i],
 			config.NewDefaultTimeoutConfig(),
@@ -163,7 +161,9 @@ func TestEngineDelayStart(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
+		msg := []byte("Testmessage")
+		request := types.NewEcSigningRequest(workId, worker.CopySortedPartyIds(pIDs), n-1,
+			[][]byte{msg}, []string{"ganache1"}, savedData[i])
 
 		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simulate that different workers can start at different times.
@@ -176,7 +176,7 @@ func TestEngineDelayStart(t *testing.T) {
 	runEnginesWithDelay(engines, workId, outCh, errCh, done, 0)
 }
 
-func TestEngineSendDuplicateMessage(t *testing.T) {
+func TestEngine_SendDuplicateMessage(t *testing.T) {
 	t.Parallel()
 
 	n := 4
@@ -194,22 +194,20 @@ func TestEngineSendDuplicateMessage(t *testing.T) {
 	presignIds, pidStrings := getEngineTestPresignAndPids(n, workId, pIDs)
 
 	for i := 0; i < n; i++ {
-		cb := func(result *htypes.PresignResult) {
-			outputLock.Lock()
-			defer outputLock.Unlock()
-
-			finishedWorkerCount += 1
-			if finishedWorkerCount == n {
-				done <- true
-			}
-		}
-
 		engines[i] = NewEngine(
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
 			components.GetMokDbForAvailManager(presignIds, pidStrings),
-			&helper.MockEngineCallback{
-				OnWorkPresignFinishedFunc: cb,
+			&MockEngineCallback{
+				OnWorkSigningFinishedFunc: func(request *types.WorkRequest, result *htypes.KeysignResult) {
+					outputLock.Lock()
+					defer outputLock.Unlock()
+
+					finishedWorkerCount += 1
+					if finishedWorkerCount == n {
+						done <- true
+					}
+				},
 			},
 			privKeys[i],
 			config.NewDefaultTimeoutConfig(),
@@ -219,7 +217,9 @@ func TestEngineSendDuplicateMessage(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
+		msg := []byte("Testmessage")
+		request := types.NewEcSigningRequest(workId, worker.CopySortedPartyIds(pIDs), n-1,
+			[][]byte{msg}, []string{"ganache1"}, savedData[i])
 
 		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
 			// Deplay starting each engine to simulate that different workers can start at different times.
@@ -231,8 +231,7 @@ func TestEngineSendDuplicateMessage(t *testing.T) {
 	runEnginesWithDuplicatedMessage(engines, workId, outCh, errCh, done)
 }
 
-func TestEngineJobTimeout(t *testing.T) {
-	log.Verbose("Running test with tss works starting at different time.")
+func TestEngine_JobTimeout(t *testing.T) {
 	n := 4
 
 	privKeys, nodes, pIDs, savedData := getEngineTestData(n)
@@ -250,13 +249,14 @@ func TestEngineJobTimeout(t *testing.T) {
 	for i := 0; i < n; i++ {
 		config := config.NewDefaultTimeoutConfig()
 		config.SelectionLeaderTimeout = time.Second * 1
+		config.SelectionMemberTimeout = time.Second * 2
 		config.PresignJobTimeout = time.Second * 3
 
 		engines[i] = NewEngine(
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
 			components.GetMokDbForAvailManager(presignIds, pidStrings),
-			&helper.MockEngineCallback{
+			&MockEngineCallback{
 				OnWorkFailedFunc: func(request *types.WorkRequest, culprits []*tss.PartyID) {
 					outputLock.Lock()
 					defer outputLock.Unlock()
@@ -275,7 +275,8 @@ func TestEngineJobTimeout(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
+		request := types.NewEcSigningRequest(workId, worker.CopySortedPartyIds(pIDs), n-1,
+			make([][]byte, 1), []string{"ganache1"}, savedData[i])
 
 		go func(engine Engine, request *types.WorkRequest, delay time.Duration) {
 			// Delay starting each engine to simulate that different workers can start at different times.
@@ -304,16 +305,6 @@ func TestEngine_MissingMessages(t *testing.T) {
 	presignIds, pidStrings := getEngineTestPresignAndPids(n, workId, pIDs)
 
 	for i := 0; i < n; i++ {
-		cb := func(result *htypes.PresignResult) {
-			outputLock.Lock()
-			defer outputLock.Unlock()
-
-			finishedWorkerCount += 1
-			if finishedWorkerCount == n {
-				done <- true
-			}
-		}
-
 		config := config.NewDefaultTimeoutConfig()
 		config.MonitorMessageTimeout = time.Duration(time.Second * 1)
 
@@ -321,8 +312,16 @@ func TestEngine_MissingMessages(t *testing.T) {
 			nodes[i],
 			NewMockConnectionManager(nodes[i].PeerId.String(), outCh),
 			components.GetMokDbForAvailManager(presignIds, pidStrings),
-			&helper.MockEngineCallback{
-				OnWorkPresignFinishedFunc: cb,
+			&MockEngineCallback{
+				OnWorkSigningFinishedFunc: func(request *types.WorkRequest, result *htypes.KeysignResult) {
+					outputLock.Lock()
+					defer outputLock.Unlock()
+
+					finishedWorkerCount += 1
+					if finishedWorkerCount == n {
+						done <- true
+					}
+				},
 			},
 			privKeys[i],
 			config,
@@ -332,7 +331,9 @@ func TestEngine_MissingMessages(t *testing.T) {
 
 	// Start all engines
 	for i := 0; i < n; i++ {
-		request := types.NewPresignRequest(workId, helper.CopySortedPartyIds(pIDs), n-1, savedData[i], true, 1)
+		msg := []byte("Testmessage")
+		request := types.NewEcSigningRequest(workId, worker.CopySortedPartyIds(pIDs), n-1,
+			[][]byte{msg}, []string{"ganache"}, savedData[i])
 
 		go func(engine Engine, request *types.WorkRequest) {
 			engine.AddRequest(request)
@@ -341,25 +342,25 @@ func TestEngine_MissingMessages(t *testing.T) {
 
 	drop := make(map[string]map[string]bool)
 	drop[getDropMsgPair(nodes[0].PartyId.Id, nodes[3].PartyId.Id)] = map[string]bool{
-		"PresignRound2Message": true,
-		"PresignRound3Message": true,
-		"PresignRound4Message": true,
+		"SignRound2Message": true,
+		"SignRound3Message": true,
+		"SignRound4Message": true,
 	}
 
 	drop[getDropMsgPair(nodes[1].PartyId.Id, nodes[3].PartyId.Id)] = map[string]bool{
-		"PresignRound2Message": true,
-		"PresignRound3Message": true,
-		"PresignRound4Message": true,
+		"SignRound2Message": true,
+		"SignRound3Message": true,
+		"SignRound4Message": true,
 	}
 
 	drop[getDropMsgPair(nodes[2].PartyId.Id, nodes[3].PartyId.Id)] = map[string]bool{
-		"PresignRound2Message": true,
-		"PresignRound3Message": true,
-		"PresignRound4Message": true,
+		"SignRound2Message": true,
+		"SignRound3Message": true,
+		"SignRound4Message": true,
 	}
 
 	drop[getDropMsgPair(nodes[1].PartyId.Id, nodes[2].PartyId.Id)] = map[string]bool{
-		"PresignRound4Message": true,
+		"SignRound4Message": true,
 	}
 
 	// Run all engines
