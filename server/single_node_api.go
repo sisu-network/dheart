@@ -36,14 +36,9 @@ func NewSingleNodeApi(c client.Client) *SingleNodeApi {
 	}
 }
 
-// Initializes private keys used for dheart
+// Init implements Api interface.
 func (api *SingleNodeApi) Init() {
-	// Initialized keygens
-	var err error
-	api.ecPrivate, err = crypto.GenerateKey()
-	if err != nil {
-		panic(err)
-	}
+	// Do nothing
 }
 
 // SetSisuReady implements Api interface.
@@ -70,6 +65,12 @@ func (api *SingleNodeApi) KeyGen(keygenId string, keyType string, tPubKeys []typ
 		var result types.KeygenResult
 		switch keyType {
 		case libchain.KEY_TYPE_ECDSA:
+			var err error
+			api.ecPrivate, err = crypto.GenerateKey()
+			if err != nil {
+				panic(err)
+			}
+
 			pubKey := api.ecPrivate.Public()
 			publicKeyECDSA, _ := pubKey.(*ecdsa.PublicKey)
 			publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)

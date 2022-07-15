@@ -12,6 +12,7 @@ type KeysignMessage struct {
 	InChain     string
 	OutChain    string
 	OutHash     string
+	Bytes       []byte
 	BytesToSign []byte
 }
 
