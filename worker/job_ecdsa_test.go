@@ -15,8 +15,6 @@ import (
 )
 
 func TestEcJob_Keygen(t *testing.T) {
-	t.Parallel()
-
 	n := 6
 	threshold := 1
 
@@ -49,8 +47,6 @@ func TestEcJob_Keygen(t *testing.T) {
 }
 
 func TestEcJob_Presign(t *testing.T) {
-	t.Parallel()
-
 	n := 4
 	threshold := 1
 	jobs := make([]*Job, n)
@@ -84,8 +80,6 @@ func TestEcJob_Presign(t *testing.T) {
 }
 
 func TestEcJob_Signing_WithPresign(t *testing.T) {
-	t.Parallel()
-
 	n := 4
 	threshold := 1
 
@@ -120,8 +114,6 @@ func TestEcJob_Signing_WithPresign(t *testing.T) {
 }
 
 func TestEcJob_Signing_NoPresign(t *testing.T) {
-	t.Parallel()
-
 	n := 4
 	threshold := 1
 
