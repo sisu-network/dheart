@@ -137,7 +137,7 @@ func doKeysign(nodes []*MockSisuNode, tendermintPubKeys []ctypes.PubKey, keysign
 	wg.Add(n)
 
 	tx := generateEthTx()
-	signer := etypes.NewEIP2930Signer(libchain.GetChainIntFromId(TEST_CHAIN))
+	signer := etypes.NewLondonSigner(libchain.GetChainIntFromId(TEST_CHAIN))
 	hash := signer.Hash(tx)
 	hashBytes := hash[:]
 

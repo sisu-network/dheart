@@ -78,7 +78,7 @@ func main() {
 
 	pubKey := privKey.PublicKey
 	pubKeyBytes := elliptic.Marshal(pubKey, pubKey.X, pubKey.Y)
-	signer := etypes.NewEIP2930Signer(big.NewInt(1))
+	signer := etypes.NewLondonSigner(big.NewInt(1))
 	hash := signer.Hash(tx)
 
 	mockSisuClient := &mock.MockClient{

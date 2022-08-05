@@ -81,7 +81,7 @@ func TestEcWorkerSigning_EndToEnd(t *testing.T) {
 	done := make(chan bool)
 	finishedWorkerCount := 0
 	ethTx := generateEthTx()
-	signer := etypes.NewEIP2930Signer(big.NewInt(1))
+	signer := etypes.NewLondonSigner(big.NewInt(1))
 	hash := signer.Hash(ethTx)
 	hashBytes := hash[:]
 	signingMsgs := [][]byte{hashBytes}
@@ -400,7 +400,7 @@ func doTestThreshold(t *testing.T) {
 	done := make(chan bool)
 	finishedWorkerCount := 0
 	ethTx := generateEthTx()
-	signer := etypes.NewEIP2930Signer(big.NewInt(1))
+	signer := etypes.NewLondonSigner(big.NewInt(1))
 	hash := signer.Hash(ethTx)
 	hashBytes := hash[:]
 	signingMsgs := [][]byte{hashBytes}
