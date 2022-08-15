@@ -2,6 +2,7 @@ package worker
 
 import (
 	"crypto/elliptic"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"sync"
@@ -298,6 +299,15 @@ func (job *Job) padEcSignature(sigData *ecsigning.SignatureData) {
 		r := utils.PadToLengthBytesForSignature(sigData.Signature.R, bitSizeInBytes)
 		s := utils.PadToLengthBytesForSignature(sigData.Signature.S, bitSizeInBytes)
 		sigData.Signature.Signature = append(r, s...)
+
+		if len(r) != 32 {
+			log.Error("Critical error: length(R) is not 32 even after padding. Hex(R) = ",
+				hex.EncodeToString(sigData.Signature.R), ". bitSizeInBytes = ", bitSizeInBytes)
+		}
+		if len(s) != 32 {
+			log.Error("Critical error: length(S) is not 32 even after padding. Hex(S) = ",
+				hex.EncodeToString(sigData.Signature.S), ". bitSizeInBytes = ", bitSizeInBytes)
+		}
 	}
 }
 
