@@ -294,17 +294,18 @@ func (job *Job) startListening() {
 
 // Add padding bytes to Ecdsa signature for ETH based chains.
 func (job *Job) padEcSignature(sigData *ecsigning.SignatureData) {
-	if libchain.IsETHBasedChain(job.chain) {
-		bitSizeInBytes := tss.EC(tss.EcdsaScheme).Params().BitSize / 8
-		r := utils.PadToLengthBytesForSignature(sigData.Signature.R, bitSizeInBytes)
-		s := utils.PadToLengthBytesForSignature(sigData.Signature.S, bitSizeInBytes)
-		sigData.Signature.Signature = append(r, s...)
+	bitSizeInBytes := tss.EC(tss.EcdsaScheme).Params().BitSize / 8
+	sigData.Signature.R = utils.PadToLengthBytesForSignature(sigData.Signature.R, bitSizeInBytes)
+	sigData.Signature.S = utils.PadToLengthBytesForSignature(sigData.Signature.S, bitSizeInBytes)
 
-		if len(r) != 32 {
+	if libchain.IsETHBasedChain(job.chain) {
+		sigData.Signature.Signature = append(sigData.Signature.R, sigData.Signature.S...)
+
+		if len(sigData.Signature.R) != 32 {
 			log.Error("Critical error: length(R) is not 32 even after padding. Hex(R) = ",
 				hex.EncodeToString(sigData.Signature.R), ". bitSizeInBytes = ", bitSizeInBytes)
 		}
-		if len(s) != 32 {
+		if len(sigData.Signature.S) != 32 {
 			log.Error("Critical error: length(S) is not 32 even after padding. Hex(S) = ",
 				hex.EncodeToString(sigData.Signature.S), ". bitSizeInBytes = ", bitSizeInBytes)
 		}
