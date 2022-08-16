@@ -304,6 +304,7 @@ func (job *Job) padEcSignature(sigData *ecsigning.SignatureData) {
 
 	if libchain.IsETHBasedChain(job.chain) {
 		sigData.Signature.Signature = append(sigData.Signature.R, sigData.Signature.S...)
+		sigData.Signature.Signature = append(sigData.Signature.Signature, sigData.Signature.SignatureRecovery[0])
 
 		if len(sigData.Signature.R) != 32 {
 			log.Error("Critical error: length(R) is not 32 even after padding. Hex(R) = ",
