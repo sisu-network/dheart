@@ -43,8 +43,7 @@ func (engine *defaultEngine) onEcSigningFinished(request *types.WorkRequest, dat
 
 	signatures := make([][]byte, len(data))
 	for i, sig := range data {
-		signatures[i] = append(sig.R, sig.S...)
-		signatures[i] = append(signatures[i], data[i].SignatureRecovery[0])
+		signatures[i] = data[i].Signature
 
 		if len(signatures[i]) != 65 {
 			log.Error("Signatures length is not 65: hex of R,S,Recovery = ",
