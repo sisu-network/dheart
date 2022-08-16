@@ -2,16 +2,12 @@ package worker
 
 import (
 	"crypto/elliptic"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"sync"
 	"time"
 
-	libchain "github.com/sisu-network/lib/chain"
-
 	"github.com/sisu-network/dheart/core/message"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/helper"
 	"github.com/sisu-network/lib/log"
 	eckeygen "github.com/sisu-network/tss-lib/ecdsa/keygen"
@@ -254,8 +250,6 @@ func (job *Job) startListening() {
 			}
 
 		case data := <-job.ecEndSigningCh:
-			job.padEcSignature(data)
-
 			job.doneEndCh.Store(true)
 			job.callback.OnJobResult(job, JobResult{
 				Success:   true,
@@ -288,31 +282,6 @@ func (job *Job) startListening() {
 			if job.isDone() {
 				return
 			}
-		}
-	}
-}
-
-// Add padding bytes to Ecdsa signature for ETH based chains.
-func (job *Job) padEcSignature(sigData *ecsigning.SignatureData) {
-	if sigData.Signature == nil {
-		return
-	}
-
-	bitSizeInBytes := tss.EC(tss.EcdsaScheme).Params().BitSize / 8
-	sigData.Signature.R = utils.PadToLengthBytesForSignature(sigData.Signature.R, bitSizeInBytes)
-	sigData.Signature.S = utils.PadToLengthBytesForSignature(sigData.Signature.S, bitSizeInBytes)
-
-	if libchain.IsETHBasedChain(job.chain) {
-		sigData.Signature.Signature = append(sigData.Signature.R, sigData.Signature.S...)
-		sigData.Signature.Signature = append(sigData.Signature.Signature, sigData.Signature.SignatureRecovery[0])
-
-		if len(sigData.Signature.R) != 32 {
-			log.Error("Critical error: length(R) is not 32 even after padding. Hex(R) = ",
-				hex.EncodeToString(sigData.Signature.R), ". bitSizeInBytes = ", bitSizeInBytes)
-		}
-		if len(sigData.Signature.S) != 32 {
-			log.Error("Critical error: length(S) is not 32 even after padding. Hex(S) = ",
-				hex.EncodeToString(sigData.Signature.S), ". bitSizeInBytes = ", bitSizeInBytes)
 		}
 	}
 }

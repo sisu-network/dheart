@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	htypes "github.com/sisu-network/dheart/types"
+	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
 	libCommon "github.com/sisu-network/tss-lib/common"
@@ -43,7 +44,12 @@ func (engine *defaultEngine) onEcSigningFinished(request *types.WorkRequest, dat
 
 	signatures := make([][]byte, len(data))
 	for i, sig := range data {
-		signatures[i] = data[i].Signature
+		bitSizeInBytes := tss.EC(tss.EcdsaScheme).Params().BitSize / 8
+		r := utils.PadToLengthBytesForSignature(data[i].R, bitSizeInBytes)
+		s := utils.PadToLengthBytesForSignature(data[i].S, bitSizeInBytes)
+
+		signatures[i] = append(r, s...)
+		signatures[i] = append(signatures[i], data[i].SignatureRecovery[0])
 
 		if len(signatures[i]) != 65 {
 			log.Error("Signatures length is not 65: hex of R,S,Recovery = ",
