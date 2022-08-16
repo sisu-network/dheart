@@ -294,6 +294,10 @@ func (job *Job) startListening() {
 
 // Add padding bytes to Ecdsa signature for ETH based chains.
 func (job *Job) padEcSignature(sigData *ecsigning.SignatureData) {
+	if sigData.Signature == nil {
+		return
+	}
+
 	bitSizeInBytes := tss.EC(tss.EcdsaScheme).Params().BitSize / 8
 	sigData.Signature.R = utils.PadToLengthBytesForSignature(sigData.Signature.R, bitSizeInBytes)
 	sigData.Signature.S = utils.PadToLengthBytesForSignature(sigData.Signature.S, bitSizeInBytes)
