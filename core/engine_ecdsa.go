@@ -2,6 +2,7 @@ package core
 
 import (
 	cryptoec "crypto/ecdsa"
+	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	htypes "github.com/sisu-network/dheart/types"
@@ -44,6 +45,14 @@ func (engine *defaultEngine) onEcSigningFinished(request *types.WorkRequest, dat
 	for i, sig := range data {
 		signatures[i] = append(sig.R, sig.S...)
 		signatures[i] = append(signatures[i], data[i].SignatureRecovery[0])
+
+		if len(signatures[i]) != 65 {
+			log.Error("Signatures length is not 65: hex of R,S,Recovery = ",
+				hex.EncodeToString(sig.R),
+				hex.EncodeToString(sig.S),
+				hex.EncodeToString(data[i].SignatureRecovery),
+			)
+		}
 	}
 
 	result := &htypes.KeysignResult{
