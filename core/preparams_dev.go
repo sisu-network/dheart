@@ -26,6 +26,7 @@ var (
 
 func preloadPreparams(db db.Database, cfg config.HeartConfig) {
 	var index int
+
 	switch cfg.Db.Schema {
 	case "dheart0":
 		index = 0
@@ -33,8 +34,20 @@ func preloadPreparams(db db.Database, cfg config.HeartConfig) {
 		index = 1
 	case "dheart2":
 		index = 2
-	case "eth-ropsten":
+	case "dheart3":
 		index = 3
+	case "dheart4":
+		index = 4
+	case "dheart5":
+		index = 5
+	case "dheart6":
+		index = 6
+	case "dheart7":
+		index = 7
+	case "dheart8":
+		index = 8
+	case "dheart9":
+		index = 9
 	}
 
 	preparams := &keygen.LocalPreParams{}
