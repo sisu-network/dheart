@@ -376,7 +376,10 @@ func (w *WorkerExecutor) ProcessUpdateMessage(tssMsg *commonTypes.TssMessage) er
 
 			if err := job.processMessage(msgs[id]); err != nil {
 				log.Error("worker: cannot process message, err = ", err)
-				// TODO: handle failure case here.
+
+				w.broadcastResult(ExecutionResult{
+					Success: false,
+				})
 				return
 			}
 		}(i, j)
