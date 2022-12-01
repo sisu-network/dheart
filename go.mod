@@ -20,7 +20,7 @@ require (
 	github.com/logdna/logdna-go v1.0.2
 	github.com/mattn/go-sqlite3 v1.14.13
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/sisu-network/lib v0.0.1-alpha9.0.20220805094201-302101a59f7f
+	github.com/sisu-network/lib v0.0.1-alpha9.0.20221129023746-aab7a16a0f85
 	github.com/sisu-network/tss-lib v0.1.3-0.20220602042956-0a991a4b5046
 	github.com/stretchr/testify v1.7.2
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7

@@ -113,7 +113,7 @@ func (api *SingleNodeApi) keySignEth(chain string, bytesToSign []byte) ([]byte, 
 	return sig, err
 }
 
-func (api *SingleNodeApi) keySignCardano(chain string, bytesToSign []byte) ([]byte, error) {
+func (api *SingleNodeApi) keySignEddsa(chain string, bytesToSign []byte) ([]byte, error) {
 	sig, err := api.edPrivate.Sign(bytesToSign)
 	return sig.Serialize(), err
 }
@@ -129,8 +129,8 @@ func (api *SingleNodeApi) KeySign(req *types.KeysignRequest, tPubKeys []types.Pu
 		var err error
 		if libchain.IsETHBasedChain(msg.OutChain) {
 			signature, err = api.keySignEth(msg.OutChain, msg.BytesToSign)
-		} else if libchain.IsCardanoChain(msg.OutChain) {
-			signature, err = api.keySignCardano(msg.OutChain, msg.BytesToSign)
+		} else if libchain.IsCardanoChain(msg.OutChain) || libchain.IsSolanaChain(msg.OutChain) {
+			signature, err = api.keySignEddsa(msg.OutChain, msg.BytesToSign)
 		} else {
 			err = fmt.Errorf("Unknown chain: %s for message at index %d", msg.OutChain, i)
 		}
