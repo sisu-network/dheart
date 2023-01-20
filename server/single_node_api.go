@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/sisu-network/dheart/client"
 	"github.com/sisu-network/dheart/types"
-	"github.com/sisu-network/dheart/utils"
 	"github.com/sisu-network/lib/log"
 
 	libchain "github.com/sisu-network/lib/chain"
@@ -74,12 +73,10 @@ func (api *SingleNodeApi) KeyGen(keygenId string, keyType string, tPubKeys []typ
 			pubKey := api.ecPrivate.Public()
 			publicKeyECDSA, _ := pubKey.(*ecdsa.PublicKey)
 			publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
-			address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
 
 			result = types.KeygenResult{
 				KeyType:     keyType,
 				Outcome:     types.OutcomeSuccess,
-				Address:     address,
 				PubKeyBytes: publicKeyBytes,
 			}
 		case libchain.KEY_TYPE_EDDSA:
@@ -89,7 +86,6 @@ func (api *SingleNodeApi) KeyGen(keygenId string, keyType string, tPubKeys []typ
 			result = types.KeygenResult{
 				KeyType:     keyType,
 				Outcome:     types.OutcomeSuccess,
-				Address:     utils.GetAddressFromCardanoPubkey(pubKeyBytes).String(),
 				PubKeyBytes: pubKeyBytes,
 			}
 		}

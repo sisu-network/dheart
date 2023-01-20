@@ -23,7 +23,6 @@ func (engine *defaultEngine) onEcKeygenFinished(request *types.WorkRequest, outp
 		X:     pkX,
 		Y:     pkY,
 	}
-	address := crypto.PubkeyToAddress(publicKeyECDSA).Hex()
 	publicKeyBytes := crypto.FromECDSAPub(&publicKeyECDSA)
 
 	log.Verbose("publicKeyBytes length = ", len(publicKeyBytes))
@@ -33,7 +32,6 @@ func (engine *defaultEngine) onEcKeygenFinished(request *types.WorkRequest, outp
 		KeyType:     request.KeygenType,
 		PubKeyBytes: publicKeyBytes,
 		Outcome:     htypes.OutcomeSuccess,
-		Address:     address,
 	}
 
 	engine.callback.OnWorkKeygenFinished(&result)
