@@ -9,7 +9,6 @@ type KeygenResult struct {
 	KeygenIndex int
 	PubKeyBytes []byte
 	Outcome     OutcomeType
-	Address     string
 	Culprits    []*tss.PartyID
 }
 
