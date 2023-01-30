@@ -224,8 +224,8 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 		go func() {
 			defer wg.Done()
 
-			// Retry 5 times at max.
-			for i := 0; i < 5; i++ {
+			// Retry 100 times at max.
+			for i := 0; i < 100; i++ {
 				if err := cm.host.Connect(ctx, *peerinfo); err != nil {
 					log.Warn(fmt.Sprintf("Error while connecting to node %q: %-v", peerinfo, err))
 					time.Sleep(time.Second * 3)
