@@ -2,7 +2,7 @@ package config
 
 import "time"
 
-var defaultJobTimeout = 10 * time.Minute
+var defaultJobTimeout = 3 * time.Minute
 
 type TimeoutConfig struct {
 	PresignJobTimeout      time.Duration
@@ -21,7 +21,7 @@ func NewDefaultTimeoutConfig() TimeoutConfig {
 		SigningJobTimeout:      defaultJobTimeout,
 		PresignJobTimeout:      defaultJobTimeout,
 		MonitorMessageTimeout:  time.Second * 15,
-		SelectionLeaderTimeout: selectionLeaderTimeout,
-		SelectionMemberTimeout: selectionLeaderTimeout + time.Second*15,
+		SelectionLeaderTimeout: selectionLeaderTimeout + time.Second*15,
+		SelectionMemberTimeout: selectionLeaderTimeout,
 	}
 }

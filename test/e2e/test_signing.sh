@@ -20,7 +20,7 @@ run_test() {
 }
 
 
-cd 'engine-keysign'
+cd './ecdsa/engine-keysign'
 
 for i in {1..1}
 do

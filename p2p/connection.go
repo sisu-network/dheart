@@ -66,7 +66,6 @@ func (con *Connection) createStream(protocolId protocol.ID) (network.Stream, err
 	stream, err := (*con.host).NewStream(ctx, con.peerId, protocolId)
 
 	if err != nil {
-		log.Warn(err)
 		return nil, fmt.Errorf("fail to create new stream to peer: %s, %w", con.peerId, err)
 	}
 	return stream, nil
@@ -77,7 +76,7 @@ func (con *Connection) writeToStream(msg []byte, protocolId protocol.ID) error {
 	if stream == nil {
 		newStream, err := con.createStream(protocolId)
 		if err != nil {
-			log.Warn("Cannot create a new stream", err)
+			log.Warnf("Cannot create a new stream, err = %v", err)
 			return err
 		}
 

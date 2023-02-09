@@ -5,7 +5,7 @@
 # flakiness, we don't want to include this test scripts into our CI flow yet.
 
 # FOLDERS=('core-heart/keygen' 'core-heart/presign' 'engine-keygen' 'p2p-network')
-FOLDERS=('engine-eddsa')
+FOLDERS=('engine/ecdsa-keysign')
 
 
 CUR_PATH=$(pwd)
@@ -13,8 +13,11 @@ CUR_PATH=$(pwd)
 run_test() {
   echo "Running test in folder" $1
   cd $1
-  PROJECT_ID=$PROJECT_ID go run main.go -index 0 &
-  PROJECT_ID=$PROJECT_ID go run main.go -index 1 &
+
+  n=4
+  for i in $(seq $n); do
+    PROJECT_ID=$PROJECT_ID go run main.go -n $n -index $i &
+  done
 
   echo "Waiting for all the jobs"
 
