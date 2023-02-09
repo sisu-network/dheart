@@ -16,7 +16,8 @@ run_test() {
 
   n=4
   for i in $(seq $n); do
-    PROJECT_ID=$PROJECT_ID go run main.go -n $n -index $i &
+    index=$(($i-1))
+    PROJECT_ID=$PROJECT_ID go run main.go -n $n -index $index &
   done
 
   echo "Waiting for all the jobs"

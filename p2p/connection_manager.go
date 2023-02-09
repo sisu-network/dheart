@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	maddr "github.com/multiformats/go-multiaddr"
 	"github.com/sisu-network/lib/log"
 
@@ -104,7 +104,7 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) e
 		cm.bootstrapPeers[i] = peer
 	}
 
-	host, err := libp2p.New(ctx,
+	host, err := libp2p.New(
 		libp2p.ListenAddrs([]maddr.Multiaddr{listenAddr}...),
 		libp2p.Identity(p2pPriKey),
 	)
@@ -199,8 +199,8 @@ func (cm *DefaultConnectionManager) discover(ctx context.Context, host host.Host
 		return fmt.Errorf("Failed to bootstrap DHT: %w", err)
 	}
 
-	routingDiscovery := discovery.NewRoutingDiscovery(kademliaDHT)
-	discovery.Advertise(ctx, routingDiscovery, cm.rendezvous)
+	routingDiscovery := routing.NewRoutingDiscovery(kademliaDHT)
+	routingDiscovery.Advertise(ctx, cm.rendezvous)
 	log.Info("Successfully announced!")
 
 	return nil

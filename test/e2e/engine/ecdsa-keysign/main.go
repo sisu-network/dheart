@@ -229,6 +229,7 @@ func main() {
 	cb := NewEngineCallback(keygenCh, nil, keysignch)
 	database := getDb(index)
 
+	fmt.Println("Len nodes and allKeys, index = ", len(nodes), len(allKeys), index)
 	engine := core.NewEngine(nodes[index], cm, database, cb, allKeys[index],
 		config.NewDefaultTimeoutConfig())
 	cm.AddListener(p2p.TSSProtocolID, engine)
@@ -247,7 +248,7 @@ func main() {
 	// Keysign
 	log.Info("Doing keysign now!")
 	rand.Seed(int64(seed + 110))
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 20; i++ {
 		msg := make([]byte, 20)
 		rand.Read(msg) //nolint
 		if err != nil {

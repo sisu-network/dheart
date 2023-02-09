@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sisu-network/lib/log"
 
 	"github.com/sisu-network/dheart/core/cache"
