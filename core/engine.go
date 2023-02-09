@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sisu-network/lib/log"
 
 	"github.com/sisu-network/dheart/core/cache"
@@ -248,6 +248,11 @@ func (engine *defaultEngine) finishWorker(workId string) {
 	engine.workLock.Lock()
 	delete(engine.workers, workId)
 	engine.workLock.Unlock()
+
+	log.Verbosef("%s finished. Worker queue len = %d", workId, len(engine.workers))
+
+	// Start next work
+	engine.startNextWork()
 }
 
 // startNextWork gets a request from the queue (if not empty) and execute it. If there is no
@@ -255,6 +260,7 @@ func (engine *defaultEngine) finishWorker(workId string) {
 func (engine *defaultEngine) startNextWork() {
 	engine.workLock.Lock()
 	if len(engine.workers) >= MaxWorker {
+		log.Verbosef("Max work reach, worker queue len = %d", len(engine.workers))
 		engine.workLock.Unlock()
 		return
 	}
@@ -435,23 +441,27 @@ func (engine *defaultEngine) OnNodeNotSelected(request *types.WorkRequest) {
 		}
 		engine.callback.OnWorkSigningFinished(request, result)
 	}
+
+	// Finish this worker and start the next one (if any).
+	engine.finishWorker(request.WorkId)
 }
 
 func (engine *defaultEngine) OnWorkFailed(request *types.WorkRequest) {
 	// Clear all the worker's resources
-	engine.workLock.Lock()
+	engine.workLock.RLock()
 	worker := engine.workers[request.WorkId]
-	delete(engine.workers, request.WorkId)
-	engine.workLock.Unlock()
+	engine.workLock.RUnlock()
 
 	if worker == nil {
 		log.Error("Worker " + request.WorkId + " does not exist.")
 		return
 	}
+
 	culprits := worker.GetCulprits()
 	engine.callback.OnWorkFailed(request, culprits)
 
-	engine.startNextWork()
+	// Finish this worker and start the next one (if any).
+	engine.finishWorker(request.WorkId)
 }
 
 func (engine *defaultEngine) GetAvailablePresigns(batchSize int, n int,
@@ -486,6 +496,6 @@ func (engine *defaultEngine) OnWorkerResult(request *types.WorkRequest, result *
 		log.Error("OnWorkerResult: Unknown work type ", request.WorkType)
 	}
 
+	// Finish this worker and start the next one (if any).
 	engine.finishWorker(request.WorkId)
-	engine.startNextWork()
 }

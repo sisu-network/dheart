@@ -97,7 +97,8 @@ func getDb(index int) db.Database {
 	return dbInstance
 }
 
-func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine, outCh chan *htypes.KeygenResult) *htypes.KeygenResult {
+func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine,
+	outCh chan *htypes.KeygenResult) *htypes.KeygenResult {
 	// Add request
 	workId := "keygen0"
 	threshold := utils.GetThreshold(len(pids))
@@ -124,8 +125,8 @@ func verifySignature(pubkey *ecdsa.PublicKey, msg []byte, R, S *big.Int) {
 	}
 }
 
-func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine, keysignch chan *htypes.KeysignResult,
-	keygenResult *htypes.KeygenResult, message []byte) {
+func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine,
+	keysignch chan *htypes.KeysignResult, keygenResult *htypes.KeygenResult, message []byte) {
 	workId := "keysign"
 	messages := [][]byte{message}
 	chains := []string{"eth"}
@@ -228,7 +229,9 @@ func main() {
 	cb := NewEngineCallback(keygenCh, nil, keysignch)
 	database := getDb(index)
 
-	engine := core.NewEngine(nodes[index], cm, database, cb, allKeys[index], config.NewDefaultTimeoutConfig())
+	fmt.Println("Len nodes and allKeys, index = ", len(nodes), len(allKeys), index)
+	engine := core.NewEngine(nodes[index], cm, database, cb, allKeys[index],
+		config.NewDefaultTimeoutConfig())
 	cm.AddListener(p2p.TSSProtocolID, engine)
 
 	// Add nodes
@@ -252,6 +255,8 @@ func main() {
 			panic(err)
 		}
 		log.Info("Msg hex = ", hex.EncodeToString(msg))
-		testKeysign(database, pids, engine, keysignch, keygenResult, msg)
+		go func(msg []byte) {
+			testKeysign(database, pids, engine, keysignch, keygenResult, msg)
+		}(msg)
 	}
 }

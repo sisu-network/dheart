@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sisu-network/lib/log"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"

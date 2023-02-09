@@ -335,7 +335,9 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	signMessages := make([][]byte, len(req.KeysignMessages)) // TODO: make this a byte array
 	chains := make([]string, len(req.KeysignMessages))
 	for i, msg := range req.KeysignMessages {
-		workId = workId + msg.OutChain + msg.OutHash
+		log.Verbosef("There is a new work for chain %s with hash %s", msg.OutChain, msg.OutHash)
+
+		workId = workId + msg.Id
 		workId = utils.KeccakHash32(workId)
 		signMessages[i] = msg.BytesToSign
 		chains[i] = msg.OutChain
