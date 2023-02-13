@@ -156,23 +156,27 @@ func (cm *DefaultConnectionManager) getListener(protocol protocol.ID) P2PDataLis
 }
 
 func (cm *DefaultConnectionManager) handleStream(stream network.Stream) {
-	for {
-		peerIDString := stream.Conn().RemotePeer().String()
-		protocol := stream.Protocol()
+	peerIDString := stream.Conn().RemotePeer().String()
+	protocol := stream.Protocol()
 
+	for {
 		// TODO: Add cancel channel here.
 		dataBuf, err := ReadStreamWithBuffer(stream)
 
 		if err != nil {
-			log.Warn(err)
+			log.Errorf("Failed to read from stream, err = %v", err)
+			if err == network.ErrReset {
+				time.Sleep(time.Second * 3)
+			}
 			// TODO: handle retry here.
-			return
+			continue
 		}
+
 		if dataBuf != nil {
 			listener := cm.getListener(protocol)
 			if listener == nil {
 				// No listener. Ignore the message
-				return
+				continue
 			}
 
 			go func(peerIDString string, dataBuf []byte) {
@@ -237,30 +241,12 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 			if err != nil {
 				log.Errorf("Failed to create new stream, retry i = %d, err = %v", i, err)
 			} else {
-				log.Infof("Stream for peer %s with address %s is created successfully", addrInfo.ID, peerAddr)
 				break
 			}
 		}
 
 		cm.connections[addrInfo.ID] = conn
 	}
-}
-
-func (cm *DefaultConnectionManager) connectToPeer(peerAddr maddr.Multiaddr) error {
-	// TODO: handle the case where connection fails.
-	pi, err := peer.AddrInfoFromP2pAddr(peerAddr)
-	if err != nil {
-		return fmt.Errorf("fail to add peer: %w", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), TimeoutConnecting)
-	defer cancel()
-
-	if err := cm.host.Connect(ctx, *pi); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID,
