@@ -203,13 +203,6 @@ func (cm *DefaultConnectionManager) discover(ctx context.Context, host host.Host
 }
 
 func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
-	// Creates connection objects.
-	for _, peerAddr := range cm.bootstrapPeers {
-		addrInfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-		conn := NewConnection(addrInfo.ID, peerAddr, &cm.host)
-		cm.connections[addrInfo.ID] = conn
-	}
-
 	// Attempts to connect to every bootstrapped peers.
 	log.Info("Trying to create connections with peers...")
 	wg := &sync.WaitGroup{}
@@ -233,6 +226,24 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 		}()
 	}
 	wg.Wait()
+
+	// Creates connection objects.
+	for _, peerAddr := range cm.bootstrapPeers {
+		addrInfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+		conn := NewConnection(addrInfo.ID, peerAddr, &cm.host)
+
+		for i := 0; i < 10; i++ {
+			_, err := conn.CreateStream(TSSProtocolID)
+			if err != nil {
+				log.Errorf("Failed to create new stream, retry i = %d, err = %v", i, err)
+			} else {
+				log.Infof("Stream for peer %s with address %s is created successfully", addrInfo.ID, peerAddr)
+				break
+			}
+		}
+
+		cm.connections[addrInfo.ID] = conn
+	}
 }
 
 func (cm *DefaultConnectionManager) connectToPeer(peerAddr maddr.Multiaddr) error {
@@ -252,7 +263,8 @@ func (cm *DefaultConnectionManager) connectToPeer(peerAddr maddr.Multiaddr) erro
 	return nil
 }
 
-func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error {
+func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID,
+	msg []byte) error {
 	conn := cm.connections[pID]
 	if conn == nil {
 		log.Error("Connection to pid not found, pid = ", pID)
@@ -263,7 +275,11 @@ func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protoc
 	if err != nil {
 		log.HighVerbosef("Failed writing to stream to peer %s, err = %v", pID, err)
 		if err == network.ErrReset {
-
+			// The stream is reset. We need to recreate the stream for this connection.
+			_, err = conn.CreateStream(protocolId)
+			if err != nil {
+				log.Errorf("Failed to recreate connection stream for %s, err = %v", pID, err)
+			}
 		}
 	}
 
