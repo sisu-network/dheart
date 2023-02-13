@@ -224,8 +224,8 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 		go func() {
 			defer wg.Done()
 
-			// Retry 5 times at max.
-			for i := 0; i < 5; i++ {
+			// Retry 50 times at max.
+			for i := 0; i < 50; i++ {
 				if err := cm.host.Connect(ctx, *peerinfo); err != nil {
 					log.Warn(fmt.Sprintf("Error while connecting to node %q: %-v", peerinfo, err))
 					time.Sleep(time.Second * 3)
@@ -265,7 +265,7 @@ func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protoc
 
 	err := conn.writeToStream(msg, protocolId)
 	if err != nil {
-		log.HighVerbose("Failed writing to stream, err = ", err)
+		log.HighVerbosef("Failed writing to stream to peer %s, err = %v", pID, err)
 	}
 
 	return err

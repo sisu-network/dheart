@@ -33,7 +33,7 @@ const (
 )
 
 type Engine interface {
-	Init()
+	Init() error
 
 	AddNodes(nodes []*Node)
 
@@ -108,11 +108,13 @@ func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback 
 	}
 }
 
-func (engine *defaultEngine) Init() {
+func (engine *defaultEngine) Init() error {
 	err := engine.presignsManager.Load()
 	if err != nil {
-		panic(err)
+		return err
 	}
+
+	return nil
 }
 
 func (engine *defaultEngine) AddNodes(nodes []*Node) {

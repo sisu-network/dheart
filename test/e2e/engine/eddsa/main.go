@@ -108,7 +108,10 @@ func main() {
 	myKeygen := worker.LoadEdKeygenSavedData(pids)[index]
 
 	pubkey := edwards.NewPublicKey(myKeygen.EDDSAPub.X(), myKeygen.EDDSAPub.Y())
-	address := utils.GetAddressFromCardanoPubkey(pubkey.Serialize())
+	address, err := utils.GetAddressFromCardanoPubkey(pubkey.Serialize())
+	if err != nil {
+		panic(err)
+	}
 	log.Info("sender address = ", address)
 
 	node := getCardanoNode()

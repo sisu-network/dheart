@@ -23,7 +23,10 @@ func NewTssApi(heart *core.Heart) *TssApi {
 }
 
 func (api *TssApi) Init() {
-	api.heart.Start()
+	err := api.heart.Start()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (api *TssApi) Version() string {
