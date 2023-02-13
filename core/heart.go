@@ -92,16 +92,16 @@ func (h *Heart) Start() error {
 			log.Info("Generating time = ", time.Now().Sub(start))
 			if err != nil {
 				log.Error("Cannot generate preparams. err = ", err)
-				panic(err)
+				return err
 			}
 
 			err = h.db.SavePreparams(preparams)
 			if err != nil {
 				log.Error("cannot save preparams, err = ", err)
-				panic(err)
+				return err
 			}
 		} else if err != nil {
-			panic(err)
+			return err
 		} else if err == nil {
 			log.Info("Preparams was generated.")
 		}
@@ -125,11 +125,14 @@ func (h *Heart) initConnectionManager() error {
 	}
 
 	log.Info("Adding engine as listener for connection manager....")
-	h.engine.Init()
+	err := h.engine.Init()
+	if err != nil {
+		return err
+	}
 	h.loadPeers(h.engine)
 
 	// Start connection manager.
-	err := h.cm.Start(h.privateKey.Bytes(), h.privateKey.Type())
+	err = h.cm.Start(h.privateKey.Bytes(), h.privateKey.Type())
 	if err != nil {
 		log.Error("Cannot start connection manager. err =", err)
 		return err
@@ -273,7 +276,7 @@ func (h *Heart) SetPrivKey(encryptedKey string, tendermintKeyType string) error 
 
 	err = h.initConnectionManager()
 	if err != nil {
-		log.Error("Failed to start heart, err =", err)
+		return fmt.Errorf("Failed to start heart, err = %v", err)
 	}
 
 	return nil
