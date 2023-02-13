@@ -54,7 +54,6 @@ type DefaultConnectionManager struct {
 	connections      map[peer.ID]*Connection
 	listenerLock     sync.RWMutex
 	protocolListener map[protocol.ID]P2PDataListener
-	statusManager    StatusManager
 }
 
 func NewConnectionManager(config types.ConnectionsConfig) ConnectionManager {
@@ -128,9 +127,6 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) e
 
 	// Connect to predefined peers.
 	cm.createConnections(ctx)
-
-	// Create status manager
-	cm.initializeStatusManager()
 
 	return nil
 }
@@ -266,18 +262,10 @@ func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protoc
 	err := conn.writeToStream(msg, protocolId)
 	if err != nil {
 		log.HighVerbosef("Failed writing to stream to peer %s, err = %v", pID, err)
+		if err == network.ErrReset {
+
+		}
 	}
 
 	return err
-}
-
-func (cm *DefaultConnectionManager) initializeStatusManager() {
-	peerIds := make([]peer.ID, 0, len(cm.bootstrapPeers))
-	for _, peerAddr := range cm.bootstrapPeers {
-		addrInfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-		peerIds = append(peerIds, addrInfo.ID)
-	}
-
-	cm.statusManager = NewStatusManager(peerIds, cm)
-	cm.statusManager.Start()
 }

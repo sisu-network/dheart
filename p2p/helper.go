@@ -55,7 +55,8 @@ func WriteStreamWithBuffer(msg []byte, stream network.Stream) error {
 	}
 	err = streamWrite.Flush()
 	if err != nil {
-		return fmt.Errorf("fail to flush stream: %w", err)
+		// return fmt.Errorf("fail to flush stream: %w", err)
+		return err
 	}
 	return nil
 }
