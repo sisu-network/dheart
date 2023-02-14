@@ -26,6 +26,7 @@ import (
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
+	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -126,20 +127,15 @@ func verifySignature(pubkey *ecdsa.PublicKey, msg []byte, R, S *big.Int) {
 }
 
 func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine,
-	keysignch chan *htypes.KeysignResult, keygenResult *htypes.KeygenResult, message []byte) {
+	keysignch chan *htypes.KeysignResult, keygenResult *htypes.KeygenResult,
+	presignInput *keygen.LocalPartySaveData, message []byte) {
 	workId := "keysign"
 	messages := [][]byte{message}
 	chains := []string{"eth"}
-
-	presignInput, err := database.LoadEcKeygen(libchain.KEY_TYPE_ECDSA)
-	if err != nil {
-		panic(err)
-	}
-
 	threshold := utils.GetThreshold(len(pids))
 	request := types.NewEcSigningRequest(workId, pids, threshold, messages, chains, presignInput)
 
-	err = engine.AddRequest(request)
+	err := engine.AddRequest(request)
 	if err != nil {
 		panic(err)
 	}
@@ -245,10 +241,15 @@ func main() {
 	// Keygen
 	keygenResult := doKeygen(pids, index, engine, keygenCh)
 
+	presignInput, err := database.LoadEcKeygen(libchain.KEY_TYPE_ECDSA)
+	if err != nil {
+		panic(err)
+	}
+
 	// Keysign
 	log.Info("Doing keysign now!")
 	rand.Seed(int64(seed + 110))
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 2; i++ {
 		msg := make([]byte, 20)
 		rand.Read(msg) //nolint
 		if err != nil {
@@ -256,7 +257,9 @@ func main() {
 		}
 		log.Info("Msg hex = ", hex.EncodeToString(msg))
 		go func(msg []byte) {
-			testKeysign(database, pids, engine, keysignch, keygenResult, msg)
+			testKeysign(database, pids, engine, keysignch, keygenResult, presignInput, msg)
 		}(msg)
 	}
+
+	time.Sleep(time.Second * 2)
 }
