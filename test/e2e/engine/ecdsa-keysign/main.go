@@ -26,7 +26,6 @@ import (
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/worker/types"
 	"github.com/sisu-network/lib/log"
-	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	"github.com/sisu-network/tss-lib/tss"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -58,6 +57,18 @@ func (cb *EngineCallback) OnWorkPresignFinished(result *htypes.PresignResult) {
 
 func (cb *EngineCallback) OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult) {
 	if cb.signingDataCh != nil {
+		msgs := make([]*htypes.KeysignMessage, 0)
+		for i, bz := range request.Messages {
+			msgs = append(msgs, &htypes.KeysignMessage{
+				Bytes:       bz,
+				BytesToSign: bz,
+				OutChain:    request.Chains[i],
+			})
+		}
+		result.Request = &htypes.KeysignRequest{
+			KeyType:         "ecdsa",
+			KeysignMessages: msgs,
+		}
 		cb.signingDataCh <- result
 	}
 }
@@ -122,64 +133,57 @@ func doKeygen(pids tss.SortedPartyIDs, index int, engine core.Engine,
 func verifySignature(pubkey *ecdsa.PublicKey, msg []byte, R, S *big.Int) {
 	ok := ecdsa.Verify(pubkey, msg, R, S)
 	if !ok {
-		panic(fmt.Sprintf("Signature verification fails for msg: %s", msg))
+		panic(fmt.Sprintf("Signature verification fails for msg: %s", hex.EncodeToString(msg)))
 	}
 }
 
-func testKeysign(database db.Database, pids []*tss.PartyID, engine core.Engine,
-	keysignch chan *htypes.KeysignResult, keygenResult *htypes.KeygenResult,
-	presignInput *keygen.LocalPartySaveData, message []byte) {
-	workId := "keysign"
-	messages := [][]byte{message}
-	chains := []string{"eth"}
-	threshold := utils.GetThreshold(len(pids))
-	request := types.NewEcSigningRequest(workId, pids, threshold, messages, chains, presignInput)
+func verifyKeysignResult(testCount int, keysignch chan *htypes.KeysignResult,
+	keysignInput *htypes.KeygenResult) {
 
-	err := engine.AddRequest(request)
-	if err != nil {
-		panic(err)
-	}
-
-	var result *htypes.KeysignResult
-	select {
-	case result = <-keysignch:
-	case <-time.After(time.Second * 100):
-		panic("Signing timeout")
-	}
-
-	if result == nil {
-		panic("result is nil")
-	}
-
-	switch result.Outcome {
-	case htypes.OutcomeSuccess:
-		for i, msg := range messages {
-			x, y := elliptic.Unmarshal(tss.EC("ecdsa"), keygenResult.PubKeyBytes)
-			pk := ecdsa.PublicKey{
-				Curve: tss.EC("ecdsa"),
-				X:     x,
-				Y:     y,
-			}
-
-			sig := result.Signatures[i]
-			if len(sig) != 65 {
-				log.Info("Signature hex = ", hex.EncodeToString(sig))
-				panic(fmt.Sprintf("Signature length is not correct. actual length = %d", len(sig)))
-			}
-			sig = sig[:64]
-
-			r := sig[:32]
-			s := sig[32:]
-
-			verifySignature(&pk, msg, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
+	for i := 0; i < testCount; i++ {
+		var result *htypes.KeysignResult
+		select {
+		case result = <-keysignch:
+		case <-time.After(time.Second * 100):
+			panic("Signing timeout")
 		}
 
-		log.Info("Signing succeeded!")
+		if result == nil {
+			panic("result is nil")
+		}
 
-	case htypes.OutcomeFailure:
-		panic("Failed to create signature")
-	case htypes.OutcometNotSelected:
-		log.Info("Node is not selected.")
+		message := result.Request.KeysignMessages[0].BytesToSign
+
+		switch result.Outcome {
+		case htypes.OutcomeSuccess:
+			for i, msg := range result.Request.KeysignMessages {
+				x, y := elliptic.Unmarshal(tss.EC("ecdsa"), keysignInput.PubKeyBytes)
+				pk := ecdsa.PublicKey{
+					Curve: tss.EC("ecdsa"),
+					X:     x,
+					Y:     y,
+				}
+
+				sig := result.Signatures[i]
+				if len(sig) != 65 {
+					log.Info("Signature hex = ", hex.EncodeToString(sig))
+					panic(fmt.Sprintf("Signature length is not correct. actual length = %d", len(sig)))
+				}
+				sig = sig[:64]
+
+				r := sig[:32]
+				s := sig[32:]
+
+				verifySignature(&pk, msg.BytesToSign, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
+			}
+
+			log.Infof("Signing succeeded for %s!", hex.EncodeToString(message))
+
+		case htypes.OutcomeFailure:
+			panic("Failed to create signature")
+		case htypes.OutcometNotSelected:
+			log.Info("Node is not selected.")
+		}
 	}
 }
 
@@ -225,7 +229,6 @@ func main() {
 	cb := NewEngineCallback(keygenCh, nil, keysignch)
 	database := getDb(index)
 
-	fmt.Println("Len nodes and allKeys, index = ", len(nodes), len(allKeys), index)
 	engine := core.NewEngine(nodes[index], cm, database, cb, allKeys[index],
 		config.NewDefaultTimeoutConfig())
 	cm.AddListener(p2p.TSSProtocolID, engine)
@@ -249,17 +252,28 @@ func main() {
 	// Keysign
 	log.Info("Doing keysign now!")
 	rand.Seed(int64(seed + 110))
-	for i := 0; i < 2; i++ {
+	testCount := 4
+	for i := 0; i < testCount; i++ {
 		msg := make([]byte, 20)
 		rand.Read(msg) //nolint
 		if err != nil {
 			panic(err)
 		}
-		log.Info("Msg hex = ", hex.EncodeToString(msg))
-		go func(msg []byte) {
-			testKeysign(database, pids, engine, keysignch, keygenResult, presignInput, msg)
-		}(msg)
+		go func(i int, msg []byte) {
+			workId := fmt.Sprintf("%s__%s", "keysign", hex.EncodeToString(msg))
+			chains := []string{"eth"}
+			threshold := utils.GetThreshold(len(pids))
+			request := types.NewEcSigningRequest(workId, pids, threshold, [][]byte{msg}, chains,
+				presignInput)
+
+			err := engine.AddRequest(request)
+			if err != nil {
+				panic(err)
+			}
+		}(i, msg)
 	}
 
-	time.Sleep(time.Second * 2)
+	verifyKeysignResult(testCount, keysignch, keygenResult)
+
+	time.Sleep(time.Second)
 }

@@ -144,6 +144,7 @@ func (engine *defaultEngine) AddRequest(request *types.WorkRequest) error {
 	if engine.requestQueue.AddWork(request) {
 		engine.startNextWork()
 	}
+
 	return nil
 }
 
@@ -266,6 +267,7 @@ func (engine *defaultEngine) startNextWork() {
 		engine.workLock.Unlock()
 		return
 	}
+
 	nextWork := engine.requestQueue.Pop()
 	engine.workLock.Unlock()
 
