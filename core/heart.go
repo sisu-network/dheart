@@ -327,7 +327,11 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	nodes := NewNodes(tPubKeys)
 	pids := make([]*tss.PartyID, n)
 	for i, node := range nodes {
-		pids[i] = node.PartyId
+		pids[i] = tss.NewPartyID(
+			node.PartyId.Id,
+			node.PartyId.Moniker,
+			node.PartyId.KeyInt(),
+		)
 	}
 
 	sorted := tss.SortPartyIDs(pids)

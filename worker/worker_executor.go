@@ -134,8 +134,13 @@ func (w *WorkerExecutor) Init() (err error) {
 	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.request.Threshold)
 	batchSize := w.request.BatchSize
 	jobs := make([]*Job, batchSize)
-	log.Info("batchSize = ", batchSize)
-	log.Info("WorkerExecutor WorkType = ", w.workType)
+	log.Infof("%s WorkerExecutor WorkType = %s", w.myPid.Id, w.workType)
+
+	s := fmt.Sprintf("My pid: %s Work Id %s. Other: ", w.myPid.Id[len(w.myPid.Id)-4:], w.request.WorkId)
+	for _, pid := range w.pIDs {
+		s += fmt.Sprintf("%s %d -- ", pid.Id[len(pid.Id)-4:], pid.Index)
+	}
+	fmt.Println(s)
 
 	workId := w.request.WorkId
 	// Creates all jobs
@@ -234,6 +239,13 @@ func (w *WorkerExecutor) OnJobMessage(job *Job, msg tss.Message) {
 		msgKey = msgKey + "-" + msg.GetTo()[0].Id
 	}
 
+	fmt.Printf("WorkerExecutor: %s sending mesasge %s, %s with from index %d\n",
+		w.myPid.Id[len(w.myPid.Id)-4:],
+		w.request.WorkId,
+		msg.WireMsg().From,
+		msg.GetFrom().Index,
+	)
+
 	// Update the list of finished jobs for msgKey
 	w.jobOutputLock.Lock()
 	list := w.jobOutput[msgKey]
@@ -262,8 +274,18 @@ func (w *WorkerExecutor) OnJobMessage(job *Job, msg tss.Message) {
 
 		if dest == nil {
 			// broadcast
+			// fmt.Printf("AAAA %s Broadcasting message, workId: %s, %s\n",
+			// 	w.myPid.Id[len(w.myPid.Id)-4:],
+			// 	w.request.WorkId,
+			// 	msg.Type(),
+			// )
 			w.dispatcher.BroadcastMessage(w.pIDs, tssMsg)
 		} else {
+			// fmt.Printf("AAAA %s UnicastMessage to %s, workId %s, %s\n",
+			// 	w.myPid.Id[len(w.myPid.Id)-4:],
+			// 	dest[0].Id[len(dest[0].Id)-4:],
+			// 	w.request.WorkId,
+			// 	msg.Type())
 			w.dispatcher.UnicastMessage(dest[0], tssMsg)
 		}
 	}
@@ -355,6 +377,14 @@ func (w *WorkerExecutor) ProcessUpdateMessage(tssMsg *commonTypes.TssMessage) er
 			return fmt.Errorf("error when parsing wire message %w", err)
 		}
 
+		fmt.Printf("ProcessUpdateMessage %s received %s, %s from %s index %d\n",
+			w.myPid.Id[len(w.myPid.Id)-4:],
+			w.request.WorkId,
+			msg.Type(),
+			msg.WireMsg().From.Id,
+			msg.GetFrom().Index,
+		)
+
 		msgRouting := tss.MessageRouting{}
 		if err := json.Unmarshal(updateMessage.SerializedMessageRouting, &msgRouting); err != nil {
 			return fmt.Errorf("error when unmarshal message routing %w", err)
@@ -367,14 +397,14 @@ func (w *WorkerExecutor) ProcessUpdateMessage(tssMsg *commonTypes.TssMessage) er
 	w.messageMonitor.NewMessageReceived(msgs[0], from)
 
 	for i, j := range jobs {
-		go func(id int, job *Job) {
-			_, err := message.GetMsgRound(msgs[id].Content())
+		go func(jobIndex int, job *Job) {
+			_, err := message.GetMsgRound(msgs[jobIndex].Content())
 			if err != nil {
 				log.Error("error when getting round %w", err)
 				return
 			}
 
-			if err := job.processMessage(msgs[id]); err != nil {
+			if err := job.processMessage(msgs[jobIndex]); err != nil {
 				log.Error("worker: cannot process message, err = ", err)
 
 				w.broadcastResult(ExecutionResult{

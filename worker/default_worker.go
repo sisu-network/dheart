@@ -2,6 +2,7 @@ package worker
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -152,13 +153,14 @@ func (w *DefaultWorker) Start(preworkCache []*commonTypes.TssMessage) error {
 	cacheMsgs := w.preExecutionCache.PopAllMessages(w.workId, commonTypes.GetPreworkSelectionMsgType())
 	go w.preworkSelection.Run(cacheMsgs)
 
-	log.Info("Worker started for job ", w.request.WorkType)
+	log.Infof("Worker started for job %s, workid = %s", w.request.WorkType, w.workId)
 
 	return nil
 }
 
 func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
-	log.Info("Selection result: Success = ", result.Success)
+	log.Infof("%s Selection result: Success = %s", w.myPid.Id[len(w.myPid.Id)-4:],
+		result.Success)
 	if !result.Success {
 		w.callback.OnWorkFailed(w.request)
 		return
@@ -180,6 +182,8 @@ func (w *DefaultWorker) onSelectionResult(result SelectionResult) {
 
 func (w *DefaultWorker) startEcExecution(result SelectionResult) {
 	sortedPids := tss.SortPartyIDs(result.SelectedPids)
+
+	fmt.Printf("Starting EC Signing, mypid = %s\n", w.myPid.Id)
 
 	// We need to load the set of presigns data
 	var ecSigningPresign []*ecsigning.SignatureData_OneRoundData
@@ -256,6 +260,16 @@ func (w *DefaultWorker) getPidFromId(id string) *tss.PartyID {
 func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 	var addToCache bool
 
+	// if len(msg.UpdateMessages) > 0 {
+	// 	fmt.Printf("ProcessNewMessage %s received message From %s, workId %s, %s serialized Routing = %s\n",
+	// 		w.myPid.Id[len(w.myPid.Id)-4:],
+	// 		msg.From[len(msg.From)-4:],
+	// 		w.workId,
+	// 		msg.UpdateMessages[0].Round,
+	// 		msg.UpdateMessages[0].SerializedMessageRouting,
+	// 	)
+	// }
+
 	switch msg.Type {
 	case common.TssMessage_UPDATE_MESSAGES:
 		w.lock.RLock()
@@ -270,7 +284,14 @@ func (w *DefaultWorker) ProcessNewMessage(msg *commonTypes.TssMessage) error {
 		w.lock.RUnlock()
 
 		if !addToCache && w.executor != nil {
-			w.executor.ProcessUpdateMessage(msg)
+
+			// fmt.Printf("%s consuming workId %s, %s\n", w.myPid.Id[len(w.myPid.Id)-4:], w.workId, msg.UpdateMessages[0].Round)
+
+			err := w.executor.ProcessUpdateMessage(msg)
+			if err != nil {
+				log.Errorf("Failed to process update message %s, %s, err = %s", w.workId,
+					msg.UpdateMessages[0].Round, err)
+			}
 		}
 
 	case common.TssMessage_AVAILABILITY_REQUEST, common.TssMessage_AVAILABILITY_RESPONSE, common.TssMessage_PRE_EXEC_OUTPUT:

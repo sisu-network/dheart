@@ -57,6 +57,10 @@ func (mock *MockConnectionManager) AddListener(protocol protocol.ID, listener p2
 	// Do nothing.
 }
 
+func (mock *MockConnectionManager) IsReady() bool {
+	return false
+}
+
 // ---- /
 func getEngineTestData(n int) ([]ctypes.PrivKey, []*Node, tss.SortedPartyIDs, []*keygen.LocalPartySaveData) {
 	type dataWrapper struct {

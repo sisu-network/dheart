@@ -11,7 +11,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	maddr "github.com/multiformats/go-multiaddr"
 	"github.com/sisu-network/lib/log"
-	"go.uber.org/atomic"
+)
+
+const (
+	CONNECTION_STATUS_NOT_CONNECTED = iota
+	CONNECTION_STATUS_CONNECTED
 )
 
 type Connection struct {
@@ -19,38 +23,30 @@ type Connection struct {
 	addr   maddr.Multiaddr
 	host   *host.Host
 
-	streams *sync.Map
-
-	creatingStream *atomic.Bool
+	streams map[protocol.ID]network.Stream
+	lock    sync.RWMutex
+	status  int
 }
 
 func NewConnection(pID peer.ID, addr maddr.Multiaddr, host *host.Host) *Connection {
 	return &Connection{
-		peerId:         pID,
-		addr:           addr,
-		host:           host,
-		streams:        &sync.Map{},
-		creatingStream: atomic.NewBool(false),
+		peerId:  pID,
+		addr:    addr,
+		host:    host,
+		streams: make(map[protocol.ID]network.Stream),
+		status:  CONNECTION_STATUS_NOT_CONNECTED,
 	}
 }
 
-func (con *Connection) CreateStream(protocolId protocol.ID) (network.Stream, error) {
-	if con.creatingStream.Load() {
-		return nil, fmt.Errorf("Another stream is being created")
+func (con *Connection) ReleaseStream() {
+	for _, stream := range con.streams {
+		if stream != nil {
+			stream.Reset()
+		}
 	}
+}
 
-	con.creatingStream.Store(true)
-	defer con.creatingStream.Store(false)
-
-	// Remove old stream if any
-	old, ok := con.streams.Load(protocolId)
-	if ok {
-		log.Verbosef("Removing old stream for peer %s", con.peerId)
-		s := old.(network.Stream)
-		s.Close()
-		con.streams.Delete(protocolId)
-	}
-
+func (con *Connection) createStream(protocolId protocol.ID) (network.Stream, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), TimeoutConnecting)
 	defer cancel()
 	stream, err := (*con.host).NewStream(ctx, con.peerId, protocolId)
@@ -59,15 +55,37 @@ func (con *Connection) CreateStream(protocolId protocol.ID) (network.Stream, err
 		return nil, fmt.Errorf("fail to create new stream to peer: %s, %w", con.peerId, err)
 	}
 
-	con.streams.Store(protocolId, stream)
+	con.streams[protocolId] = stream
+
 	return stream, nil
 }
 
 func (con *Connection) writeToStream(msg []byte, protocolId protocol.ID) error {
-	value, ok := con.streams.Load(protocolId)
-	if !ok {
-		return fmt.Errorf("Connection is not ready. A stream is being created!")
+	stream := con.streams[protocolId]
+	if stream == nil {
+		var err error
+		stream, err = con.createStream(protocolId)
+		if err != nil {
+			log.Warnf("Cannot create a new stream, err = %v", err)
+			return err
+		}
 	}
 
-	return WriteStreamWithBuffer(msg, value.(network.Stream))
+	con.lock.Lock()
+	defer con.lock.Unlock()
+
+	err := WriteStreamWithBuffer(msg, stream)
+
+	// if err == network.ErrReset {
+	// 	var err error
+	// 	stream, err = con.createStream(protocolId)
+	// 	if err != nil {
+	// 		log.Warnf("Cannot create a new stream, err = %v", err)
+	// 		return err
+	// 	}
+
+	// 	return WriteStreamWithBuffer(msg, stream)
+	// }
+
+	return err
 }

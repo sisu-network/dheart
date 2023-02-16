@@ -137,7 +137,7 @@ func verifySignature(pubkey *ecdsa.PublicKey, msg []byte, R, S *big.Int) {
 	}
 }
 
-func verifyKeysignResult(testCount int, keysignch chan *htypes.KeysignResult,
+func verifyKeysignResult(index int, testCount int, keysignch chan *htypes.KeysignResult,
 	keysignInput *htypes.KeygenResult) {
 
 	for i := 0; i < testCount; i++ {
@@ -177,12 +177,14 @@ func verifyKeysignResult(testCount int, keysignch chan *htypes.KeysignResult,
 				verifySignature(&pk, msg.BytesToSign, new(big.Int).SetBytes(r), new(big.Int).SetBytes(s))
 			}
 
-			log.Infof("Signing succeeded for %s!", hex.EncodeToString(message))
+			log.Infof("Signing succeeded for %s, index = %d, i = %d", hex.EncodeToString(message),
+				index, i)
 
 		case htypes.OutcomeFailure:
 			panic("Failed to create signature")
 		case htypes.OutcometNotSelected:
-			log.Info("Node is not selected.")
+			log.Infof("Node is not selected for message %s, index = %d, i = %d",
+				hex.EncodeToString(message), index, i)
 		}
 	}
 }
@@ -202,6 +204,8 @@ func main() {
 	cm := p2p.NewConnectionManager(cfg)
 	if isSlow {
 		cm = thelper.NewSlowConnectionManager(cfg)
+	} else {
+		cm = cm.(*p2p.DefaultConnectionManager)
 	}
 	err := cm.Start(privateKey, "secp256k1")
 	if err != nil {
@@ -239,7 +243,14 @@ func main() {
 		tendermintPubKeys[i] = privKeys[i].PubKey()
 	}
 
-	time.Sleep(time.Second * 3)
+	for {
+		if cm.IsReady() {
+			time.Sleep(time.Second * 3)
+			break
+		}
+	}
+
+	time.Sleep(time.Second * time.Duration(3+n/4))
 
 	// Keygen
 	keygenResult := doKeygen(pids, index, engine, keygenCh)
@@ -252,28 +263,31 @@ func main() {
 	// Keysign
 	log.Info("Doing keysign now!")
 	rand.Seed(int64(seed + 110))
-	testCount := 4
+	testCount := 6
 	for i := 0; i < testCount; i++ {
 		msg := make([]byte, 20)
 		rand.Read(msg) //nolint
 		if err != nil {
 			panic(err)
 		}
-		go func(i int, msg []byte) {
-			workId := fmt.Sprintf("%s__%s", "keysign", hex.EncodeToString(msg))
-			chains := []string{"eth"}
-			threshold := utils.GetThreshold(len(pids))
-			request := types.NewEcSigningRequest(workId, pids, threshold, [][]byte{msg}, chains,
-				presignInput)
+		log.Info("Msg hex = ", hex.EncodeToString(msg))
 
-			err := engine.AddRequest(request)
-			if err != nil {
-				panic(err)
-			}
-		}(i, msg)
+		workId := fmt.Sprintf("%s__%s", "keysign", hex.EncodeToString(msg))
+		chains := []string{"eth"}
+		threshold := utils.GetThreshold(len(pids))
+
+		request := types.NewEcSigningRequest(workId, pids, threshold, [][]byte{msg}, chains,
+			presignInput)
+
+		err := engine.AddRequest(request)
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	verifyKeysignResult(testCount, keysignch, keygenResult)
+	verifyKeysignResult(index, testCount, keysignch, keygenResult)
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 2)
+
+	fmt.Printf("%d %s Done!!!!\n", index, nodes[index].PartyId.Id)
 }

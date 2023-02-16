@@ -108,6 +108,8 @@ func (s *PreworkSelection) Init() {
 }
 
 func (s *PreworkSelection) Run(cachedMsgs []*commonTypes.TssMessage) {
+	fmt.Printf("Running selection round, myPid = %s, leader = %s\n", s.myPid.Id, s.leader.Id)
+
 	if s.myPid.Id == s.leader.Id {
 		s.doPreExecutionAsLeader(cachedMsgs)
 	} else {
@@ -152,7 +154,7 @@ func (s *PreworkSelection) doPreExecutionAsLeader(cachedMsgs []*commonTypes.TssM
 		// Only send request message to parties that has not sent a message to us.
 		if s.availableParties.getParty(p.Id) == nil {
 			tssMsg := common.NewAvailabilityRequestMessage(s.myPid.Id, p.Id, s.request.WorkId)
-			log.Verbose("Leader: sending query to ", p.Id, "for workId = ", s.request.WorkId)
+			log.Verbosef("Leader: sending query to %s for workId = %s", p.Id, s.request.WorkId)
 			go s.dispatcher.UnicastMessage(p, tssMsg)
 		}
 	}
@@ -214,7 +216,11 @@ func (s *PreworkSelection) waitForMemberResponse() ([]string, []*tss.PartyID, er
 				s.availableParties.add(party, 1)
 				// TODO: Check if this is a new member to save one call for checkEnoughParticipants
 				if ok, presignIds, selectedPids := s.checkEnoughParticipants(); ok {
-					log.Info("Leader: selectedPids found")
+					log.Infof("Leader: selectedPids found, selectedPids = %s", selectedPids)
+					for _, pid := range selectedPids {
+						fmt.Print(pid.Id[len(pid.Id)-4:], " ")
+					}
+					fmt.Println()
 					return presignIds, selectedPids, nil
 				}
 			}
@@ -265,7 +271,7 @@ func (s *PreworkSelection) checkEnoughParticipants() (bool, []string, []*tss.Par
 
 // Finalize work as a leader and start execution.
 func (s *PreworkSelection) leaderFinalized(success bool, presignIds []string, selectedPids []*tss.PartyID) {
-	log.Verbose("Leader finalized, success = ", success)
+	log.Verbosef("%s leader finalized, success = %s", s.myPid.Id, success)
 
 	workId := s.request.WorkId
 	if !success { // Failure case
@@ -329,7 +335,7 @@ func (s *PreworkSelection) doPreExecutionAsMember(leader *tss.PartyID, cachedMsg
 // memberFinalized is called when all the participants have been finalized by the leader.
 // We either start execution or finish this work.
 func (s *PreworkSelection) memberFinalized(msg *common.PreExecOutputMessage) {
-	log.Verbose("memberFinalized, success = ", msg.Success)
+	log.Verbosef("%s member Finalized, success = %s", s.myPid.Id, msg.Success)
 
 	if msg.Success {
 		// Do basic message validation

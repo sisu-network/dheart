@@ -74,8 +74,15 @@ func NewEdSigningRequest(workId string, pIds tss.SortedPartyIDs, threshold int, 
 }
 
 func baseRequest(workType WorkType, workdId string, n int, threshold int, pIDs tss.SortedPartyIDs, batchSize int) *WorkRequest {
+	// Make a copy of pids so that when we sort pids, it does not change the indexes in the original pids.
+	copy := make([]*tss.PartyID, len(pIDs))
+	for i, pid := range pIDs {
+		copy[i] = tss.NewPartyID(pid.Id, pid.Moniker, pid.KeyInt())
+	}
+	copy = tss.SortPartyIDs(copy)
+
 	return &WorkRequest{
-		AllParties: pIDs,
+		AllParties: copy,
 		WorkType:   workType,
 		WorkId:     workdId,
 		BatchSize:  batchSize,

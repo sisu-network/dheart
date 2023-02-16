@@ -233,6 +233,20 @@ func (job *Job) startListening() {
 			job.addOutMessage(msg)
 			job.callback.OnJobMessage(job, msg)
 
+			s := fmt.Sprintf("%s a messsage is produced %s, %s from index %d",
+				job.party.PartyID().Id[len(job.party.PartyID().Id)-4:],
+				job.workId,
+				msg.String(),
+				msg.GetFrom().Index,
+			)
+
+			if msg.GetTo() != nil {
+				id := msg.GetTo()[0].Id
+				s += fmt.Sprintf(" (%s)", id[len(id)-4:])
+			}
+
+			fmt.Println(s)
+
 			if job.isDone() {
 				return
 			}
@@ -287,6 +301,27 @@ func (job *Job) startListening() {
 }
 
 func (job *Job) processMessage(msg tss.Message) *tss.Error {
+	_, routing, wireErr := msg.WireBytes()
+	if wireErr != nil {
+		return tss.NewError(wireErr, "", 0, nil, nil)
+	}
+
+	fmt.Printf("%s job process message %s, %s from %s to %s index %d\n",
+		job.party.PartyID().Id[len(job.party.PartyID().Id)-4:],
+		job.workId,
+		msg.Type(),
+		routing.From.Id[len(routing.From.Id)-4:],
+		routing.To,
+		routing.From.Index,
+	)
+
+	// fmt.Printf("%s job process message %s, %s %t\n",
+	// 	job.party.PartyID().Id[len(job.party.PartyID().Id)-4:],
+	// 	job.workId,
+	// 	msg.String(),
+	// 	msg.IsBroadcast(),
+	// )
+
 	err := helper.SharedPartyUpdater(job.party, msg)
 	if err != nil {
 		log.Error("Failed to process message:", msg.Type(), "err = ", err)
