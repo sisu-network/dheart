@@ -263,7 +263,7 @@ func main() {
 	// Keysign
 	log.Info("Doing keysign now!")
 	rand.Seed(int64(seed + 110))
-	testCount := 6
+	testCount := 10
 	for i := 0; i < testCount; i++ {
 		msg := make([]byte, 20)
 		rand.Read(msg) //nolint

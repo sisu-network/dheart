@@ -249,16 +249,15 @@ func (engine *defaultEngine) OnAskMessage(tssMsg *commonTypes.TssMessage) error 
 // finishWorker removes a worker from the current worker pool.
 func (engine *defaultEngine) finishWorker(workId string) {
 	engine.workLock.Lock()
-	fmt.Printf("%s deleting worker with id %s\n", engine.myPid.Id[len(engine.myPid.Id)-4:], workId)
 	delete(engine.workers, workId)
 	engine.workLock.Unlock()
 
 	// fmt.Println
-	log.Verbosef("%s: %s finished. Worker queue len = %d", engine.myPid.Id[len(engine.myPid.Id)-4:],
-		workId, len(engine.workers))
+	s := fmt.Sprintf("%s finished work %s: remaining work id ", engine.myPid.Id, workId)
 	for id := range engine.workers {
-		fmt.Printf("%s: remaining workd id %s\n", engine.myPid.Id[len(engine.myPid.Id)-4:], id)
+		s += id
 	}
+	log.Verbosef(s)
 
 	// Start next work
 	engine.startNextWork()
@@ -364,9 +363,6 @@ func (engine *defaultEngine) sendSignMessaged(signedMessage *common.SignedMessag
 			continue
 		}
 
-		if signedMessage.TssMessage.Type.String() == "PRE_EXEC_OUTPUT" {
-			fmt.Printf("Send PRE_EXEC_OUTPUT to %s \n", pid.Id)
-		}
 		node := engine.getNodeFromPeerId(pid.Id)
 
 		if node == nil {

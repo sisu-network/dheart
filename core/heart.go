@@ -327,14 +327,9 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	nodes := NewNodes(tPubKeys)
 	pids := make([]*tss.PartyID, n)
 	for i, node := range nodes {
-		pids[i] = tss.NewPartyID(
-			node.PartyId.Id,
-			node.PartyId.Moniker,
-			node.PartyId.KeyInt(),
-		)
+		pids[i] = node.PartyId
 	}
 
-	sorted := tss.SortPartyIDs(pids)
 	h.engine.AddNodes(nodes)
 
 	// TODO: Find unique workId
@@ -360,8 +355,8 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 		}
 		workRequest = types.NewEcSigningRequest(
 			workId,
-			sorted,
-			utils.GetThreshold(sorted.Len()),
+			pids,
+			utils.GetThreshold(len(pids)),
 			signMessages,
 			chains,
 			presignInput,
@@ -372,7 +367,7 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 			return nil
 		}
 
-		workRequest = types.NewEdSigningRequest(workId, sorted, utils.GetThreshold(sorted.Len()),
+		workRequest = types.NewEdSigningRequest(workId, pids, utils.GetThreshold(len(pids)),
 			signMessages, chains, keygenData)
 	}
 

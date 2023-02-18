@@ -13,11 +13,6 @@ import (
 	"github.com/sisu-network/lib/log"
 )
 
-const (
-	CONNECTION_STATUS_NOT_CONNECTED = iota
-	CONNECTION_STATUS_CONNECTED
-)
-
 type Connection struct {
 	peerId peer.ID
 	addr   maddr.Multiaddr
@@ -34,7 +29,6 @@ func NewConnection(pID peer.ID, addr maddr.Multiaddr, host *host.Host) *Connecti
 		addr:    addr,
 		host:    host,
 		streams: make(map[protocol.ID]network.Stream),
-		status:  CONNECTION_STATUS_NOT_CONNECTED,
 	}
 }
 
@@ -74,18 +68,5 @@ func (con *Connection) writeToStream(msg []byte, protocolId protocol.ID) error {
 	con.lock.Lock()
 	defer con.lock.Unlock()
 
-	err := WriteStreamWithBuffer(msg, stream)
-
-	// if err == network.ErrReset {
-	// 	var err error
-	// 	stream, err = con.createStream(protocolId)
-	// 	if err != nil {
-	// 		log.Warnf("Cannot create a new stream, err = %v", err)
-	// 		return err
-	// 	}
-
-	// 	return WriteStreamWithBuffer(msg, stream)
-	// }
-
-	return err
+	return WriteStreamWithBuffer(msg, stream)
 }
