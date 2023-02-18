@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/sisu-network/dheart/worker/types"
+	"github.com/sisu-network/lib/log"
 )
 
 // TODO: add job priority for this queue. Keygen &signing should have more priority than presign even
@@ -50,7 +51,7 @@ func (q *requestQueue) AddWork(work *types.WorkRequest) bool {
 		q.queue = append([]*types.WorkRequest{work}, q.queue...)
 	} else {
 		// Insert into the middle of the queue
-		first := q.queue[:position]
+		first := q.queue[:position+1]
 		second := q.queue[position+1:]
 
 		q.queue = append(first, work)
@@ -79,4 +80,17 @@ func (q *requestQueue) Size() int {
 	defer q.lock.RUnlock()
 
 	return len(q.queue)
+}
+
+// Print is a debugging function
+func (q *requestQueue) Print() {
+	q.lock.RLock()
+	queue := q.queue
+	q.lock.RUnlock()
+
+	s := ""
+	for _, work := range queue {
+		s = s + " " + work.WorkId
+	}
+	log.Verbosef("Print queue: %v", s)
 }

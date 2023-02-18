@@ -44,6 +44,10 @@ func (scm *SlowConnectionManager) AddListener(protocol protocol.ID, listener p2p
 	scm.cm.AddListener(protocol, listener)
 }
 
+func (scm *SlowConnectionManager) IsReady() bool {
+	return scm.cm.IsReady()
+}
+
 func NewSlowConnectionManager(config p2pTypes.ConnectionsConfig) p2p.ConnectionManager {
 	return &SlowConnectionManager{
 		cm: p2p.NewConnectionManager(config),

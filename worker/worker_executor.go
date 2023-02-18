@@ -134,8 +134,7 @@ func (w *WorkerExecutor) Init() (err error) {
 	params := tss.NewParameters(p2pCtx, w.myPid, len(w.pIDs), w.request.Threshold)
 	batchSize := w.request.BatchSize
 	jobs := make([]*Job, batchSize)
-	log.Info("batchSize = ", batchSize)
-	log.Info("WorkerExecutor WorkType = ", w.workType)
+	log.Infof("%s WorkerExecutor WorkType = %s", w.myPid.Id, w.workType)
 
 	workId := w.request.WorkId
 	// Creates all jobs
@@ -261,7 +260,6 @@ func (w *WorkerExecutor) OnJobMessage(job *Job, msg tss.Message) {
 		}
 
 		if dest == nil {
-			// broadcast
 			w.dispatcher.BroadcastMessage(w.pIDs, tssMsg)
 		} else {
 			w.dispatcher.UnicastMessage(dest[0], tssMsg)
@@ -367,14 +365,14 @@ func (w *WorkerExecutor) ProcessUpdateMessage(tssMsg *commonTypes.TssMessage) er
 	w.messageMonitor.NewMessageReceived(msgs[0], from)
 
 	for i, j := range jobs {
-		go func(id int, job *Job) {
-			_, err := message.GetMsgRound(msgs[id].Content())
+		go func(jobIndex int, job *Job) {
+			_, err := message.GetMsgRound(msgs[jobIndex].Content())
 			if err != nil {
 				log.Error("error when getting round %w", err)
 				return
 			}
 
-			if err := job.processMessage(msgs[id]); err != nil {
+			if err := job.processMessage(msgs[jobIndex]); err != nil {
 				log.Error("worker: cannot process message, err = ", err)
 
 				w.broadcastResult(ExecutionResult{

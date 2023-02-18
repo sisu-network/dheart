@@ -38,7 +38,8 @@ func (engine *defaultEngine) onEcKeygenFinished(request *types.WorkRequest, outp
 }
 
 func (engine *defaultEngine) onEcSigningFinished(request *types.WorkRequest, data []*libCommon.ECSignature) {
-	log.Info("Signing finished for Ecdsa workId ", request.WorkId)
+	log.Infof("%s: Signing finished for Ecdsa workId %s", engine.myPid.Id[len(engine.myPid.Id)-4:],
+		request.WorkId)
 
 	signatures := make([][]byte, len(data))
 	for i, sig := range data {

@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	maddr "github.com/multiformats/go-multiaddr"
 	"github.com/sisu-network/lib/log"
+	"go.uber.org/atomic"
 
 	types "github.com/sisu-network/dheart/p2p/types"
 )
@@ -41,6 +42,8 @@ type ConnectionManager interface {
 
 	// Adds data listener for a protocol.
 	AddListener(protocol protocol.ID, listener P2PDataListener)
+
+	IsReady() bool
 }
 
 // DefaultConnectionManager implements ConnectionManager interface.
@@ -54,6 +57,7 @@ type DefaultConnectionManager struct {
 	connections      map[peer.ID]*Connection
 	listenerLock     sync.RWMutex
 	protocolListener map[protocol.ID]P2PDataListener
+	ready            *atomic.Bool
 }
 
 func NewConnectionManager(config types.ConnectionsConfig) ConnectionManager {
@@ -62,6 +66,7 @@ func NewConnectionManager(config types.ConnectionsConfig) ConnectionManager {
 		rendezvous:       config.Rendezvous,
 		connections:      make(map[peer.ID]*Connection),
 		protocolListener: make(map[protocol.ID]P2PDataListener),
+		ready:            atomic.NewBool(false),
 	}
 }
 
@@ -131,6 +136,10 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) e
 	return nil
 }
 
+func (cm *DefaultConnectionManager) IsReady() bool {
+	return cm.ready.Load()
+}
+
 func (cm *DefaultConnectionManager) AddListener(protocol protocol.ID, listener P2PDataListener) {
 	cm.listenerLock.Lock()
 	defer cm.listenerLock.Unlock()
@@ -164,19 +173,15 @@ func (cm *DefaultConnectionManager) handleStream(stream network.Stream) {
 		dataBuf, err := ReadStreamWithBuffer(stream)
 
 		if err != nil {
-			log.Errorf("Failed to read from stream, err = %v", err)
-			if err == network.ErrReset {
-				time.Sleep(time.Second * 3)
-			}
+			log.Warn(err)
 			// TODO: handle retry here.
-			continue
+			return
 		}
-
 		if dataBuf != nil {
 			listener := cm.getListener(protocol)
 			if listener == nil {
 				// No listener. Ignore the message
-				continue
+				return
 			}
 
 			go func(peerIDString string, dataBuf []byte) {
@@ -207,6 +212,13 @@ func (cm *DefaultConnectionManager) discover(ctx context.Context, host host.Host
 }
 
 func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
+	// Creates connection objects.
+	for _, peerAddr := range cm.bootstrapPeers {
+		addrInfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+		conn := NewConnection(addrInfo.ID, peerAddr, &cm.host)
+		cm.connections[addrInfo.ID] = conn
+	}
+
 	// Attempts to connect to every bootstrapped peers.
 	log.Info("Trying to create connections with peers...")
 	wg := &sync.WaitGroup{}
@@ -223,34 +235,18 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 					log.Warn(fmt.Sprintf("Error while connecting to node %q: %-v", peerinfo, err))
 					time.Sleep(time.Second * 3)
 				} else {
-					log.Info("Connection established with bootstrap node: %q", *peerinfo)
+					log.Infof("%s Connection established with bootstrap node: %q", cm.myNetworkId, *peerinfo)
 					break
 				}
 			}
+
+			cm.ready.Store(true)
 		}()
 	}
 	wg.Wait()
-
-	// Creates connection objects.
-	for _, peerAddr := range cm.bootstrapPeers {
-		addrInfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-		conn := NewConnection(addrInfo.ID, peerAddr, &cm.host)
-
-		for i := 0; i < 10; i++ {
-			_, err := conn.CreateStream(TSSProtocolID)
-			if err != nil {
-				log.Errorf("Failed to create new stream, retry i = %d, err = %v", i, err)
-			} else {
-				break
-			}
-		}
-
-		cm.connections[addrInfo.ID] = conn
-	}
 }
 
-func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID,
-	msg []byte) error {
+func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error {
 	conn := cm.connections[pID]
 	if conn == nil {
 		log.Error("Connection to pid not found, pid = ", pID)
@@ -259,14 +255,7 @@ func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protoc
 
 	err := conn.writeToStream(msg, protocolId)
 	if err != nil {
-		log.HighVerbosef("Failed writing to stream to peer %s, err = %v", pID, err)
-		if err == network.ErrReset {
-			// The stream is reset. We need to recreate the stream for this connection.
-			_, err = conn.CreateStream(protocolId)
-			if err != nil {
-				log.Errorf("Failed to recreate connection stream for %s, err = %v", pID, err)
-			}
-		}
+		log.HighVerbosef("%s failed writing to stream, err = ", cm.myNetworkId, err)
 	}
 
 	return err

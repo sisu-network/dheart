@@ -144,6 +144,7 @@ func (engine *defaultEngine) AddRequest(request *types.WorkRequest) error {
 	if engine.requestQueue.AddWork(request) {
 		engine.startNextWork()
 	}
+
 	return nil
 }
 
@@ -251,7 +252,12 @@ func (engine *defaultEngine) finishWorker(workId string) {
 	delete(engine.workers, workId)
 	engine.workLock.Unlock()
 
-	log.Verbosef("%s finished. Worker queue len = %d", workId, len(engine.workers))
+	// fmt.Println
+	s := fmt.Sprintf("%s finished work %s: remaining work id ", engine.myPid.Id, workId)
+	for id := range engine.workers {
+		s += id
+	}
+	log.Verbosef(s)
 
 	// Start next work
 	engine.startNextWork()
@@ -266,6 +272,7 @@ func (engine *defaultEngine) startNextWork() {
 		engine.workLock.Unlock()
 		return
 	}
+
 	nextWork := engine.requestQueue.Pop()
 	engine.workLock.Unlock()
 
@@ -359,7 +366,7 @@ func (engine *defaultEngine) sendSignMessaged(signedMessage *common.SignedMessag
 		node := engine.getNodeFromPeerId(pid.Id)
 
 		if node == nil {
-			log.Error("Cannot find node with party key", pid.Id)
+			log.Errorf("Cannot find node with party key %s", pid.Id)
 			return
 		}
 
@@ -415,7 +422,8 @@ func (engine *defaultEngine) OnNetworkMessage(message *p2ptypes.P2PMessage) {
 	}
 
 	// TODO: Check message signature here.
-	if tssMessage.Type == common.TssMessage_UPDATE_MESSAGES && len(tssMessage.UpdateMessages) > 0 && tssMessage.IsBroadcast() {
+	if tssMessage.Type == common.TssMessage_UPDATE_MESSAGES && len(tssMessage.UpdateMessages) > 0 &&
+		tssMessage.IsBroadcast() {
 		engine.cacheWorkMsg(signedMessage)
 	}
 

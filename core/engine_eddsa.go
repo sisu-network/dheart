@@ -27,7 +27,8 @@ func (engine *defaultEngine) onEdKeygenFinished(request *wtypes.WorkRequest, out
 }
 
 func (engine *defaultEngine) onEdSigningFinished(request *wtypes.WorkRequest, data []*edsigning.SignatureData) {
-	log.Info("Signing finished for Eddsa workId ", request.WorkId)
+	log.Infof("%s Signing finished for Eddsa workId %s", engine.myPid.Id[len(engine.myPid.Id)-4:],
+		request.WorkId)
 
 	signatures := make([][]byte, len(data))
 	for i := range data {
