@@ -121,6 +121,7 @@ func (d *SqlDatabase) Connect() error {
 		if err != nil {
 			return err
 		}
+
 		database.Close()
 	}
 
@@ -134,6 +135,11 @@ func (d *SqlDatabase) Connect() error {
 	}
 
 	d.db = database
+	database.SetMaxIdleConns(5)
+	database.SetMaxOpenConns(10)
+	database.SetConnMaxIdleTime(5 * time.Second)
+	database.SetConnMaxLifetime(30 * time.Second)
+
 	log.Info("Db is connected successfully")
 	return nil
 }
@@ -241,9 +247,9 @@ func (d *SqlDatabase) SavePreparams(preparams *eckeygen.LocalPreParams) error {
 	}
 
 	params := []interface{}{libchain.KEY_TYPE_ECDSA, bz}
-
 	query := "INSERT INTO preparams (key_type, preparams) VALUES (?, ?)"
 	_, err = d.db.Exec(query, params...)
+
 	return err
 }
 
