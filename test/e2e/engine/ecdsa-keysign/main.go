@@ -201,15 +201,10 @@ func main() {
 	flag.IntVar(&seed, "seed", 0, "seed for the test")
 	flag.Parse()
 
-	mockDb := &db.MockDatabase{
-		LoadPeersFunc: func() []p2ptypes.Peer {
-			return []p2ptypes.Peer{}
-		},
-	}
 	cfg, privateKey := p2p.GetMockSecp256k1Config(n, index)
-	cm := p2p.NewConnectionManager(cfg, mockDb)
+	cm := p2p.NewConnectionManager(cfg, []p2ptypes.Peer{})
 	if isSlow {
-		cm = thelper.NewSlowConnectionManager(cfg, mockDb)
+		cm = thelper.NewSlowConnectionManager(cfg, []p2ptypes.Peer{})
 	} else {
 		cm = cm.(*p2p.DefaultConnectionManager)
 	}

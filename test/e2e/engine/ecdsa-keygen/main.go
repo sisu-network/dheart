@@ -72,15 +72,10 @@ func main() {
 	flag.BoolVar(&isSlowNode, "is-slow", false, "Use it when testing message caching mechanism")
 	flag.Parse()
 
-	mockDb := &db.MockDatabase{
-		LoadPeersFunc: func() []p2ptypes.Peer {
-			return []p2ptypes.Peer{}
-		},
-	}
 	cfg, privateKey := p2p.GetMockSecp256k1Config(n, index)
-	cm := p2p.NewConnectionManager(cfg, mockDb)
+	cm := p2p.NewConnectionManager(cfg, []p2ptypes.Peer{})
 	if isSlowNode {
-		cm = thelper.NewSlowConnectionManager(cfg, mockDb)
+		cm = thelper.NewSlowConnectionManager(cfg, []p2ptypes.Peer{})
 	}
 	err := cm.Start(privateKey, "secp256k1")
 

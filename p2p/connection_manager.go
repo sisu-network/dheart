@@ -19,7 +19,7 @@ import (
 	"github.com/sisu-network/lib/log"
 	"go.uber.org/atomic"
 
-	"github.com/sisu-network/dheart/db"
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	types "github.com/sisu-network/dheart/p2p/types"
 )
 
@@ -59,17 +59,17 @@ type DefaultConnectionManager struct {
 	listenerLock     sync.RWMutex
 	protocolListener map[protocol.ID]P2PDataListener
 	ready            *atomic.Bool
-	db               db.Database
+	savedPeers       []p2ptypes.Peer
 }
 
-func NewConnectionManager(config types.ConnectionsConfig, db db.Database) ConnectionManager {
+func NewConnectionManager(config types.ConnectionsConfig, savedPeers []p2ptypes.Peer) ConnectionManager {
 	return &DefaultConnectionManager{
 		config:           config,
 		rendezvous:       config.Rendezvous,
 		connections:      make(map[peer.ID]*Connection),
 		protocolListener: make(map[protocol.ID]P2PDataListener),
 		ready:            atomic.NewBool(false),
-		db:               db,
+		savedPeers:       savedPeers,
 	}
 }
 

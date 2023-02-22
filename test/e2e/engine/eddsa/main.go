@@ -14,7 +14,6 @@ import (
 
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/core/config"
-	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/test/e2e/helper"
 	"github.com/sisu-network/dheart/types"
@@ -69,13 +68,8 @@ func main() {
 	flag.IntVar(&n, "n", 2, "number of nodes in the test")
 	flag.Parse()
 
-	mockDb := &db.MockDatabase{
-		LoadPeersFunc: func() []p2ptypes.Peer {
-			return []p2ptypes.Peer{}
-		},
-	}
 	cfg, privateKey := p2p.GetMockSecp256k1Config(n, index)
-	cm := p2p.NewConnectionManager(cfg, mockDb)
+	cm := p2p.NewConnectionManager(cfg, []p2ptypes.Peer{})
 	err := cm.Start(privateKey, "secp256k1")
 	if err != nil {
 		panic(err)
