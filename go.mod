@@ -18,6 +18,7 @@ require (
 	github.com/logdna/logdna-go v1.0.2
 	github.com/mattn/go-sqlite3 v1.14.13
 	github.com/multiformats/go-multiaddr v0.8.0
+	github.com/puzpuzpuz/xsync v1.5.2
 	github.com/sisu-network/lib v0.0.2
 	github.com/sisu-network/tss-lib v0.1.3-0.20220602042956-0a991a4b5046
 	github.com/stretchr/testify v1.8.1

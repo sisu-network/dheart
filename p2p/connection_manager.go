@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	maddr "github.com/multiformats/go-multiaddr"
+	"github.com/puzpuzpuz/xsync"
 	"github.com/sisu-network/lib/log"
 	"go.uber.org/atomic"
 
@@ -55,7 +56,7 @@ type DefaultConnectionManager struct {
 	port             int
 	rendezvous       string
 	bootstrapPeers   []maddr.Multiaddr
-	connections      map[peer.ID]*Connection
+	connections      *xsync.MapOf[peer.ID, *Connection]
 	listenerLock     sync.RWMutex
 	protocolListener map[protocol.ID]P2PDataListener
 	ready            *atomic.Bool
@@ -66,7 +67,7 @@ func NewConnectionManager(config types.ConnectionsConfig, savedPeers []p2ptypes.
 	return &DefaultConnectionManager{
 		config:           config,
 		rendezvous:       config.Rendezvous,
-		connections:      make(map[peer.ID]*Connection),
+		connections:      new(xsync.MapOf[peer.ID, *Connection]),
 		protocolListener: make(map[protocol.ID]P2PDataListener),
 		ready:            atomic.NewBool(false),
 		savedPeers:       savedPeers,
@@ -176,7 +177,7 @@ func (cm *DefaultConnectionManager) handleStream(stream network.Stream) {
 		dataBuf, err := ReadStreamWithBuffer(stream)
 
 		if err != nil {
-			log.Warn(err)
+			log.Warn("Failed to read stream, err = ", err)
 			// TODO: handle retry here.
 			return
 		}
@@ -219,7 +220,7 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 	for _, peerAddr := range cm.bootstrapPeers {
 		addrInfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
 		conn := NewConnection(addrInfo.ID, peerAddr, &cm.host)
-		cm.connections[addrInfo.ID] = conn
+		cm.connections.Store(addrInfo.ID, conn)
 	}
 
 	// Attempts to connect to every bootstrapped peers.
@@ -250,8 +251,8 @@ func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
 }
 
 func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error {
-	conn := cm.connections[pID]
-	if conn == nil {
+	conn, ok := cm.connections.Load(pID)
+	if !ok {
 		log.Error("Connection to pid not found, pid = ", pID)
 		return errors.New("pID not found")
 	}
