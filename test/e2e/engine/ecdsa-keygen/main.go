@@ -9,6 +9,7 @@ import (
 	"github.com/sisu-network/dheart/core/config"
 	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	thelper "github.com/sisu-network/dheart/test/e2e/helper"
 	htypes "github.com/sisu-network/dheart/types"
 	"github.com/sisu-network/dheart/worker"
@@ -71,10 +72,15 @@ func main() {
 	flag.BoolVar(&isSlowNode, "is-slow", false, "Use it when testing message caching mechanism")
 	flag.Parse()
 
+	mockDb := &db.MockDatabase{
+		LoadPeersFunc: func() []p2ptypes.Peer {
+			return []p2ptypes.Peer{}
+		},
+	}
 	cfg, privateKey := p2p.GetMockSecp256k1Config(n, index)
-	cm := p2p.NewConnectionManager(cfg)
+	cm := p2p.NewConnectionManager(cfg, mockDb)
 	if isSlowNode {
-		cm = thelper.NewSlowConnectionManager(cfg)
+		cm = thelper.NewSlowConnectionManager(cfg, mockDb)
 	}
 	err := cm.Start(privateKey, "secp256k1")
 

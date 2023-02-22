@@ -19,6 +19,7 @@ type MockDatabase struct {
 
 	GetAvailablePresignShortFormFunc func() ([]string, []string, error)
 	LoadPresignFunc                  func(presignIds []string) ([]*ecsigning.SignatureData_OneRoundData, error)
+	LoadPeersFunc                    func() []p2ptypes.Peer
 }
 
 func NewMockDatabase() Database {
@@ -85,10 +86,10 @@ func (m *MockDatabase) UpdatePresignStatus(presignIds []string) error {
 	return nil
 }
 
-func (m *MockDatabase) SavePeers([]*p2ptypes.Peer) error {
+func (m *MockDatabase) SavePeers([]p2ptypes.Peer) error {
 	return nil
 }
 
-func (m *MockDatabase) LoadPeers() []*p2ptypes.Peer {
+func (m *MockDatabase) LoadPeers() []p2ptypes.Peer {
 	return nil
 }

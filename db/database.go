@@ -58,8 +58,8 @@ type Database interface {
 	LoadPresignStatus(presignIds []string) ([]string, error)
 	UpdatePresignStatus(presignIds []string) error
 
-	SavePeers([]*p2ptypes.Peer) error
-	LoadPeers() []*p2ptypes.Peer
+	SavePeers([]p2ptypes.Peer) error
+	LoadPeers() []p2ptypes.Peer
 }
 
 type dbLogger struct {
@@ -528,7 +528,7 @@ func (d *SqlDatabase) UpdatePresignStatus(presignIds []string) error {
 	return err
 }
 
-func (d *SqlDatabase) SavePeers(peers []*p2ptypes.Peer) error {
+func (d *SqlDatabase) SavePeers(peers []p2ptypes.Peer) error {
 	query := "INSERT INTO peers (`address`, pubkey, pubkey_type) VALUES "
 	query = query + getQueryQuestionMark(len(peers), 3)
 
@@ -540,8 +540,8 @@ func (d *SqlDatabase) SavePeers(peers []*p2ptypes.Peer) error {
 	return nil
 }
 
-func (d *SqlDatabase) LoadPeers() []*p2ptypes.Peer {
-	peers := make([]*p2ptypes.Peer, 0)
+func (d *SqlDatabase) LoadPeers() []p2ptypes.Peer {
+	peers := make([]p2ptypes.Peer, 0)
 	query := fmt.Sprintf("SELECT `address`, pubkey, pubkey_type FROM peers")
 
 	rows, err := d.db.Query(query)
@@ -559,7 +559,7 @@ func (d *SqlDatabase) LoadPeers() []*p2ptypes.Peer {
 			continue
 		}
 
-		peer := &p2ptypes.Peer{
+		peer := p2ptypes.Peer{
 			Address:    nullableAddress.String,
 			PubKey:     nullablePubkey.String,
 			PubKeyType: nullablePubkey.String,

@@ -20,6 +20,6 @@ type ConnectionsConfig struct {
 	Port           int    `toml:"port"`
 	Rendezvous     string `toml:"rendezvous"`
 	Protocol       protocol.ID
-	Peers          []*Peer `toml:"peers"`
+	Peers          []Peer `toml:"peers"`
 	PrivateKeyType string
 }

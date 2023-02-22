@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	"github.com/sisu-network/lib/log"
@@ -42,8 +43,13 @@ func main() {
 
 	n = 2
 
+	mockDb := &db.MockDatabase{
+		LoadPeersFunc: func() []p2ptypes.Peer {
+			return []p2ptypes.Peer{}
+		},
+	}
 	config, privateKey := p2p.GetMockSecp256k1Config(n, index)
-	cm := p2p.NewConnectionManager(config)
+	cm := p2p.NewConnectionManager(config, mockDb)
 
 	dataChan := make(chan *p2ptypes.P2PMessage)
 

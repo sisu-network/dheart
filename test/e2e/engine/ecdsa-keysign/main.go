@@ -8,6 +8,7 @@ import (
 	"math/rand"
 
 	ipfslog "github.com/ipfs/go-log"
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 
 	"flag"
 	"fmt"
@@ -200,10 +201,15 @@ func main() {
 	flag.IntVar(&seed, "seed", 0, "seed for the test")
 	flag.Parse()
 
+	mockDb := &db.MockDatabase{
+		LoadPeersFunc: func() []p2ptypes.Peer {
+			return []p2ptypes.Peer{}
+		},
+	}
 	cfg, privateKey := p2p.GetMockSecp256k1Config(n, index)
-	cm := p2p.NewConnectionManager(cfg)
+	cm := p2p.NewConnectionManager(cfg, mockDb)
 	if isSlow {
-		cm = thelper.NewSlowConnectionManager(cfg)
+		cm = thelper.NewSlowConnectionManager(cfg, mockDb)
 	} else {
 		cm = cm.(*p2p.DefaultConnectionManager)
 	}

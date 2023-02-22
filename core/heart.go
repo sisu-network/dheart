@@ -114,7 +114,7 @@ func (h *Heart) initConnectionManager() error {
 	log.Info("Creating connection manager")
 
 	// Connection manager
-	h.cm = p2p.NewConnectionManager(h.config.Connection)
+	h.cm = p2p.NewConnectionManager(h.config.Connection, h.db)
 
 	// Engine
 	myNode := NewNode(h.privateKey.PubKey())

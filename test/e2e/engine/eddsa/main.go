@@ -6,6 +6,7 @@ import (
 	"time"
 
 	cardanobf "github.com/echovl/cardano-go/blockfrost"
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/echovl/cardano-go"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/sisu-network/dheart/core"
 	"github.com/sisu-network/dheart/core/config"
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	"github.com/sisu-network/dheart/test/e2e/helper"
 	"github.com/sisu-network/dheart/types"
@@ -67,8 +69,13 @@ func main() {
 	flag.IntVar(&n, "n", 2, "number of nodes in the test")
 	flag.Parse()
 
+	mockDb := &db.MockDatabase{
+		LoadPeersFunc: func() []p2ptypes.Peer {
+			return []p2ptypes.Peer{}
+		},
+	}
 	cfg, privateKey := p2p.GetMockSecp256k1Config(n, index)
-	cm := p2p.NewConnectionManager(cfg)
+	cm := p2p.NewConnectionManager(cfg, mockDb)
 	err := cm.Start(privateKey, "secp256k1")
 	if err != nil {
 		panic(err)

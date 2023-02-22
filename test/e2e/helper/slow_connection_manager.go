@@ -7,6 +7,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/sisu-network/dheart/db"
 	"github.com/sisu-network/dheart/p2p"
 	p2pTypes "github.com/sisu-network/dheart/p2p/types"
 	"github.com/sisu-network/dheart/types/common"
@@ -48,8 +49,8 @@ func (scm *SlowConnectionManager) IsReady() bool {
 	return scm.cm.IsReady()
 }
 
-func NewSlowConnectionManager(config p2pTypes.ConnectionsConfig) p2p.ConnectionManager {
+func NewSlowConnectionManager(config p2pTypes.ConnectionsConfig, database db.Database) p2p.ConnectionManager {
 	return &SlowConnectionManager{
-		cm: p2p.NewConnectionManager(config),
+		cm: p2p.NewConnectionManager(config, database),
 	}
 }
