@@ -3,10 +3,10 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"sync"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/puzpuzpuz/xsync"
 	"github.com/sisu-network/lib/log"
 
 	"github.com/sisu-network/dheart/core/cache"
@@ -69,21 +69,19 @@ type defaultEngine struct {
 	callback EngineCallback
 	cm       p2p.ConnectionManager
 	signer   signer.Signer
-	nodes    map[string]*Node
+	nodes    *xsync.MapOf[string, *Node]
 	config   config.TimeoutConfig
 
 	///////////////////////
 	// Mutable data. Any data change requires a lock operation.
 	///////////////////////
-	workers      map[string]worker.Worker
+	workers      *xsync.MapOf[string, worker.Worker]
 	requestQueue *requestQueue
 
-	workLock *sync.RWMutex
 	// Cache all message before a worker starts
 	preworkCache *cache.MessageCache
 	// Cache messages during and after worker's execution.
 	workCache       *cache.WorkMessageCache
-	nodeLock        *sync.RWMutex
 	presignsManager components.AvailablePresigns
 }
 
@@ -94,14 +92,12 @@ func NewEngine(myNode *Node, cm p2p.ConnectionManager, db db.Database, callback 
 		myPid:           myNode.PartyId,
 		db:              db,
 		cm:              cm,
-		workers:         make(map[string]worker.Worker),
+		workers:         new(xsync.MapOf[string, worker.Worker]),
 		requestQueue:    NewRequestQueue(),
-		workLock:        &sync.RWMutex{},
 		preworkCache:    cache.NewMessageCache(),
 		callback:        callback,
-		nodes:           make(map[string]*Node),
+		nodes:           new(xsync.MapOf[string, *Node]),
 		signer:          signer.NewDefaultSigner(privateKey),
-		nodeLock:        &sync.RWMutex{},
 		presignsManager: components.NewAvailPresignManager(db),
 		config:          config,
 		workCache:       cache.NewWorkMessageCache(cache.MaxMessagePerNode, myNode.PartyId),
@@ -118,11 +114,8 @@ func (engine *defaultEngine) Init() error {
 }
 
 func (engine *defaultEngine) AddNodes(nodes []*Node) {
-	engine.nodeLock.Lock()
-	defer engine.nodeLock.Unlock()
-
 	for _, node := range nodes {
-		engine.nodes[node.PeerId.String()] = node
+		engine.nodes.Store(node.PeerId.String(), node)
 	}
 }
 
@@ -135,8 +128,8 @@ func (engine *defaultEngine) AddRequest(request *types.WorkRequest) error {
 	// Make sure that we know all the partyid in the request.
 	for _, partyId := range request.AllParties {
 		key := partyId.Id
-		node := engine.getNodeFromPeerId(key)
-		if node == nil && key != engine.myPid.Id {
+		_, ok := engine.nodes.Load(key)
+		if !ok && key != engine.myPid.Id {
 			return fmt.Errorf("A party is the request cannot be found in the node list: %s", key)
 		}
 	}
@@ -165,17 +158,13 @@ func (engine *defaultEngine) startWork(request *types.WorkRequest) {
 			engine.config, MaxBatchSize, engine.presignsManager)
 	}
 
-	engine.workLock.Lock()
-
-	engine.workers[request.WorkId] = w
+	engine.workers.Store(request.WorkId, w)
 	cachedMsgs := engine.preworkCache.PopAllMessages(request.WorkId, nil)
 	log.Info("Starting a work with id ", request.WorkId, " with cache size ", len(cachedMsgs))
 
 	if err := w.Start(cachedMsgs); err != nil {
 		log.Error("Cannot start work error = ", err)
 	}
-
-	engine.workLock.Unlock()
 }
 
 // ProcessNewMessage processes new incoming tss message from network.
@@ -193,14 +182,12 @@ func (engine *defaultEngine) ProcessNewMessage(tssMsg *commonTypes.TssMessage) e
 	default:
 		addToCache := false
 
-		engine.workLock.RLock()
-		worker := engine.getWorker(tssMsg.WorkId)
-		if worker == nil {
+		worker, ok := engine.workers.Load(tssMsg.WorkId)
+		if !ok {
 			// This could be the case when a worker has not started yet. Save it to the cache.
 			engine.preworkCache.AddMessage(tssMsg)
 			addToCache = true
 		}
-		engine.workLock.RUnlock()
 
 		if !addToCache {
 			if err := worker.ProcessNewMessage(tssMsg); err != nil {
@@ -231,11 +218,13 @@ func (engine *defaultEngine) OnAskMessage(tssMsg *commonTypes.TssMessage) error 
 	}
 
 	var dest *tss.PartyID
-	for _, node := range engine.nodes {
+	engine.nodes.Range(func(key string, node *Node) bool {
 		if node.PartyId.Id == tssMsg.From {
 			dest = node.PartyId
 		}
-	}
+
+		return true
+	})
 
 	if dest != nil {
 		log.Verbose("Replying request message: ", msgKey, " dest = ", dest)
@@ -248,15 +237,14 @@ func (engine *defaultEngine) OnAskMessage(tssMsg *commonTypes.TssMessage) error 
 
 // finishWorker removes a worker from the current worker pool.
 func (engine *defaultEngine) finishWorker(workId string) {
-	engine.workLock.Lock()
-	delete(engine.workers, workId)
-	engine.workLock.Unlock()
+	engine.workers.Delete(workId)
 
 	// fmt.Println
 	s := fmt.Sprintf("%s finished work %s: remaining work id ", engine.myPid.Id, workId)
-	for id := range engine.workers {
+	engine.workers.Range(func(id string, value worker.Worker) bool {
 		s += id
-	}
+		return true
+	})
 	log.Verbosef(s)
 
 	// Start next work
@@ -266,35 +254,18 @@ func (engine *defaultEngine) finishWorker(workId string) {
 // startNextWork gets a request from the queue (if not empty) and execute it. If there is no
 // available worker, wait for one of the current worker to finish before running.
 func (engine *defaultEngine) startNextWork() {
-	engine.workLock.Lock()
-	if len(engine.workers) >= MaxWorker {
-		log.Verbosef("Max work reach, worker queue len = %d", len(engine.workers))
-		engine.workLock.Unlock()
+	if engine.workers.Size() >= MaxWorker {
+		log.Verbosef("Max work reach, worker queue len = %d", engine.workers.Size())
 		return
 	}
 
 	nextWork := engine.requestQueue.Pop()
-	engine.workLock.Unlock()
 
 	if nextWork == nil {
 		return
 	}
 
 	engine.startWork(nextWork)
-}
-
-func (engine *defaultEngine) getNodeFromPeerId(peerId string) *Node {
-	engine.nodeLock.RLock()
-	defer engine.nodeLock.RUnlock()
-
-	return engine.nodes[peerId]
-}
-
-func (engine *defaultEngine) getWorker(workId string) worker.Worker {
-	engine.workLock.RLock()
-	defer engine.workLock.RUnlock()
-
-	return engine.workers[workId]
 }
 
 // Broadcast a message to everyone in a list.
@@ -356,23 +327,20 @@ func (engine *defaultEngine) sendSignMessaged(signedMessage *common.SignedMessag
 
 	// Converts pids => peerIds
 	peerIds := make([]peer.ID, 0, len(pIDs))
-	engine.nodeLock.RLock()
 	for _, pid := range pIDs {
 		if pid.Id == engine.myPid.Id {
 			// Don't send to ourself.
 			continue
 		}
 
-		node := engine.getNodeFromPeerId(pid.Id)
-
-		if node == nil {
+		node, ok := engine.nodes.Load(pid.Id)
+		if !ok {
 			log.Errorf("Cannot find node with party key %s", pid.Id)
 			return
 		}
 
 		peerIds = append(peerIds, node.PeerId)
 	}
-	engine.nodeLock.RUnlock()
 
 	// Write to stream
 	for _, peerId := range peerIds {
@@ -403,8 +371,8 @@ func (engine *defaultEngine) getSignedMessageBytes(tssMessage *common.TssMessage
 
 // OnNetworkMessage implements P2PDataListener interface.
 func (engine *defaultEngine) OnNetworkMessage(message *p2ptypes.P2PMessage) {
-	node := engine.getNodeFromPeerId(message.FromPeerId)
-	if node == nil {
+	_, ok := engine.nodes.Load(message.FromPeerId)
+	if !ok {
 		log.Error("Cannot find node from peer id ", message.FromPeerId)
 		return
 	}
@@ -433,10 +401,7 @@ func (engine *defaultEngine) OnNetworkMessage(message *p2ptypes.P2PMessage) {
 }
 
 func (engine *defaultEngine) GetActiveWorkerCount() int {
-	engine.workLock.RLock()
-	defer engine.workLock.RUnlock()
-
-	return len(engine.workers)
+	return engine.workers.Size()
 }
 
 // OnNodeNotSelected is called when this node is not selected by the leader in the election round.
@@ -458,11 +423,8 @@ func (engine *defaultEngine) OnNodeNotSelected(request *types.WorkRequest) {
 
 func (engine *defaultEngine) OnWorkFailed(request *types.WorkRequest) {
 	// Clear all the worker's resources
-	engine.workLock.RLock()
-	worker := engine.workers[request.WorkId]
-	engine.workLock.RUnlock()
-
-	if worker == nil {
+	worker, ok := engine.workers.Load(request.WorkId)
+	if !ok {
 		log.Error("Worker " + request.WorkId + " does not exist.")
 		return
 	}

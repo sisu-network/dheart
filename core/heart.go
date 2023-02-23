@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/puzpuzpuz/xsync"
 	libchain "github.com/sisu-network/lib/chain"
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -46,12 +47,10 @@ type Heart struct {
 	client     client.Client
 	valPubkeys []ctypes.PubKey
 
-	ready atomic.Value
-
-	privateKey ctypes.PrivKey
-	aesKey     []byte
-
-	keysignRequests map[string]*htypes.KeysignRequest
+	ready           atomic.Value
+	privateKey      ctypes.PrivKey
+	aesKey          []byte
+	keysignRequests *xsync.MapOf[string, *htypes.KeysignRequest]
 }
 
 func NewHeart(config config.HeartConfig, client client.Client) *Heart {
@@ -59,7 +58,7 @@ func NewHeart(config config.HeartConfig, client client.Client) *Heart {
 		config:          config,
 		aesKey:          config.AesKey,
 		client:          client,
-		keysignRequests: make(map[string]*htypes.KeysignRequest),
+		keysignRequests: new(xsync.MapOf[string, *htypes.KeysignRequest]),
 	}
 }
 
@@ -187,7 +186,12 @@ func (h *Heart) OnWorkKeygenFinished(result *htypes.KeygenResult) {
 }
 
 func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, result *htypes.KeysignResult) {
-	clientRequest := h.keysignRequests[request.WorkId]
+	clientRequest, ok := h.keysignRequests.Load(request.WorkId)
+	if !ok {
+		log.Errorf("OnWorkSigningFinished: cannot find client request with work id %s", request.WorkId)
+		return
+	}
+
 	result.Request = clientRequest
 
 	err := h.client.PostKeysignResult(result)
@@ -196,11 +200,15 @@ func (h *Heart) OnWorkSigningFinished(request *types.WorkRequest, result *htypes
 	}
 
 	// Remove this request.
-	delete(h.keysignRequests, request.WorkId)
+	h.keysignRequests.Delete(request.WorkId)
 }
 
 func (h *Heart) OnWorkFailed(request *types.WorkRequest, culprits []*tss.PartyID) {
-	clientRequest := h.keysignRequests[request.WorkId]
+	clientRequest, ok := h.keysignRequests.Load(request.WorkId)
+	if !ok {
+		log.Errorf("OnWorkFailed: cannot find client request with work id %s", request.WorkId)
+		return
+	}
 
 	switch request.WorkType {
 	case types.EcKeygen, types.EdKeygen:
@@ -372,8 +380,7 @@ func (h *Heart) Keysign(req *htypes.KeysignRequest, tPubKeys []ctypes.PubKey) er
 	}
 
 	err := h.engine.AddRequest(workRequest)
-
-	h.keysignRequests[workRequest.WorkId] = req
+	h.keysignRequests.Store(workRequest.WorkId, req)
 
 	return err
 }
