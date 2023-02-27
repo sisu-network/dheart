@@ -61,6 +61,8 @@ func (mock *MockConnectionManager) IsReady() bool {
 	return false
 }
 
+func (mock *MockConnectionManager) AddPeers([]p2ptypes.Peer) {}
+
 // ---- /
 func getEngineTestData(n int) ([]ctypes.PrivKey, []*Node, tss.SortedPartyIDs, []*keygen.LocalPartySaveData) {
 	type dataWrapper struct {

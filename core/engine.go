@@ -34,15 +34,10 @@ const (
 
 type Engine interface {
 	Init() error
-
 	AddNodes(nodes []*Node)
-
 	AddRequest(request *types.WorkRequest) error
-
 	OnNetworkMessage(message *p2ptypes.P2PMessage)
-
 	ProcessNewMessage(tssMsg *commonTypes.TssMessage) error
-
 	GetActiveWorkerCount() int
 }
 

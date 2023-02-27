@@ -50,6 +50,8 @@ func (scm *SlowConnectionManager) IsReady() bool {
 	return scm.cm.IsReady()
 }
 
+func (scm *SlowConnectionManager) AddPeers([]p2ptypes.Peer) {}
+
 func NewSlowConnectionManager(config p2pTypes.ConnectionsConfig, savedPeers []p2ptypes.Peer) p2p.ConnectionManager {
 	return &SlowConnectionManager{
 		cm: p2p.NewConnectionManager(config, savedPeers),

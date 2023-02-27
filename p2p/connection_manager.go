@@ -12,7 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
+	libp2pPeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	maddr "github.com/multiformats/go-multiaddr"
@@ -40,10 +40,13 @@ type ConnectionManager interface {
 	Start(privKeyBytes []byte, keyType string) error
 
 	// Sends an array of byte to a particular peer.
-	WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error
+	WriteToStream(pID libp2pPeer.ID, protocolId protocol.ID, msg []byte) error
 
 	// Adds data listener for a protocol.
 	AddListener(protocol protocol.ID, listener P2PDataListener)
+
+	// Add a new set of peers
+	AddPeers([]p2ptypes.Peer)
 
 	IsReady() bool
 }
@@ -51,26 +54,27 @@ type ConnectionManager interface {
 // DefaultConnectionManager implements ConnectionManager interface.
 type DefaultConnectionManager struct {
 	config           types.ConnectionsConfig
-	myNetworkId      peer.ID
+	myNetworkId      libp2pPeer.ID
 	host             host.Host
 	port             int
 	rendezvous       string
-	bootstrapPeers   []maddr.Multiaddr
-	connections      *xsync.MapOf[peer.ID, *Connection]
+	connections      *xsync.MapOf[libp2pPeer.ID, *Connection]
 	listenerLock     sync.RWMutex
 	protocolListener map[protocol.ID]P2PDataListener
 	ready            *atomic.Bool
-	savedPeers       []p2ptypes.Peer
+	initPeers        []p2ptypes.Peer
+	curPeers         []p2ptypes.Peer
 }
 
-func NewConnectionManager(config types.ConnectionsConfig, savedPeers []p2ptypes.Peer) ConnectionManager {
+func NewConnectionManager(config types.ConnectionsConfig, initPeers []p2ptypes.Peer) ConnectionManager {
 	return &DefaultConnectionManager{
 		config:           config,
 		rendezvous:       config.Rendezvous,
-		connections:      new(xsync.MapOf[peer.ID, *Connection]),
+		connections:      new(xsync.MapOf[libp2pPeer.ID, *Connection]),
 		protocolListener: make(map[protocol.ID]P2PDataListener),
 		ready:            atomic.NewBool(false),
-		savedPeers:       savedPeers,
+		initPeers:        initPeers,
+		curPeers:         initPeers,
 	}
 }
 
@@ -100,18 +104,6 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) e
 		return err
 	}
 
-	// Initialize peers
-	log.Info("cm.config.BootstrapPeers = ", cm.config.Peers)
-	cm.bootstrapPeers = make([]maddr.Multiaddr, len(cm.config.Peers))
-	for i, peerString := range cm.config.Peers {
-		peer, err := maddr.NewMultiaddr(peerString.Address)
-		if err != nil {
-			return err
-		}
-
-		cm.bootstrapPeers[i] = peer
-	}
-
 	host, err := libp2p.New(
 		libp2p.ListenAddrs([]maddr.Multiaddr{listenAddr}...),
 		libp2p.Identity(p2pPriKey),
@@ -135,7 +127,8 @@ func (cm *DefaultConnectionManager) Start(privKeyBytes []byte, keyType string) e
 	}
 
 	// Connect to predefined peers.
-	cm.createConnections(ctx)
+	log.Infof("cm.initPeers = %s", cm.initPeers)
+	cm.createConnections(cm.initPeers)
 
 	return nil
 }
@@ -215,42 +208,50 @@ func (cm *DefaultConnectionManager) discover(ctx context.Context, host host.Host
 	return nil
 }
 
-func (cm *DefaultConnectionManager) createConnections(ctx context.Context) {
+func (cm *DefaultConnectionManager) createConnections(peers []p2ptypes.Peer) {
 	// Creates connection objects.
-	for _, peerAddr := range cm.bootstrapPeers {
-		addrInfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-		conn := NewConnection(addrInfo.ID, peerAddr, &cm.host)
-		cm.connections.Store(addrInfo.ID, conn)
-	}
-
-	// Attempts to connect to every bootstrapped peers.
-	log.Info("Trying to create connections with peers...")
 	wg := &sync.WaitGroup{}
-	for _, peerAddr := range cm.bootstrapPeers {
-		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-		wg.Add(1)
+	for _, peer := range peers {
+		// 1. Create a new connection instance
+		peerMultAddr, err := maddr.NewMultiaddr(peer.Address)
+		if err != nil {
+			log.Errorf("Failed to add peer with address %s, err = %s", peer.Address, err)
+			continue
+		}
 
-		go func() {
+		addrInfo, err := libp2pPeer.AddrInfoFromP2pAddr(peerMultAddr)
+		if err != nil {
+			log.Errorf("Failed to get addrInfo %s, err = %s", peer.Address, err)
+			continue
+		}
+
+		conn := NewConnection(addrInfo.ID, peerMultAddr, &cm.host)
+		cm.connections.Store(addrInfo.ID, conn)
+
+		// 2. Attempts to connect to every bootstrapped peers.
+		log.Info("Trying to create connections with peers...")
+		wg.Add(1)
+		go func(addrInfo *libp2pPeer.AddrInfo) {
 			defer wg.Done()
 
 			// Retry 50 times at max.
 			for i := 0; i < 50; i++ {
-				if err := cm.host.Connect(ctx, *peerinfo); err != nil {
-					log.Warn(fmt.Sprintf("Error while connecting to node %q: %-v", peerinfo, err))
+				if err := cm.host.Connect(context.Background(), *addrInfo); err != nil {
+					log.Warnf("Error while connecting to node %q: %-v", peerMultAddr, err)
 					time.Sleep(time.Second * 3)
 				} else {
-					log.Infof("%s Connection established with bootstrap node: %q", cm.myNetworkId, *peerinfo)
+					log.Infof("%s Connection established with bootstrap node: %q", cm.myNetworkId, peerMultAddr)
 					break
 				}
 			}
-
-			cm.ready.Store(true)
-		}()
+		}(addrInfo)
 	}
 	wg.Wait()
+
+	cm.ready.Store(true)
 }
 
-func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protocol.ID, msg []byte) error {
+func (cm *DefaultConnectionManager) WriteToStream(pID libp2pPeer.ID, protocolId protocol.ID, msg []byte) error {
 	conn, ok := cm.connections.Load(pID)
 	if !ok {
 		log.Error("Connection to pid not found, pid = ", pID)
@@ -263,4 +264,8 @@ func (cm *DefaultConnectionManager) WriteToStream(pID peer.ID, protocolId protoc
 	}
 
 	return err
+}
+
+func (cm *DefaultConnectionManager) AddPeers(peers []p2ptypes.Peer) {
+	cm.createConnections(peers)
 }

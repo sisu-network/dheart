@@ -10,7 +10,35 @@ import (
 	"github.com/sisu-network/tss-lib/ecdsa/keygen"
 	ecsigning "github.com/sisu-network/tss-lib/ecdsa/signing"
 	"github.com/sisu-network/tss-lib/tss"
+
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 )
+
+const (
+	DbSchema = "HeartTestDb"
+)
+
+func getTestDbConfig() config.DbConfig {
+	cfg := config.DbConfig{
+		Host:     "localhost",
+		Port:     3306,
+		Username: "root",
+		Password: "password",
+		Schema:   DbSchema,
+	}
+
+	return cfg
+}
+
+func getTestDb(t *testing.T, inMemory bool) Database {
+	cfg := getTestDbConfig()
+	cfg.InMemory = inMemory
+	db := NewDatabase(&cfg)
+	err := db.Init()
+	require.Nil(t, err)
+
+	return db
+}
 
 func TestSqlDatabase_SaveEcKeygen(t *testing.T) {
 	t.Parallel()
@@ -81,8 +109,6 @@ func TestSqlDatabase_SavePresignData(t *testing.T) {
 }
 
 func TestSqlDatabase_LoadPresignStatus(t *testing.T) {
-	t.Parallel()
-
 	dbConfig := config.GetLocalhostDbConfig()
 	dbConfig.Schema = "dheart"
 	dbConfig.InMemory = true
@@ -119,8 +145,6 @@ func TestSqlDatabase_LoadPresignStatus(t *testing.T) {
 }
 
 func TestSqlDatabase_SavePreparams(t *testing.T) {
-	t.Parallel()
-
 	dbConfig := config.GetLocalhostDbConfig()
 	dbConfig.Schema = "dheart"
 	dbConfig.InMemory = true
@@ -138,4 +162,32 @@ func TestSqlDatabase_SavePreparams(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, big.NewInt(10), preparams.P)
 	require.Equal(t, big.NewInt(20), preparams.Q)
+}
+
+func testPeers(t *testing.T, inMemory bool) {
+	db := getTestDb(t, inMemory)
+
+	peers := []p2ptypes.Peer{
+		{
+			Address: "addr1",
+			PubKey:  "pub1",
+		},
+		{
+			Address: "addr2",
+			PubKey:  "pub2",
+		},
+	}
+	err := db.SavePeers(peers)
+	require.Nil(t, err)
+
+	loaded := db.LoadPeers()
+	require.Equal(t, peers, loaded)
+
+	// Update the address of the first peer
+	peers[0].Address = "new_address"
+	err = db.SavePeers(peers)
+	require.Nil(t, err)
+
+	loaded = db.LoadPeers()
+	require.Equal(t, peers, loaded)
 }

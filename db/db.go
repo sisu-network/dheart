@@ -529,12 +529,18 @@ func (d *SqlDatabase) UpdatePresignStatus(presignIds []string) error {
 }
 
 func (d *SqlDatabase) SavePeers(peers []p2ptypes.Peer) error {
-	query := "INSERT INTO peers (`address`, pubkey, pubkey_type) VALUES "
-	query = query + getQueryQuestionMark(len(peers), 3)
+	var query string
+	if d.config.InMemory {
+		query = "INSERT INTO peers (`address`, pubkey, pubkey_type) VALUES (?, ?, ?) ON CONFLICT(pubkey) DO UPDATE SET address=?"
+	} else {
+		query = "INSERT INTO peers (`address`, pubkey, pubkey_type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE address=?"
+	}
 
-	_, err := d.db.Exec(query)
-	if err != nil {
-		return err
+	for _, peer := range peers {
+		_, err := d.db.Exec(query, peer.Address, peer.PubKey, peer.PubKeyType, peer.Address)
+		if err != nil {
+			log.Errorf("Failed to insert peer with address %s and pubkey %s, err = %s", peer.Address, peer.PubKey, err)
+		}
 	}
 
 	return nil
@@ -562,7 +568,7 @@ func (d *SqlDatabase) LoadPeers() []p2ptypes.Peer {
 		peer := p2ptypes.Peer{
 			Address:    nullableAddress.String,
 			PubKey:     nullablePubkey.String,
-			PubKeyType: nullablePubkey.String,
+			PubKeyType: nullableKeytype.String,
 		}
 		peers = append(peers, peer)
 	}

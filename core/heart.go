@@ -14,6 +14,7 @@ import (
 
 	ctypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/sisu-network/dheart/client"
+	p2ptypes "github.com/sisu-network/dheart/p2p/types"
 	htypes "github.com/sisu-network/dheart/types"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -113,7 +114,11 @@ func (h *Heart) initConnectionManager() error {
 	log.Info("Creating connection manager")
 
 	// Connection manager
-	h.cm = p2p.NewConnectionManager(h.config.Connection, h.db.LoadPeers())
+	initPeers := h.db.LoadPeers()
+	if len(initPeers) == 0 {
+		initPeers = h.config.Connection.Peers
+	}
+	h.cm = p2p.NewConnectionManager(h.config.Connection, initPeers)
 
 	// Engine
 	myNode := NewNode(h.privateKey.PubKey())
@@ -443,4 +448,15 @@ func (h *Heart) doPresign(blockHeight int64) {
 			log.Error("Failed to add presign request to engine, err = ", err)
 		}
 	}
+}
+
+func (h *Heart) AddPeers(peers []p2ptypes.Peer) {
+	// 1. Save new peers to db
+	err := h.db.SavePeers(peers)
+	if err != nil {
+		log.Errorf("Failed to save peers in the db, err = %s", err)
+	}
+
+	// 2. Inform connection manager about these new peers and try to connect to them.
+	h.cm.AddPeers(peers)
 }
