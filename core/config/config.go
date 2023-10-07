@@ -7,12 +7,13 @@ import (
 )
 
 type DbConfig struct {
-	Host     string `toml:"host"`
-	Port     int    `toml:"port"`
-	Username string `toml:"username"`
-	Password string `toml:"password"`
-	Schema   string `toml:"schema"`
-	InMemory bool   `toml:"in-memory"` // Should only used in tests
+	Host          string `toml:"host"`
+	Port          int    `toml:"port"`
+	Username      string `toml:"username"`
+	Password      string `toml:"password"`
+	Schema        string `toml:"schema"`
+	InMemory      bool   `toml:"in-memory"` // Should only used in tests
+	MigrationPath string `toml:"migration-path"`
 }
 
 type HeartConfig struct {

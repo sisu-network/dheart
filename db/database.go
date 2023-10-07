@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -185,7 +184,7 @@ func (d *SqlDatabase) inMemoryMigration() error {
 	}
 	defer os.RemoveAll(migrationDir)
 
-	files, err := ioutil.ReadDir(migrationDir)
+	files, err := os.ReadDir(migrationDir)
 	if err != nil {
 		return err
 	}
