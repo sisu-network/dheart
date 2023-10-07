@@ -2,10 +2,10 @@ package worker
 
 import (
 	"encoding/hex"
+	"os"
 
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"path/filepath"
 	"runtime"
@@ -221,12 +221,12 @@ func GetTestSavedFileName(dirFormat, fileFormat string, index int) string {
 
 func SaveTestPreparams(index int, bz []byte) error {
 	fileName := GetTestSavedFileName(TestEcPreparamsFixtureDirFormat, TestEcPreparamsFixtureFileFormat, index)
-	return ioutil.WriteFile(fileName, bz, 0600)
+	return os.WriteFile(fileName, bz, 0600)
 }
 
 func LoadEcPreparams(index int) *eckeygen.LocalPreParams {
 	fileName := GetTestSavedFileName(TestEcPreparamsFixtureDirFormat, TestEcPreparamsFixtureFileFormat, index)
-	bz, err := ioutil.ReadFile(fileName)
+	bz, err := os.ReadFile(fileName)
 	if err != nil {
 		panic(err)
 	}
@@ -249,7 +249,7 @@ func SaveEcKeygenOutput(outputs []*eckeygen.LocalPartySaveData) error {
 			panic(err)
 		}
 
-		if err := ioutil.WriteFile(fileName, bz, 0600); err != nil {
+		if err := os.WriteFile(fileName, bz, 0600); err != nil {
 			return err
 		}
 	}
@@ -264,7 +264,7 @@ func LoadEcKeygenSavedData(pids tss.SortedPartyIDs) []*eckeygen.LocalPartySaveDa
 	for i := 0; i < len(PRIVATE_KEY_HEX); i++ {
 		fileName := GetTestSavedFileName(TestEcKeygenSavedDataFixtureDirFormat, TestEcKeygenSavedDataFixtureFileFormat, i)
 
-		bz, err := ioutil.ReadFile(fileName)
+		bz, err := os.ReadFile(fileName)
 		if err != nil {
 			panic(err)
 		}
@@ -302,7 +302,7 @@ func SaveEcPresignData(n int, keygenOutputs []*eckeygen.LocalPartySaveData, data
 		panic(err)
 	}
 
-	if err := ioutil.WriteFile(fileName, bz, 0600); err != nil {
+	if err := os.WriteFile(fileName, bz, 0600); err != nil {
 		return err
 	}
 
@@ -311,7 +311,7 @@ func SaveEcPresignData(n int, keygenOutputs []*eckeygen.LocalPartySaveData, data
 
 func LoadEcPresignSavedData() *PresignDataWrapper {
 	fileName := GetTestSavedFileName(TestEcPresignSavedDataFixtureDirFormat, TestEcPresignSavedDataFixtureFileFormat, 0)
-	bz, err := ioutil.ReadFile(fileName)
+	bz, err := os.ReadFile(fileName)
 	if err != nil {
 		panic(err)
 	}
@@ -342,7 +342,7 @@ func SaveEdKeygenOutput(data []*edkeygen.LocalPartySaveData) error {
 			panic(err)
 		}
 
-		if err := ioutil.WriteFile(fileName, bz, 0600); err != nil {
+		if err := os.WriteFile(fileName, bz, 0600); err != nil {
 			return err
 		}
 	}
@@ -355,7 +355,7 @@ func LoadEdKeygenSavedData(pids tss.SortedPartyIDs) []*edkeygen.LocalPartySaveDa
 
 	for i := 0; i < len(pids); i++ {
 		fileName := GetTestSavedFileName(TestEdKeygenSavedDataFixtureDirFormat, TestEdKeygenSavedDataFixtureFileFormat, i)
-		bz, err := ioutil.ReadFile(fileName)
+		bz, err := os.ReadFile(fileName)
 		if err != nil {
 			panic(err)
 		}
@@ -379,7 +379,7 @@ func LoadEdKeygenSavedData(pids tss.SortedPartyIDs) []*edkeygen.LocalPartySaveDa
 	return savedData
 }
 
-/////
+// ///
 type MockMessageDispatcher struct {
 	BroadcastMessageFunc func(pIDs []*tss.PartyID, tssMessage *common.TssMessage)
 	UnicastMessageFunc   func(dest *tss.PartyID, tssMessage *common.TssMessage)

@@ -2,9 +2,8 @@ package config
 
 import (
 	"bytes"
-	"io/ioutil"
+	"os"
 	"text/template"
-	"time"
 )
 
 const defaultConfigTemplate = `# This is a TOML config file.
@@ -20,17 +19,22 @@ port = {{ .Port }}
 ###                        Database Configuration                           ###
 ###############################################################################
 [db]
-	host = "{{ .Db.Host }}"
-	port = {{ .Db.Port }}
-	username = "{{ .Db.Username }}"
-	password = "{{ .Db.Password }}"
-	schema = "{{ .Db.Schema }}"
-	migration-path = "{{ .Db.MigrationPath }}"
+  host = "{{ .Db.Host }}"
+  port = {{ .Db.Port }}
+  username = "{{ .Db.Username }}"
+  password = "{{ .Db.Password }}"
+  schema = "{{ .Db.Schema }}"
+  migration-path = "{{ .Db.MigrationPath }}"
 [connection]
   host = "0.0.0.0"
   port = 28300
   rendezvous = "rendezvous"
-  peers = {{ .Connection.BootstrapPeers }}
+{{ range .Connection.Peers }}
+  [[connection.peers]]
+    address = "{{ .Address }}"
+    pubkey = "{{ .PubKey }}"
+    pubkey_type = "{{ .PubKeyType }}"
+{{end}}
 `
 
 var configTemplate *template.Template
@@ -52,15 +56,5 @@ func WriteConfigFile(configFilePath string, config HeartConfig) {
 		panic(err)
 	}
 
-	ioutil.WriteFile(configFilePath, buffer.Bytes(), 0600)
-}
-
-type duration struct {
-	time.Duration
-}
-
-func (d *duration) UnmarshalText(text []byte) error {
-	var err error
-	d.Duration, err = time.ParseDuration(string(text))
-	return err
+	os.WriteFile(configFilePath, buffer.Bytes(), 0600)
 }
